@@ -1,5 +1,5 @@
 ---
-description: "可选的 hard-agent 组合包：任务目标武装加上回合停止门，让会话必须持续维持一个目标。"
+description: "可选的 hard-agent 组合包：任务武装、回合停止门、配额待机与 compaction 交接，让会话必须持续维持一个目标。"
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-启用这个可选组合包会以单一层挂载 hard-agent 双插件：`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。
+启用这个可选组合包会以单一层挂载 hard-agent 四插件：`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。
 
 ## 目录
 
@@ -33,7 +33,7 @@ kind: "package-bundle"
       objective: 'Find and verify every authentication bypass in the target repository'
 ```
 
-目标工具与目标服务来自 `dsh-base`；本组合包只添加任务与停止门。
+目标工具与目标服务来自 `dsh-base`；本组合包只添加任务、停止门、待机与交接。
 
 -----
 
@@ -43,7 +43,7 @@ kind: "package-bundle"
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) 插入携带空白目标的 `hard-mission` 行——在部署设置真实目标之前这是一次刻意的响亮失败——以及默认配置的 `hard-stopgate` 行。每个插件拥有自己的行为与生命周期；参见 [hard-mission](../hard-mission/README.zh.md) 与 [hard-stopgate](../hard-stopgate/README.zh.md)。
+[`cordis.patch.yml`](cordis.patch.yml) 插入携带空白目标的 `hard-mission` 行——在部署设置真实目标之前这是一次刻意的响亮失败——以及默认配置的停止门、待机与交接行。每个插件拥有自己的行为与生命周期；参见 [hard-mission](../hard-mission/README.zh.md)、[hard-stopgate](../hard-stopgate/README.zh.md)、[hard-standby](../hard-standby/README.zh.md) 与 [hard-handoff](../hard-handoff/README.zh.md)。
 
 </details>
 
@@ -52,7 +52,7 @@ kind: "package-bundle"
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as this bundle only mounts the mission and stop-gate plugins; their prompt sections and steering messages are owned and documented by those packages.
+None, as this bundle only mounts the four hard plugins; their prompt sections, steering messages, wake follow-ups, and injected handoffs are owned and documented by those packages.
 
 #### KV Cache effect
 

@@ -3,26 +3,26 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/hard-bundle/README.md
 /:
-  en: 6f3ae62ad3c9f088
-  zh: 25043de2775009e0
+  en: 3132ca91d30566d8
+  zh: 2fbfdcc90bce8598
 /deepseek-ai-dsh-experimental-hard-bundle:
   en: 5d1226a497899302
   zh: c0bc605f0debc2c7
 /deepseek-ai-dsh-experimental-hard-bundle/summary:
-  en: 9cef20527aad2855
-  zh: 1e7b8c263dd49bf7
+  en: 88511180cf290b06
+  zh: b274dd2d299b1842
 /deepseek-ai-dsh-experimental-hard-bundle/table-of-contents:
   en: 76368b6b1da79c80
   zh: 49b8d2c4457703e6
 /deepseek-ai-dsh-experimental-hard-bundle/use-this-package:
-  en: 0634c92b7d8d4465
-  zh: ad65240ff59a73ae
+  en: 2e5ccf2ebb64c652
+  zh: 5d23bf873f949857
 /deepseek-ai-dsh-experimental-hard-bundle/understand-the-implementation:
-  en: 70ea8113739b0152
-  zh: 743ac732bf827079
+  en: d8faf2dde1353143
+  zh: 46cab9037ffb2164
 /deepseek-ai-dsh-experimental-hard-bundle/model-experience:
-  en: 661baf7bcae2897f
-  zh: 661baf7bcae2897f
+  en: 1282a31f818c8786
+  zh: 1282a31f818c8786
 /deepseek-ai-dsh-experimental-hard-bundle/model-experience/kv-cache-effect:
   en: f33230f7de0b482a
   zh: f33230f7de0b482a

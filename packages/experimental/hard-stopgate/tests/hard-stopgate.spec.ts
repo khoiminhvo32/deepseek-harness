@@ -10,6 +10,7 @@ import GoalService from '@deepseek-ai/dsh-goal'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as hardStopgate from '@deepseek-ai/dsh-experimental-hard-stopgate'
+import { hardStandbyProjectionDefinition } from '@deepseek-ai/dsh-experimental-hard-standby'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 interface StubAgent {
@@ -71,6 +72,7 @@ async function harness(config: hardStopgate.Config = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  ctx.sessionProjections.register(hardStandbyProjectionDefinition)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(GoalService)
   const fiber = await ctx.plugin(hardStopgate, config)
@@ -108,6 +110,34 @@ describe('hard stopgate', () => {
     await stopAt(ctx, root.agent, 1)
     expect(root.steered).toHaveLength(0)
     expect(goal.activation).toBe('armed')
+  })
+
+  it('lets the turn close while a standby wait is pending and steers again once it lapses', async () => {
+    const { ctx, root } = await harness()
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    root.session.append('hard/standby/scheduled', {
+      reason: 'quota',
+      wakeAt: Date.now() + 600_000,
+      providerCode: 'QUOTA',
+    })
+    await stopAt(ctx, root.agent, 1)
+    expect(root.steered).toHaveLength(0)
+
+    root.session.append('hard/standby/woke', { at: Date.now(), delivered: false, skip: 'goal phase paused' })
+    await stopAt(ctx, root.agent, 1)
+    expect(root.steered).toHaveLength(1)
+  })
+
+  it('steers when only a lapsed wait remains scheduled', async () => {
+    const { ctx, root } = await harness()
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    root.session.append('hard/standby/scheduled', {
+      reason: 'quota',
+      wakeAt: Date.now() - 1,
+      providerCode: 'QUOTA',
+    })
+    await stopAt(ctx, root.agent, 1)
+    expect(root.steered).toHaveLength(1)
   })
 
   it('lets paused, blocked, and completed phases close freely', async () => {
@@ -195,7 +225,7 @@ describe('hard stopgate config and namespace', () => {
   it('has the Loader-safe namespace export shape', () => {
     expect('default' in hardStopgate).toBe(false)
     expect(hardStopgate.name).toBe('hard-stopgate')
-    expect(hardStopgate.inject).toEqual(['goals'])
+    expect(hardStopgate.inject).toEqual(['goals', 'sessionProjections'])
     const loader = Object.create(Loader.prototype) as Loader
     expect(loader.unwrapExports(hardStopgate)).toBe(hardStopgate)
   })

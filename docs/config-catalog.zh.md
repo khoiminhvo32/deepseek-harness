@@ -993,6 +993,23 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-handoff -->
+<a id="deepseek-aidsh-experimental-hard-handoff"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-handoff`
+
+- `inject`: `agents` · `goals` · `hardLedger`
+- `source`: [`packages/experimental/hard-handoff/src/index.ts:43`](../packages/experimental/hard-handoff/src/index.ts)
+
+```ts config-catalog
+/** Handoff plugin config. */
+export interface Config {
+  /** Maximum open-work items listed in one handoff before truncation. */
+  maxItems?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-handoff -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
 <a id="deepseek-aidsh-experimental-hard-ledger"></a>
 
@@ -1036,13 +1053,43 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-mission -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-standby -->
+<a id="deepseek-aidsh-experimental-hard-standby"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-standby`
+
+- `inject`: `agents` · `goals` · `sessionProjections`
+- `source`: [`packages/experimental/hard-standby/src/index.ts:60`](../packages/experimental/hard-standby/src/index.ts)
+
+```ts config-catalog
+/** Standby plugin config. */
+export interface Config {
+  /**
+   * Master switch; `false` registers nothing, so the session ends on quota
+   * failures like any unmanaged session.
+   */
+  enabled?: boolean
+  /**
+   * Five-field UTC cron naming the quota-reset windows, used when the
+   * provider sends no reset delay. Validated at load; omit when unset.
+   */
+  quotaResetCron?: string
+  /**
+   * Upper bound of one wait in hours. When neither the provider nor the cron
+   * names a reset time, the cap is also the retry cadence.
+   */
+  maxStandbyHours?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-standby -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-stopgate -->
 <a id="deepseek-aidsh-experimental-hard-stopgate"></a>
 
 ## `@deepseek-ai/dsh-experimental-hard-stopgate`
 
-- `inject`: `goals`
-- `source`: [`packages/experimental/hard-stopgate/src/index.ts:37`](../packages/experimental/hard-stopgate/src/index.ts)
+- `inject`: `goals` · `sessionProjections`
+- `source`: [`packages/experimental/hard-stopgate/src/index.ts:43`](../packages/experimental/hard-stopgate/src/index.ts)
 
 ```ts config-catalog
 /** Stop-gate plugin config. */

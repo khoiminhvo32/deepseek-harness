@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-handoff/README.md
+/:
+  en: 8b850b1790fc19cf
+  zh: 09c1957716ce78c2
+/deepseek-ai-dsh-experimental-hard-handoff:
+  en: d05da3f413aa57d8
+  zh: 232b9faaeedf8969
+/deepseek-ai-dsh-experimental-hard-handoff/summary:
+  en: 055f48337e07af31
+  zh: 869c2d9f57c53174
+/deepseek-ai-dsh-experimental-hard-handoff/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-handoff/use-this-package:
+  en: 29415849d0dba5d4
+  zh: 53185c2bcb0bbf80
+/deepseek-ai-dsh-experimental-hard-handoff/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-handoff/understand-the-implementation/design:
+  en: 2d38de1559c44e38
+  zh: a40dbad9c527fdfa
+/deepseek-ai-dsh-experimental-hard-handoff/understand-the-implementation/source-map:
+  en: df66d0b86facd426
+  zh: c9bc3fcf42149fef
+/deepseek-ai-dsh-experimental-hard-handoff/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-handoff/model-experience/injected-context:
+  en: 0a38a6ef751fc5d5
+  zh: 0a38a6ef751fc5d5
+/deepseek-ai-dsh-experimental-hard-handoff/model-experience/injected-context/what-the-model-sees:
+  en: 1b3d44cce739b82f
+  zh: 5e529c335ac93654
+/deepseek-ai-dsh-experimental-hard-handoff/model-experience/injected-context/token-effect:
+  en: a14fca0e1fcac1fe
+  zh: 2280ca1ab0785969
+/deepseek-ai-dsh-experimental-hard-handoff/model-experience/injected-context/kv-cache-effect:
+  en: 55f27a815f89a071
+  zh: 8006dc5eba1ae8a0
+/deepseek-ai-dsh-experimental-hard-handoff/known-limitations-and-deferred-work:
+  en: 562e7da681a4ed1e
+  zh: 01038340a55a0432
+/deepseek-ai-dsh-experimental-hard-handoff/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

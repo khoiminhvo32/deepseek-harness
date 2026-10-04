@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-standby/README.md
+/:
+  en: 69cab8d4dd92cc92
+  zh: 9096ba1b555e8677
+/deepseek-ai-dsh-experimental-hard-standby:
+  en: f6f4bd38e5566e30
+  zh: 435350036a29ffe5
+/deepseek-ai-dsh-experimental-hard-standby/summary:
+  en: 0f6e911788b87772
+  zh: 35fa5f21dc424313
+/deepseek-ai-dsh-experimental-hard-standby/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-standby/use-this-package:
+  en: 60331167c84b7f09
+  zh: 1724bd7cfef19510
+/deepseek-ai-dsh-experimental-hard-standby/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-standby/understand-the-implementation/design:
+  en: 40e5643f34cb6cf7
+  zh: 801ea286d0dabb11
+/deepseek-ai-dsh-experimental-hard-standby/understand-the-implementation/source-map:
+  en: b30ecc87359acc08
+  zh: b44b23666cb05eac
+/deepseek-ai-dsh-experimental-hard-standby/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-standby/model-experience/follow-up-messages:
+  en: 40d6d8cb2bb09cf8
+  zh: 40d6d8cb2bb09cf8
+/deepseek-ai-dsh-experimental-hard-standby/model-experience/follow-up-messages/what-the-model-sees:
+  en: c2237c5df3740ac7
+  zh: c81bb287b36e825e
+/deepseek-ai-dsh-experimental-hard-standby/model-experience/follow-up-messages/token-effect:
+  en: 1090c12e504e9cf4
+  zh: 733356917251d399
+/deepseek-ai-dsh-experimental-hard-standby/model-experience/follow-up-messages/kv-cache-effect:
+  en: 25941393a2c42882
+  zh: e3399481f712c47a
+/deepseek-ai-dsh-experimental-hard-standby/known-limitations-and-deferred-work:
+  en: 9a2394e3b94d64e8
+  zh: 5a4dab6542147ec8
+/deepseek-ai-dsh-experimental-hard-standby/known-limitations-and-deferred-work/dev-note:
+  en: 8522155e0d0168c2
+  zh: cdd2a143b725accd

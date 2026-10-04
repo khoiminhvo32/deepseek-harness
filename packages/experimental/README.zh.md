@@ -48,10 +48,12 @@ kind: "package-group"
 | [`tool-agent-team`](tool-agent-team/README.zh.md) | 让模型创建、发消息与协调 teammate 的九个工具 | 按作用域注册工具到 `ctx.tools` |
 | [`hard-mission`](hard-mission/README.zh.md) | 将配置的目标武装为持久目标，并传达任务契约 | — |
 | [`hard-stopgate`](hard-stopgate/README.zh.md) | 在已武装目标成立期间把回合边界重新推回工作 | — |
+| [`hard-standby`](hard-standby/README.zh.md) | 以有界节奏熬过终端配额失败并唤醒任务 | — |
+| [`hard-handoff`](hard-handoff/README.zh.md) | 在每次成功 compaction 后注入持久台账摘要 | — |
 | [`hard-ledger`](hard-ledger/README.zh.md) | 通过 `hard/*` 会话事件记录持久的 findings、假设、覆盖与扫描状态 | `ctx.hardLedger` |
 | [`hard-verifier`](hard-verifier/README.zh.md) | 执行 findings 的效果证明并重算其 CVSS 4.0 分数 | `ctx.hardVerifier` |
 | [`hard-tools`](hard-tools/README.zh.md) | 面向模型的 finding、假设、覆盖与扫描工具 | 将工具注册到 `ctx.tools` |
-| [`hard-bundle`](hard-bundle/README.zh.md) | 任务与停止门的可选 hard-agent 组合包 | — |
+| [`hard-bundle`](hard-bundle/README.zh.md) | 任务、停止门、待机与交接的可选 hard-agent 组合包 | — |
 | [`webworker-packer`](webworker-packer/README.zh.md) | 构建浏览器 worker 预览所消费的 gzip 压缩虚拟文件系统（VFS）镜像 | 库与 CLI（命令行界面），不使用 ctx key |
 | [`webworker-runtime`](webworker-runtime/README.zh.md) | 在专用浏览器 worker 中运行 harness 插件树 | 库与 worker 入口，不使用 ctx key |
 

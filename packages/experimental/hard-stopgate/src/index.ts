@@ -2,16 +2,22 @@
  * Hard stop gate on the turn boundary. While an armed goal is active, a turn
  * that tries to close receives a steering continuation order until the
  * per-turn steer budget is spent; goalless, disarmed, paused, blocked, and
- * completed agents close freely. The gate reads only goal state; open-work
- * awareness (unverified findings, uncovered sweep cells) joins with the
- * hard-verifier ledger.
+ * completed agents close freely, and a pending standby wait closes freely
+ * because the scheduled wake owns the session's rhythm. The gate reads only
+ * goal state and the standby projection; open-work awareness (unverified
+ * findings, uncovered sweep cells) joins with the hard-verifier ledger.
  * @module @deepseek-ai/dsh-experimental-hard-stopgate
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Loads the declaration-merged `Context` keys this plugin injects, including
+// the `hardStandby` projection key the standby-aware rule reads.
+import type {} from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-experimental-hard-standby'
 import type { GoalView } from '@deepseek-ai/dsh-goal'
+import type {} from '@deepseek-ai/dsh-session-projection'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 
@@ -28,7 +34,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 export const name = 'hard-stopgate'
-export const inject = ['goals']
+export const inject = ['goals', 'sessionProjections']
 
 /** Default per-turn forced-continuation budget. */
 export const DEFAULT_MAX_STEERS_PER_TURN = 16
@@ -50,15 +56,17 @@ export const Config: z<Config> = z.object({
 
 /**
  * The goal that still owes progress at this boundary, or `undefined` when the
- * turn may close: no goal, a disarmed goal, a non-active phase, or a spent
- * per-turn steer budget.
+ * turn may close: no goal, a disarmed goal, a non-active phase, a spent
+ * per-turn steer budget, or a pending standby wait.
  */
 function owingGoal(
   goal: GoalView | undefined,
   steeredThisTurn: number,
   maxSteers: number,
+  pendingStandby: boolean,
 ): GoalView | undefined {
   if (goal === undefined || goal.activation !== 'armed' || goal.phase !== 'active') return undefined
+  if (pendingStandby) return undefined
   return steeredThisTurn < maxSteers ? goal : undefined
 }
 
@@ -86,7 +94,11 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('agent/turn-stopping', ({ agent, turn }) => {
     const counted = steers.get(agent.id)
     const steeredThisTurn = counted?.turn === turn ? counted.count : 0
-    const owing = owingGoal(ctx.goals.get(agent), steeredThisTurn, maxSteersPerTurn)
+    // A pending standby wait owns the session's rhythm: let the turn close
+    // cleanly so the scheduled wake delivers the next continuation instead.
+    const scheduledWakeAt = ctx.sessionProjections.stateOf(agent.session, 'hardStandby')?.scheduled?.wakeAt
+    const pendingStandby = scheduledWakeAt !== undefined && scheduledWakeAt > Date.now()
+    const owing = owingGoal(ctx.goals.get(agent), steeredThisTurn, maxSteersPerTurn, pendingStandby)
     if (owing === undefined) return
     steers.set(agent.id, { turn, count: steeredThisTurn + 1 })
     agent.steer(createUserMessage({

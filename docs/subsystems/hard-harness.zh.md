@@ -2,7 +2,7 @@
 
 [English](hard-harness.md) | 中文
 
-Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, and the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands.
+Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands, the [standby](../../packages/experimental/hard-standby/README.zh.md) waits out terminal quota failures and wakes the mission at the reset time, and the [handoff](../../packages/experimental/hard-handoff/README.zh.md) injects the durable ledger summary after each successful compaction.
 
 ## Ledger state
 
@@ -14,7 +14,7 @@ The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events an
 
 ## Design rationale
 
-The hard-harness design record (.agents/plans/2026-10-04-hard-harness-design.md) owns the verification-driven contract, the two-pass methodology, and the quota-standby and compaction-handoff plans that remain deferred.
+The hard-harness design record (.agents/plans/2026-10-04-hard-harness-design.md) owns the verification-driven contract and the two-pass methodology. The standby keeps the session alive through provider quota windows: it schedules a bounded wait on a terminal `QUOTA` failure, folds it through the `hardStandby` projection, and at the wake resumes an active disarmed goal and delivers a continuation follow-up, never reviving paused or capped work. The handoff bridges compaction: after each successful `compaction/end` it injects one deterministic summary of findings, hypotheses, coverage, and open work, assembled only from ledger folds.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

@@ -5,3 +5,7 @@
         objective: ''
     - id: hard-stopgate
       name: '@deepseek-ai/dsh-experimental-hard-stopgate'
+    - id: hard-standby
+      name: '@deepseek-ai/dsh-experimental-hard-standby'
+    - id: hard-handoff
+      name: '@deepseek-ai/dsh-experimental-hard-handoff'

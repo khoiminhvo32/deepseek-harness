@@ -1,0 +1,574 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/coverage/cell",
+      "kind": "event",
+      "event": "hard/coverage/cell",
+      "surface": false,
+      "digest": "be0ae110c839a6218eaf7315ac9e1ac79840ed36f8ab5121141c96eb72b2a37c",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClass",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "declaredSinks",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "verdict",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "cleared"
+          },
+          {
+            "kind": "literal",
+            "value": "suspicious"
+          },
+          {
+            "kind": "literal",
+            "value": "uncovered"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/coverage/cell"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/finding/proposed",
+      "kind": "event",
+      "event": "hard/finding/proposed",
+      "surface": false,
+      "digest": "191eb7fd027003b069fbd1f4fd567fff129cc3f767f238a88fb26ad4def9df83",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClass",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "claim",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "claimHash",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "component",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cvssClaimed",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "cvssVector",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "hypothesisId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "pocPath",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "title",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/finding/proposed"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/finding/verdict",
+      "kind": "event",
+      "event": "hard/finding/verdict",
+      "surface": false,
+      "digest": "d14c7ff86caaf48e763fbd5d1e8e25e776bb4b35913ed345b7b04cb72166e1bc",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cvssComputed",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cvssMatch",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "runs",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "verdict",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "confirmed"
+          },
+          {
+            "kind": "literal",
+            "value": "flaky"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/finding/verdict"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/hypothesis/state",
+      "kind": "event",
+      "event": "hard/hypothesis/state",
+      "surface": false,
+      "digest": "b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "statement",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "confirmed"
+          },
+          {
+            "kind": "literal",
+            "value": "deferred"
+          },
+          {
+            "kind": "literal",
+            "value": "proposed"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": "testing"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/hypothesis/state"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/sweep/summary",
+      "kind": "event",
+      "event": "hard/sweep/summary",
+      "surface": false,
+      "digest": "805ba772ea1180e8d0df6d274a8a9c95277505ad6542a5ddd9261831f833654b",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cellsTouched",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "emptyProof",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "newFindings",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "A"
+          },
+          {
+            "kind": "literal",
+            "value": "B"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/sweep/summary"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

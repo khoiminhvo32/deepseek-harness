@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-tools/README.md
+/:
+  en: 92403a08d891e05e
+  zh: 56558af2c2c5bbe2
+/deepseek-ai-dsh-experimental-hard-tools:
+  en: 72b97e951b4df420
+  zh: cc4f13e72e1a72bc
+/deepseek-ai-dsh-experimental-hard-tools/summary:
+  en: 9b0887e658aafad2
+  zh: 1dffe063de47d0a7
+/deepseek-ai-dsh-experimental-hard-tools/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-tools/use-this-package:
+  en: aba398005f19d322
+  zh: b915b47716c02731
+/deepseek-ai-dsh-experimental-hard-tools/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-tools/understand-the-implementation/design:
+  en: aa0ee501b1da086d
+  zh: 0146f2b4eed4231b
+/deepseek-ai-dsh-experimental-hard-tools/understand-the-implementation/source-map:
+  en: a606c26f09dd0525
+  zh: 02e155035a00b586
+/deepseek-ai-dsh-experimental-hard-tools/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-tools/model-experience/tool-schemas-and-results:
+  en: cadc497841430a21
+  zh: cadc497841430a21
+/deepseek-ai-dsh-experimental-hard-tools/model-experience/tool-schemas-and-results/what-the-model-sees:
+  en: 6ac40bd6cea82359
+  zh: 6ac40bd6cea82359
+/deepseek-ai-dsh-experimental-hard-tools/model-experience/tool-schemas-and-results/token-effect:
+  en: 4a964c8b9d0cd351
+  zh: 4a964c8b9d0cd351
+/deepseek-ai-dsh-experimental-hard-tools/model-experience/tool-schemas-and-results/kv-cache-effect:
+  en: c2d2e98ce08fb40e
+  zh: c2d2e98ce08fb40e
+/deepseek-ai-dsh-experimental-hard-tools/known-limitations-and-deferred-work:
+  en: ab3445e94de01b73
+  zh: 77be7d929647f808
+/deepseek-ai-dsh-experimental-hard-tools/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

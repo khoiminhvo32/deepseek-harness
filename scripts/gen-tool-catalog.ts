@@ -65,6 +65,11 @@ import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-us
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
+import HardVerifier from '@deepseek-ai/dsh-experimental-hard-verifier'
+import * as HardTools from '@deepseek-ai/dsh-experimental-hard-tools'
+import { Service } from '@deepseek-ai/cordis'
+import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
@@ -426,6 +431,34 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-hard-tools',
+    dir: 'hard-tools',
+    source: 'packages/experimental/hard-tools/src/index.ts',
+    requires: ['ctx.tools', 'ctx.hardLedger', 'ctx.hardVerifier', 'ctx.shell for proof execution', 'a live Agent'],
+    writes: ['tool/call', 'hard/finding/proposed', 'hard/finding/verdict', 'hard/hypothesis/state', 'hard/coverage/cell', 'hard/sweep/summary', 'tool/result'],
+    async mount(ctx) {
+      class CatalogShell extends Service {
+        constructor(shellCtx: CordisContext) {
+          super(shellCtx, 'shell')
+        }
+
+        resolve(request: { command: string; timeoutMs?: number }): { command: string; timeoutMs?: number } {
+          return { command: request.command, ...request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs } }
+        }
+
+        execute(): Promise<{ result(): Promise<never> }> {
+          return Promise.reject(new Error('the tool catalog never executes proofs'))
+        }
+      }
+      await ctx.plugin(HardLedger)
+      await ctx.plugin(CatalogShell)
+      await ctx.plugin(HardVerifier)
+      await ctx.plugin(HardTools)
+    },
+    note:
+      'hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-schedule',

@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-verifier/README.md
+/:
+  en: 281da49a82df6119
+  zh: b77c556d854745d7
+/deepseek-ai-dsh-experimental-hard-verifier:
+  en: c5cae634b80329ac
+  zh: 6ab7488593235145
+/deepseek-ai-dsh-experimental-hard-verifier/summary:
+  en: d65b4c39d6d856b3
+  zh: 26aee74688b108b4
+/deepseek-ai-dsh-experimental-hard-verifier/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-verifier/use-this-package:
+  en: 03676e6c36085677
+  zh: 2fbb52eecd0f8c8b
+/deepseek-ai-dsh-experimental-hard-verifier/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-verifier/understand-the-implementation/design:
+  en: 664ad3742cbb4a3a
+  zh: 4b76011d0c1ab926
+/deepseek-ai-dsh-experimental-hard-verifier/understand-the-implementation/source-map:
+  en: c05d7c841bae4a69
+  zh: 4d15680e722427ac
+/deepseek-ai-dsh-experimental-hard-verifier/model-experience:
+  en: ecfdcc0c24e88c5b
+  zh: ecfdcc0c24e88c5b
+/deepseek-ai-dsh-experimental-hard-verifier/model-experience/kv-cache-effect:
+  en: c8d2726253aedacc
+  zh: c8d2726253aedacc
+/deepseek-ai-dsh-experimental-hard-verifier/known-limitations-and-deferred-work:
+  en: 24386347247706b5
+  zh: 3d92e751fbafaa18
+/deepseek-ai-dsh-experimental-hard-verifier/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

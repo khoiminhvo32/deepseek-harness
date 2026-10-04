@@ -9,6 +9,12 @@
 
 ```mermaid
 flowchart LR
+  pkg_hard_ledger["hard-ledger"]
+  svc_hardLedger["ctx.hardLedger<br/>Log-derived findings, hypotheses, coverage, and sweep state"]
+  pkg_hard_tools["hard-tools"]
+  pkg_hard_verifier["hard-verifier"]
+  pkg_hard_stopgate["hard-stopgate"]
+  svc_hardVerifier["ctx.hardVerifier<br/>Executed proofs of effect with recomputed CVSS 4.0 scores"]
   pkg_hmr["hmr"]
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
@@ -336,6 +342,8 @@ flowchart LR
   pkg_fs_sandbox --> svc_fs
   pkg_fs_ssh --> svc_fs
   pkg_goal --> svc_goals
+  pkg_hard_ledger --> svc_hardLedger
+  pkg_hard_verifier --> svc_hardVerifier
   pkg_hmr --> svc_hmr
   pkg_host_directory_picker --> svc_directoryPicker
   pkg_host_directory_picker_browse --> svc_directoryPicker
@@ -465,6 +473,10 @@ flowchart LR
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
+  svc_hardLedger --> pkg_hard_stopgate
+  svc_hardLedger --> pkg_hard_tools
+  svc_hardLedger --> pkg_hard_verifier
+  svc_hardVerifier --> pkg_hard_tools
   svc_hmr --> pkg_app_boot
   svc_jobs --> pkg_api_job_controller
   svc_jobs --> pkg_tool_bash
@@ -573,6 +585,8 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.hardLedger` | `seam` | `hard-ledger` | - | `hard-tools`, `hard-verifier`, `hard-stopgate` | - | Validates and appends hard/* session events and serves the hardLedger session projection; ids are assigned from projected counts. |
+| `ctx.hardVerifier` | `seam` | `hard-verifier` | - | `hard-tools` | - | Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 负责模块和精确配置监听；应用修改共用其队列，自动重载等待应用文件锁。 |
 | `ctx.pluginRegistryProbe` | `core` | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | 在 Host 上并发比较公共安装源响应；初始安装源推荐由 Client 负责。 |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | 与 CLI 共享 profile 包操作，并向 Web 和 Agent 调用方分别报告持久状态与运行状态。 |

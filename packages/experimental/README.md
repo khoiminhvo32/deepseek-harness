@@ -48,6 +48,9 @@ Experimental prototypes may change their contracts and carry no support promise.
 | [`tool-agent-team`](tool-agent-team/README.md) | Nine tools that let the model create, message, and coordinate teammates | registers scoped tools on `ctx.tools` |
 | [`hard-mission`](hard-mission/README.md) | Arms the configured objective as a durable goal and teaches the mission contract | — |
 | [`hard-stopgate`](hard-stopgate/README.md) | Steers the turn boundary back to work while an armed goal is active | — |
+| [`hard-ledger`](hard-ledger/README.md) | Durable findings, hypotheses, coverage, and sweep state over `hard/*` session events | `ctx.hardLedger` |
+| [`hard-verifier`](hard-verifier/README.md) | Executes findings' proofs of effect and recomputes their CVSS 4.0 scores | `ctx.hardVerifier` |
+| [`hard-tools`](hard-tools/README.md) | Model-facing finding, hypothesis, coverage, and sweep tools | registers tools on `ctx.tools` |
 | [`hard-bundle`](hard-bundle/README.md) | Optional hard-agent composition of the mission and the stop gate | — |
 | [`webworker-packer`](webworker-packer/README.md) | Builds the gzip-compressed VFS image consumed by the browser worker preview | library and CLI — no ctx key |
 | [`webworker-runtime`](webworker-runtime/README.md) | Runs the harness plugin tree inside a dedicated browser worker | library and worker entry — no ctx key |

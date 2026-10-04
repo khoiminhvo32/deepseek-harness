@@ -993,6 +993,110 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
+<a id="deepseek-aidsh-experimental-hard-ledger"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-ledger`
+
+- `inject`: `sessionProjections`
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:53`](../packages/experimental/hard-ledger/src/index.ts)
+
+```ts config-catalog
+/** Ledger service config; reserved for future thresholds. */
+export interface Config {}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-mission -->
+<a id="deepseek-aidsh-experimental-hard-mission"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-mission`
+
+- `inject`: `agents` · `goals` · `systemPrompt`
+- `source`: [`packages/experimental/hard-mission/src/index.ts:53`](../packages/experimental/hard-mission/src/index.ts)
+
+```ts config-catalog
+/** Mission plugin config. */
+export interface Config {
+  /**
+   * The durable objective the session must keep working toward. Required and
+   * non-blank: a mission without an objective fails loudly at load.
+   */
+  objective: string
+  /** Positive safe-integer cap on automatic continuation rounds. */
+  maxGoalRounds?: number
+  /**
+   * Bug classes the systematic pass sweeps, named in the mission contract.
+   * An empty list removes the class list from the contract.
+   */
+  bugClasses?: string[]
+  /** Number of systematic passes between deep-reading passes. */
+  deepReadEveryN?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-mission -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-stopgate -->
+<a id="deepseek-aidsh-experimental-hard-stopgate"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-stopgate`
+
+- `inject`: `goals`
+- `source`: [`packages/experimental/hard-stopgate/src/index.ts:37`](../packages/experimental/hard-stopgate/src/index.ts)
+
+```ts config-catalog
+/** Stop-gate plugin config. */
+export interface Config {
+  /**
+   * Maximum forced continuations within one turn before the gate allows the
+   * turn to close. The bound keeps a steering loop from running forever when
+   * the model cannot or will not advance the goal.
+   */
+  maxSteersPerTurn?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-stopgate -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-tools -->
+<a id="deepseek-aidsh-experimental-hard-tools"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-tools`
+
+- `inject`: `tools` · `hardLedger` · `hardVerifier`
+- `source`: [`packages/experimental/hard-tools/src/index.ts:21`](../packages/experimental/hard-tools/src/index.ts)
+
+```ts config-catalog
+/** Tool policy config; reserved for future thresholds. */
+export interface Config {}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-tools -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-verifier -->
+<a id="deepseek-aidsh-experimental-hard-verifier"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-verifier`
+
+- `inject`: `shell` · `hardLedger`
+- `source`: [`packages/experimental/hard-verifier/src/index.ts:31`](../packages/experimental/hard-verifier/src/index.ts)
+
+```ts config-catalog
+/** Verifier plugin config. */
+export interface Config {
+  /**
+   * PoC executions per verification. Every run must satisfy the
+   * proof-of-effect contract for `confirmed`; any split is `flaky`.
+   */
+  runs?: number
+  /** Per-run timeout in seconds; a timed-out run never satisfies the contract. */
+  timeoutSeconds?: number
+  /** Foreground stdout capture budget per run in bytes. */
+  stdoutMaxBytes?: number
+  /** Working directory for PoC execution; defaults to the shell provider's own. */
+  pocWorkdir?: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-verifier -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-inspector -->
 <a id="deepseek-aidsh-experimental-inspector"></a>
 
@@ -3328,7 +3432,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:247`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4498,6 +4602,7 @@ export interface Config {
 | `@deepseek-ai/dsh-deque` | — | [`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-agent-team-profile` | — | [`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-browser-use-runtime` | — | [`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-hard-bundle` | — | [`packages/experimental/hard-bundle/src/index.ts`](../packages/experimental/hard-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-inspector-profile` | — | [`packages/experimental/inspector-profile/src/index.ts`](../packages/experimental/inspector-profile/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-voice-input-bundle` | — | [`packages/experimental/voice-input-bundle/src/index.ts`](../packages/experimental/voice-input-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-packer` | — | [`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts) |

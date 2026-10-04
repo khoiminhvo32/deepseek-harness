@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for hard-harness.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/hard-harness.md
+/hard-harness:
+  en: f0089418324900a5
+  zh: e595cf1b98d70118
+/hard-harness/ledger-state:
+  en: b4b86afdcc0599db
+  zh: b4b86afdcc0599db
+/hard-harness/proof-of-effect-contract:
+  en: 92b5d4860be32280
+  zh: 92b5d4860be32280
+/hard-harness/design-rationale:
+  en: e6d7d1564fec84d1
+  zh: e6d7d1564fec84d1

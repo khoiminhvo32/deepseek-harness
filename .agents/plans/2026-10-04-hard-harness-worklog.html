@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hard Harness Worklog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #101012;
+    --bg-raised: #17171a;
+    --bg-inset: #0c0c0e;
+    --border: #232327;
+    --border-strong: #34343a;
+    --text: #e6e6e9;
+    --text-dim: #9b9ba3;
+    --text-faint: #6b6b74;
+    --accent: #6d8dff;
+    --accent-dim: #3b4a80;
+    --pass: #4f9e6e;
+    --pass-bg: #14251b;
+    --fail: #c96a5f;
+    --fail-bg: #2a1714;
+    --warn: #c7a15c;
+    --warn-bg: #272013;
+    --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.65; }
+  ::selection { background: var(--accent-dim); color: var(--text); }
+
+  .layout { display: grid; grid-template-columns: 264px minmax(0, 1fr); max-width: 1400px; margin: 0 auto; min-height: 100dvh; }
+  nav.toc { position: sticky; top: 0; height: 100dvh; overflow-y: auto; padding: 32px 20px 32px 32px; border-right: 1px solid var(--border); }
+  nav.toc .brand { font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px; }
+  nav.toc .brand-sub { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-bottom: 28px; }
+  nav.toc a { display: block; color: var(--text-dim); text-decoration: none; font-size: 13.5px; padding: 5px 10px; border-left: 2px solid transparent; margin-left: -12px; transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
+  nav.toc a:hover { color: var(--text); background: var(--bg-raised); }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); }
+  nav.toc a.sub { padding-left: 24px; font-size: 12.5px; }
+  nav.toc .toc-divider { margin: 14px 0 8px; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+
+  main { padding: 48px 48px 96px; max-width: 980px; }
+  header.masthead { margin-bottom: 40px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); margin-bottom: 10px; }
+  h1 { font-size: clamp(30px, 4.5vw, 44px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08; }
+  .masthead p.lede { margin-top: 14px; color: var(--text-dim); font-size: 16px; max-width: 65ch; }
+  .masthead .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-strong); color: var(--text-dim); background: var(--bg-raised); }
+  .chip.pass { color: var(--pass); border-color: #2a4d38; background: var(--pass-bg); }
+  .chip.fail { color: var(--fail); border-color: #55302b; background: var(--fail-bg); }
+  .chip.warn { color: var(--warn); border-color: #4d3f22; background: var(--warn-bg); }
+  .chip.accent { color: var(--accent); border-color: var(--accent-dim); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 24px; }
+  h2 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; margin-bottom: 6px; }
+  h2 .h2-index { font-family: var(--mono); font-size: 13px; color: var(--text-faint); font-weight: 500; margin-right: 10px; }
+  section > p.intro { color: var(--text-dim); max-width: 68ch; margin-bottom: 18px; }
+  h3 { font-size: 15.5px; font-weight: 600; margin: 26px 0 10px; }
+  p { max-width: 74ch; }
+  p + p { margin-top: 10px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { color: var(--text); font-weight: 600; }
+  code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #cdd3ea; }
+  pre { font-family: var(--mono); font-size: 12px; line-height: 1.6; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; color: #c3c8dd; margin: 12px 0; }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+  pre .out { color: var(--text-faint); }
+  pre .ok { color: var(--pass); }
+  pre .bad { color: var(--fail); }
+  pre .hl { color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; font-size: 13.5px; }
+  thead th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); font-weight: 500; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border-strong); }
+  tbody td { padding: 9px 12px 9px 0; vertical-align: top; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+  tbody tr:last-child td { border-bottom: none; }
+  td .path, td code { font-size: 12px; }
+  td:first-child { color: var(--text); }
+
+  details.bug { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  details.bug summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 12px; padding: 14px 18px; transition: background-color .15s ease; }
+  details.bug summary:hover { background: #1c1c20; }
+  details.bug summary::-webkit-details-marker { display: none; }
+  details.bug summary .bug-id { font-family: var(--mono); font-size: 11.5px; color: var(--warn); flex-shrink: 0; }
+  details.bug summary .bug-title { font-weight: 550; font-size: 14.5px; }
+  details.bug summary .bug-glyph { margin-left: auto; color: var(--text-faint); font-family: var(--mono); transition: transform .2s ease; }
+  details.bug[open] summary .bug-glyph { transform: rotate(90deg); }
+  details.bug .bug-body { padding: 4px 18px 18px 46px; }
+  details.bug .field { margin-top: 12px; }
+  details.bug .field .f-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 4px; }
+  details.bug .field p, details.bug .field ul { color: var(--text-dim); font-size: 14px; max-width: 72ch; }
+  details.bug .field ul { padding-left: 18px; }
+  details.bug .field li { margin-bottom: 4px; }
+
+  .toolbar { display: flex; gap: 10px; margin: 14px 0; }
+  .toolbar input { flex: 0 1 340px; background: var(--bg-inset); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 12.5px; padding: 8px 12px; outline: none; transition: border-color .15s ease; }
+  .toolbar input:focus { border-color: var(--accent-dim); }
+  .toolbar .count { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); align-self: center; }
+
+  .callout { border-left: 2px solid var(--accent-dim); background: var(--bg-raised); border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 14px 0; color: var(--text-dim); font-size: 14px; max-width: 74ch; }
+  .callout strong { color: var(--text); }
+  .statusline { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); border-top: 1px solid var(--border); padding-top: 16px; margin-top: 48px; }
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); margin-right: 6px; vertical-align: 1px; }
+
+  ul.plain { padding-left: 20px; color: var(--text-dim); max-width: 74ch; }
+  ul.plain li { margin-bottom: 6px; }
+  ol.plain { padding-left: 20px; color: var(--text-dim); max-width: 74ch; }
+  ol.plain li { margin-bottom: 6px; }
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 20px; }
+    main { padding: 32px 20px 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" id="toc">
+  <div class="brand">Hard Harness</div>
+  <div class="brand-sub">deepseek-harness / dsh-hard</div>
+  <div class="toc-divider">Tổng quan</div>
+  <a href="#status">Trạng thái</a>
+  <a href="#decisions">Quyết định chốt</a>
+  <div class="toc-divider">PR1</div>
+  <a href="#artifacts">Danh mục thay đổi</a>
+  <a href="#behavior">Hành vi đã implement</a>
+  <a href="#bugs">Sổ lỗi và fix</a>
+  <a href="#governance">Persistence governance</a>
+  <a href="#gates">Kết quả gates</a>
+  <div class="toc-divider">PR2</div>
+  <a href="#pr2-live" id="nav-pr2">PR2 live</a>
+</nav>
+
+<main>
+<header class="masthead">
+  <div class="eyebrow">Engineering worklog</div>
+  <h1>Hard Harness: nhật ký xây dựng</h1>
+  <p class="lede">Nhật ký làm việc đầy đủ evidence cho biến thể hard harness của DeepSeek Harness: ép model làm việc liên tục đến cùng, chỉ chấp nhận bug có PoC verify được và điểm CVSS tính lại bằng máy. Mọi mục dưới đây đều trỏ tới file, lệnh hoặc output thực tế.</p>
+  <div class="meta-row">
+    <span class="chip">repo: deepseek-harness @ master (release 0.2.1-alpha.1)</span>
+    <span class="chip">ngày: 2026-10-04</span>
+    <span class="chip pass">PR1: gates xanh</span>
+    <span class="chip pass">PR2: gates đang chạy</span>
+  </div>
+</header>
+
+<section id="status">
+  <h2><span class="h2-index">00</span>Trạng thái</h2>
+  <p class="intro">Bảng dưới đây là trạng thái thật tại thời điểm cập nhật gần nhất của tài liệu. Mục nào cũng có evidence tương ứng ở các section sau.</p>
+  <table>
+    <thead><tr><th>Giai đoạn</th><th>Trạng thái</th><th>Bằng chứng</th></tr></thead>
+    <tbody>
+      <tr><td>Design doc</td><td><span class="chip pass">chốt</span></td><td><code>.agents/plans/2026-10-04-hard-harness-design.md</code>, mục 14 ghi 4 quyết định đã chốt</td></tr>
+      <tr><td>PR1: mission + stopgate + bundle</td><td><span class="chip pass">xong</span></td><td>3 package trong <code>packages/experimental/hard-*</code>, 21/21 tests, gates xanh (xem <a href="#gates">07</a>)</td></tr>
+      <tr><td>Persistence ack cho source kind</td><td><span class="chip pass">xong</span></td><td><code>docs/persistence-changes/2026-10-04-hard-stopgate-attribution.md</code>, gate pass 62 roots / 9 records</td></tr>
+      <tr><td>PR2: ledger + tools + verifier + CVSS 4.0</td><td><span class="chip pass">xong, 55/55 tests</span></td><td><a href="#pr2-live">section 09</a>; toàn bộ gates xanh</td></tr>
+      <tr><td>Chạy thử headless bằng user</td><td><span class="chip fail">lệnh mẫu sai</span></td><td>Bug <a href="#bug-B14">B14</a>: process substitution bị <code>readFileSync</code> chặn, đã có lệnh sửa</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="decisions">
+  <h2><span class="h2-index">01</span>Quyết định chốt</h2>
+  <p class="intro">Bốn quyết định do chủ repo chốt ngày 2026-10-04, ghi tại mục 14 của <a href="../plans/2026-10-04-hard-harness-design.md">design doc</a>. Code hiện tại đã phản ánh đủ cả bốn.</p>
+  <table>
+    <thead><tr><th>Quyết định</th><th>Nội dung</th><th>Áp dụng ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td>CVSS v4.0</td><td>Engine tính lại điểm từ vector theo spec FIRST v4.0; v3.1 vẫn chọn được qua <code>verifier.cvssVersion</code></td><td>PR2, package <code>hard-verifier</code>, module <code>cvss4</code></td></tr>
+      <tr><td>Nhóm authentication</td><td><code>authn</code>, <code>authn-bypass</code>, <code>login-bypass</code>, <code>oauth-bypass</code> vào Phase A</td><td><code>hard-mission/src/index.ts</code>, mảng <code>DEFAULT_BUG_CLASSES</code></td></tr>
+      <tr><td>OWASP đủ hình source-sink</td><td>Thêm <code>open-redirect</code>, <code>session</code>, <code>misconfig</code>, <code>dependencies</code>; A04 design flaw và A09 logging để Phase B deep-read</td><td>Cùng mảng trên, tổng 17 class; JSDoc ghi rõ lý do loại A04/A09</td></tr>
+      <tr><td>Headless-first</td><td>PR1 đến PR5 không đụng client; UI Web/desktop là Phase 2 mục 4</td><td>Cấu trúc package toàn plugin Host, không có file nào dưới <code>packages/client</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="artifacts">
+  <h2><span class="h2-index">02</span>Danh mục thay đổi PR1</h2>
+  <p class="intro">Toàn bộ file tạo mới và sửa đổi trong working tree, đối chiếu <code>git status --short</code> lúc 19:30 ngày 2026-10-04. Chưa commit; nằm chờ review.</p>
+
+  <h3>Package tạo mới</h3>
+  <table>
+    <thead><tr><th>Package</th><th>File</th><th>Vai trò</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="5">hard-mission</td><td><code>package.json</code></td><td>Manifest đúng invariant repo: <code>workspace:~</code> cho cordis/schemastery, <code>workspace:*</code> cho dsh deps, không scripts, không private</td></tr>
+      <tr><td><code>tsconfig.json</code></td><td>Leaf config, references vendor + core/agent + core/system-prompt + goal/goal</td></tr>
+      <tr><td><code>src/index.ts</code></td><td>Plugin: Config schema, resolveConfig fail-loud, missionContract render, section <code>hard:mission</code>, listener <code>agent/created</code></td></tr>
+      <tr><td><code>tests/hard-mission.spec.ts</code></td><td>10 test: arming, child ignore, no-duplicate, disposal, section text, config reject, Loader namespace</td></tr>
+      <tr><td><code>README.md</code> + <code>README.zh.md</code> + <code>README.i18n.yaml</code></td><td>Tài liệu bilingual với Model Experience contract verbatim</td></tr>
+      <tr><td rowspan="5">hard-stopgate</td><td><code>package.json</code></td><td>Manifest, peer deps dsh-agent/goal/llm</td></tr>
+      <tr><td><code>tsconfig.json</code></td><td>Leaf config</td></tr>
+      <tr><td><code>src/index.ts</code></td><td>Plugin: decision <code>owingGoal</code>, order text, listener <code>agent/turn-stopping</code> + steer, budget per turn, <code>@persistenceAttribution</code> cho source kind</td></tr>
+      <tr><td><code>tests/hard-stopgate.spec.ts</code></td><td>9 test: steer, 5 trạng thái thoát, budget 2 vòng, disposed reset, disposal, config</td></tr>
+      <tr><td><code>README.md</code> + <code>README.zh.md</code> + <code>README.i18n.yaml</code></td><td>Tài liệu bilingual</td></tr>
+      <tr><td rowspan="4">hard-bundle</td><td><code>package.json</code></td><td>Bundle manifest, <code>dsh.bundle.patch</code></td></tr>
+      <tr><td><code>cordis.patch.yml</code></td><td>2 rows: hard-mission (objective rỗng cố ý fail-loud) + hard-stopgate</td></tr>
+      <tr><td><code>src/index.ts</code> + <code>tests/bundle.spec.ts</code></td><td>Runtime rỗng + test validate manifest/patch theo mẫu inspector-profile</td></tr>
+      <tr><td><code>README.md</code> + <code>README.zh.md</code> + <code>README.i18n.yaml</code></td><td>Tài liệu bundle</td></tr>
+    </tbody>
+  </table>
+
+  <h3>File sửa trên cây gốc</h3>
+  <table>
+    <thead><tr><th>File</th><th>Thay đổi</th><th>Lý do</th></tr></thead>
+    <tbody>
+      <tr><td><code>packages/core/system-prompt/src/index.ts</code></td><td>Thêm <code>HARD_MISSION: 700</code> vào SECTION_ORDERS</td><td>Order cấp phát tập trung, cấm hardcode số trong consumer</td></tr>
+      <tr><td><code>tsconfig.base.json</code></td><td>3 alias hand-written cho <code>dsh-experimental-hard-*</code></td><td>Generator từ chối map package có tên lệch thư mục (bug <a href="#bug-B02">B02</a>)</td></tr>
+      <tr><td><code>tsconfig.host.json</code></td><td>3 references mới</td><td>Đăng ký vào Host aggregate</td></tr>
+      <tr><td><code>packages/experimental/README.md</code> + zh + i18n.yaml</td><td>3 dòng trong bảng Packages</td><td>Group map bắt buộc cho package mới</td></tr>
+      <tr><td><code>scripts/verify-package-readme-model-experience.ts</code></td><td>1 entry <code>SENTENCE_MODEL_EXPERIENCE</code></td><td>Short-form ME của hard-bundle phải vào allowlist audit (bug <a href="#bug-B12">B12</a>)</td></tr>
+      <tr><td><code>docs/persistence-schema.json</code>, <code>docs/persistence-catalog.*</code>, <code>docs/config-catalog.*</code>, <code>docs/event-producer-consumer.*</code>, <code>docs/persistence-changes/historical-formats/*</code>, <code>packages/preset/agent-preset/skills/.../packages.md</code></td><td>Regenerate bằng generator</td><td>Artifact sinh ra phải theo tree (bug <a href="#bug-B13">B13</a>)</td></tr>
+      <tr><td><code>pnpm-lock.yaml</code></td><td>Lockfile</td><td><code>pnpm install</code> đăng ký workspace</td></tr>
+      <tr><td colspan="3">Tạo mới: <code>docs/persistence-changes/2026-10-04-hard-stopgate-attribution.{md,zh.md,schema.json,i18n.yaml}</code> (xem <a href="#governance">06</a>)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="behavior">
+  <h2><span class="h2-index">03</span>Hành vi đã implement</h2>
+  <p class="intro">Mô tả hành vi theo đúng những gì test pin lại, không phải mô tả mong muốn.</p>
+
+  <h3>hard-mission</h3>
+  <ul class="plain">
+    <li>Khởi động plugin validate config fail-loud: objective rỗng, maxGoalRounds, deepReadEveryN, bugClasses sai kiểu đều throw trước khi đăng ký bất cứ thứ gì (test <code>fails loud on a blank objective</code>).</li>
+    <li>Đăng ký section <code>hard:mission</code> với order <code>getSectionOrder('HARD_MISSION')</code> (= 700, đặt giữa TEAM_POLICY 600 và PTC_ONLY 800), text render từ config: mission + lớp list + nhịp deep-read + điều kiện complete.</li>
+    <li>Nghe <code>agent/created</code>: chỉ arm khi source là <code>startup</code>, agent là root (<code>ctx.agents.roots().includes(agent)</code>), và chưa có goal. Resume, clear, compact và child agent không bị đụng. Điều này giữ chính sách restore-and-disarm của GoalService làm authority (test <code>never duplicates or recreates across later creation boundaries</code>).</li>
+    <li>Vì <code>AgentRegistry.register()</code> tự announce <code>agent/created</code> source <code>startup</code> (evidence: <code>packages/core/agent/src/index.ts</code>, hàm <code>register()</code>), goal được arm ngay khi session bootstrap, không cần trigger ngoài.</li>
+  </ul>
+
+  <h3>hard-stopgate: bảng quyết định đầy đủ</h3>
+  <table>
+    <thead><tr><th>Trạng thái goal lúc turn-stopping</th><th>Hành vi</th><th>Test pin</th></tr></thead>
+    <tbody>
+      <tr><td>Không có goal</td><td>Cho đóng turn</td><td><code>lets goalless and disarmed states close freely</code></td></tr>
+      <tr><td>Có goal nhưng disarmed</td><td>Cho đóng turn</td><td>cùng test trên</td></tr>
+      <tr><td>Phase paused / blocked / complete</td><td>Cho đóng turn</td><td><code>lets paused, blocked, and completed phases close freely</code></td></tr>
+      <tr><td>Armed + active, còn budget</td><td><code>agent.steer()</code> mệnh lệnh tiếp tục, tăng counter</td><td><code>steers an armed active goal back to work</code></td></tr>
+      <tr><td>Armed + active, hết budget trong turn</td><td>Cho đóng turn, counter giữ nguyên đến turn kế</td><td><code>stops forcing after the per-turn budget and resumes on a new turn</code></td></tr>
+      <tr><td>Agent mới cùng turn sau khi disposed</td><td>Counter bị xóa, được steer lại từ đầu</td><td><code>drops per-agent counters when the agent leaves the registry</code></td></tr>
+      <tr><td>Plugin bị dispose</td><td>Không steer nữa</td><td><code>stops steering after disposal</code> (HMR-safety)</td></tr>
+    </tbody>
+  </table>
+  <p>Text mệnh lệnh steer (model-visible, verbatim trong source):</p>
+  <pre><code>The session objective is not complete: "<span class="hl">{objective}</span>". Goal round {r} of {max}.
+Do not stop or summarize; take the next concrete action that advances the objective now.
+End the turn only after marking the goal complete with update_goal action complete
+once the objective is genuinely achieved.</code></pre>
+
+  <h3>Sinh mechanism: steer là cách duy nhất để "chặn"</h3>
+  <p>Event <code>agent/turn-stopping</code> là serial event phát ở <code>packages/core/agent-loop/src/agent.ts</code> trước khi boundary commit. Listener không có return-value veto; muốn chặn phải <code>agent.steer(...)</code> để loop đọc lại inbox và chạy thêm step. Pattern này copy từ bridge Claude Code Stop hook tại <code>packages/hooks/hooks-claude-code/src/index.ts:276</code>.</p>
+</section>
+
+<section id="bugs">
+  <h2><span class="h2-index">04</span>Sổ lỗi và fix</h2>
+  <p class="intro">Mọi lỗi gặp thật trong phiên, đầy đủ symptom, root cause, evidence và fix. Dùng ô lọc để tìm theo từ khóa.</p>
+  <div class="toolbar">
+    <input type="text" id="bug-filter" placeholder="lọc theo từ khóa, ví dụ: persistence, lint, tsconfig" aria-label="Lọc lỗi">
+    <span class="count" id="bug-count"></span>
+  </div>
+  <div id="bug-list">
+
+  <details class="bug" id="bug-B01">
+    <summary><span class="bug-id">B01</span><span class="bug-title">pnpm không có trong PATH của shell</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>zsh:3: command not found: pnpm</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Máy dùng NVM đặt dưới <code>~/Library/Application Support/Herd/config/nvm</code>, shell của agent không load <code>~/.zshrc</code> nên PATH thiếu bin dir. Không có pnpm standalone; node 22.22.2 có sẵn <code>corepack</code>.</p></div>
+      <div class="field"><div class="f-label">Fix</div><pre><code>export PATH=".../nvm/versions/node/v22.22.2/bin:$PATH"
+corepack pnpm ...   <span class="out"># repo pin packageManager: pnpm@11.7.0, corepack hiển thị đúng 11.7.0</span></code></pre>
+      <p>Tất cả lệnh sau này đều dùng prefix này.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B02">
+    <summary><span class="bug-id">B02</span><span class="bug-title">gen-tsconfig-paths từ chối map 3 package mới</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>gen-tsconfig-paths: no alias maps @deepseek-ai/dsh-experimental-hard-bundle, ...;
+add a hand-written entry, because a package named after something other than its directory cannot be generated.
+<span class="bad">[ELIFECYCLE] Command failed with exit code 1.</span></code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Tên npm có infix <code>experimental-</code> nhưng thư mục tên <code>hard-mission</code>; generator không suy được mapping. Các package cùng cảnh như <code>inspector-profile</code> đã có alias hand-written trong vùng đánh dấu của <code>tsconfig.base.json</code> (dòng 310 đến 322).</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Thêm 3 alias thủ công cạnh alias experimental hiện có; chạy lại <code>gen-tsconfig-paths</code> và <code>verify-tsconfig-paths</code> đều pass (<code>package aliases are current</code>).</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B03">
+    <summary><span class="bug-id">B03</span><span class="bug-title">hard-bundle thiếu tsconfig.json làm sập generator</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>TypertAnalysisError: Cannot read file 'packages/experimental/hard-bundle/tsconfig.json'.
+    at parseConfig (packages/typert/generator/src/analyzer.ts:2753:39)
+<span class="bad">[ELIFECYCLE] Command failed with exit code 1.</span>  <span class="out"># gen-cordis-catalog và gen-cordis-api cùng chết</span></code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Ban đầu tưởng bundle như inspector-profile không cần... nhưng analyzer quét mọi workspace package và bắt buộc mỗi package có tsconfig. Inspector-profile cũng có file riêng, tôi đã bỏ sót khi copy template.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Tạo <code>hard-bundle/tsconfig.json</code> tham chiếu vendor/cordis + 2 plugin sibling. Cả hai generator sau đó chạy sạch (<code>119 artifact(s) computed, 0 written</code>).</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B04">
+    <summary><span class="bug-id">B04</span><span class="bug-title">Sai relative path trong tsconfig references</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code><span class="bad">[TSCONFIG_ERROR] Failed to load tsconfig for 'packages/experimental/hard-mission/tests/hard-mission.spec.ts': Tsconfig not found</span>
+  Plugin: vite:oxc</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Viết <code>"path": "../goal/goal"</code>; từ <code>packages/experimental/hard-mission/</code> đường đúng là <code>../../goal/goal</code> (lên 2 cấp đến packages/). Cả hard-mission và hard-stopgate cùng lỗi.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Sửa cả hai file thành <code>../../goal/goal</code>. Test sau đó chạy được.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B05">
+    <summary><span class="bug-id">B05</span><span class="bug-title">Test arm sai giả định về register() và announce()</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>5 test mission fail: goal tạo ra nhưng <code>activation: 'disarmed'</code> thay vì 'armed', hoặc goal tồn tại ở test kỳ vọng <code>undefined</code>. Lỗi tái hiện cả khi chạy từng test riêng lẻ, loại trừ test contamination.</p></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Đọc nguồn <code>AgentRegistry.register()</code>:</p>
+      <pre><code>return this.ctx.effect(async function* (this: AgentRegistry) {
+  yield this.enter(agent, undefined)
+  <span class="hl">await this.announce(agent, 'startup')</span>
+}.bind(this), 'agents.register()')</code></pre>
+      <p>register() đã tự phát <code>agent/created</code> source <code>startup</code>, nên goal arm ngay trong harness(); dispatch thủ công lần hai làm GoalService listener chạy <code>setActivation(disarmed)</code>. Giả định trong test của tôi sai, code plugin đúng production semantics.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Viết lại 4 test: kỳ vọng armed ngay sau harness(), test no-duplicate bằng cách dispatch lại mọi source rồi assert id/revision giữ nguyên, test child dùng <code>enter() + announce()</code> (pattern từ tool-goal spec), test disposal đăng ký agent mới sau dispose. Kết quả 10/10 pass.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B06">
+    <summary><span class="bug-id">B06</span><span class="bug-title">Child agent bị đăng ký trùng trong test</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>Error: agent "hard-mission-child-0.97..." is already registered
+    at packages/core/agent/src/index.ts:467:35  <span class="out"># Proxy.enter collision boundary</span></code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Test gọi <code>ctx.agents.enter(child, root)</code> rồi <code>ctx.agents.register(child)</code>; enter đã publish entry nên register đụng collision guard.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Thứ tự đúng cho child trong test: <code>enter()</code> để set ownership, rồi <code>announce()</code> để phát event, không gọi register (đã dùng trong B05).</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B07">
+    <summary><span class="bug-id">B07</span><span class="bug-title">Budget test off-by-one (17 thay vì 16 steer)</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>AssertionError: expected [ …(17) ] to have a length of 16 but got 17</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Test cũ loop turn 1..16 và tự hiểu mỗi turn một steer; kỳ vọng đếm theo turn số chứ không theo số lần attempt. Logic production đếm theo attempt trong cùng turn: attempt thứ 17 cùng turn 1 bị chặn, attempt đầu tiên của turn 2 được steer.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Viết lại theo attempt: 16 lần <code>stopAt(turn=1)</code> cho 16 steer, lần 17 cùng turn bị chặn, <code>stopAt(turn=2)</code> cho steer thứ 17. Pass.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B08">
+    <summary><span class="bug-id">B08</span><span class="bug-title">TS2339: ctx.agents / ctx.goals không tồn tại</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>packages/experimental/hard-mission/src/index.ts(129,14): error TS2339:
+  Property 'agents' does not exist on type 'Context'.  <span class="out"># + goals, x2</span></code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Key <code>ctx.&lt;name&gt;</code> đến từ declaration merging trong package của service; mission không import gì từ dsh-agent/goal/system-prompt nên interface merge không được nạp. Lint pipe qua <code>tail -3</code> đã che exit code, phát hiện muộn một nhịp.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Thêm 3 dòng <code>import type {} from '@deepseek-ai/dsh-agent' | dsh-goal | dsh-system-prompt</code> kèm comment giải thích; đây là pattern chuẩn repo (dùng ở hooks-claude-code). Sau đó typecheck full repo exit 0.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B09">
+    <summary><span class="bug-id">B09</span><span class="bug-title">12 lỗi lint (oxlint) trên code mới</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p><code>Found 0 warnings and 12 errors</code>, bốn nhóm rule: <code>restrict-plus-operands</code> (nối number vào string trong missionContract và continuationOrder), <code>no-confusing-void-expression</code> (7 chỗ <code>expect(() =&gt; apply(...))</code> trả void, 1 chỗ <code>ctx.effect(() =&gt; () =&gt; map.clear())</code>), <code>await-thenable</code> (<code>await agentEvents(...).emit(...)</code> vì emit là đồng bộ), <code>arrow-parens</code>.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Template literal cho phần nối số; block body <code>(() =&gt; { ... })</code> cho throw-expect và disposer; bỏ <code>await</code> trước .emit; thêm parens. Chạy lại: <code>Found 0 warnings and 0 errors</code>, tests vẫn 21/21.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B10">
+    <summary><span class="bug-id">B10</span><span class="bug-title">Persistence gate chặn: source kind mới là schema change</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code><span class="bad">Breaking changes relative to the accepted Session format 4 baseline require format 5 or later</span></code></pre></div>
+      <div class="field"><div class="f-label">Bisect</div><p>Worktree sạch HEAD pass (<code>62 roots match 8 history records</code>); stash toàn bộ thay đổi của tôi rồi chạy vẫn pass, pop xong fail lại. Chứng minh do thay đổi của tôi gây ra.</p></div>
+      <div class="field"><div class="f-label">Diagnose</div><p>Viết script gọi thẳng internals của gate (<code>loadPersistenceFinalization</code> + <code>classifyPersistenceChange</code>): 4 roots fail, tất cả cùng một thay đổi:</p>
+      <pre><code>DIFF: event:user/message | union-variants-changed
+      event:user/message.data.source[kind=<span class="hl">"hard-stopgate"</span>] | union variants changed | bump: true</code></pre>
+      <p>Khai báo <code>MessageSourceMap</code> kind <code>hard-stopgate</code> thêm một variant vào union MessageSource được persist trong session log của 4 event. Đây là persistence-type change có thật, gate đúng.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Theo đúng cơ chế policy của repo (<code>scripts/persistence-source-policy.ts</code>, <code>persistence-source-annotations.ts</code>): gắn tag JSDoc <code>@persistenceAttribution</code> kèm reader-promise prose vào property của MessageSourceMap, chạy <code>gen-persistence-catalog</code>, rồi <code>persistence-changes --record ... --decision same-version</code> và điền prose thật qua <code>--update --prose file.json</code> (format JSON en/zh × summary/compatibility/verification). Sau fix: <code>persistence changes: 62 roots match 9 history records</code>. Chi tiết tại <a href="#governance">section 06</a>.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B11">
+    <summary><span class="bug-id">B11</span><span class="bug-title">doc-standard: skeleton heading tiếng Trung sai</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>AssertionError: packages/experimental/hard-bundle/README.zh.md:
+  expected [ 'missing 概述', 'missing 目录', …(1) ] to deeply equal []</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p><code>scripts/doc-standard.spec.ts:154</code> bắt buộc README.zh dùng heading tiếng Trung (<code>## 概述</code>, <code>## 目录</code>, <code>### 开发备注</code>); tôi viết Summary/Table of Contents/Dev Note. Pairing checker cũng bắt link trong README.zh phải trỏ <code>.zh.md</code> locale đúng.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Sửa 3 README.zh (heading + link config-catalog.zh.md + link README.zh.md sibling), re-record pairing hash. doc-standard sau đó 22/22 pass.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B12">
+    <summary><span class="bug-id">B12</span><span class="bug-title">Model Experience short-form cần allowlist audit</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>verify-package-readme-model-experience failed:
+  packages/experimental/hard-bundle/README.md: line 55: short Model Experience form
+  requires an audited entry in SENTENCE_MODEL_EXPERIENCE</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p>Câu <code>None, as ...</code> chỉ hợp lệ khi package có entry kèm lý do trong bảng audited của <code>scripts/verify-package-readme-model-experience.ts:47</code>.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Thêm entry cho hard-bundle cạnh inspector-profile: bundle chỉ mount plugin, tự nó không thêm model context. Gate sau đó: <code>322 README(s) checked ... all conform</code>.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B13">
+    <summary><span class="bug-id">B13</span><span class="bug-title">Chuỗi generated artifacts stale</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>doc-sync fail từng lớp, mỗi lớp tự chỉ ra lệnh fix: config-catalog stale, persistence formats stale (historical-formats README), doc-graphs stale (event-producer-consumer).</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Chạy đúng generator từng gate chỉ dẫn: <code>gen-config-catalog</code>, <code>verify-persistence-formats --write</code>, <code>gen-doc-graphs</code>. doc-sync cuối: <code>42 passed, 0 failed, 0 skipped in 89.96s</code>.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B14">
+    <summary><span class="bug-id">B14</span><span class="bug-title">Lệnh mẫu của tôi: process substitution bị readFileSync chặn</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom (do user report)</div><pre><code>$ pnpm dsh --profile headless --patch &lt;(echo ...)
+Error: dsh: failed to read overlay /dev/fd/15: <span class="bad">Error: EAGAIN: resource temporarily unavailable, read</span>
+    at loadOverlayPatches (packages/boot/app-boot/src/index.ts:341:11)</code></pre></div>
+      <div class="field"><div class="f-label">Root cause</div><p><code>loadOverlayPatches</code> đọc overlay bằng I/O đồng bộ (readFileSync), còn bash process substitution mở fd pipe mà nội dung chưa sẵn sàng nên EAGAIN. Không phải bug của PR1; lỗi lệnh tôi gợi ý.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Đặt patch vào file thật, ví dụ <code>hard.patch.yml</code> ở repo root:</p>
+      <pre><code>cat &gt; hard.patch.yml &lt;&lt;'EOF'
+- overwrite:
+    id: hard-mission
+    config:
+      objective: 'Hunt bugs in repo X'
+EOF
+pnpm dsh --profile headless --patch hard.patch.yml "bắt đầu audit"</code></pre>
+      <p>Đã ghi nhận; nếu muốn hỗ trợ fd path là thay đổi upstream app-boot, không thuộc scope nhánh này.</p></div>
+    </div>
+  </details>
+
+
+  <details class="bug" id="bug-B15">
+    <summary><span class="bug-id">B15</span><span class="bug-title">Tên dependency thiếu infix experimental-</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>[ERR_PNPM_WORKSPACE_PKG_NOT_FOUND] "@deepseek-ai/dsh-hard-ledger@workspace:*" is in the dependencies
+but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace</code></pre></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p>hard-verifier khai dep <code>dsh-hard-ledger</code> thiếu infix <code>experimental-</code>; sed đổi toàn bộ package.json + imports thành <code>@deepseek-ai/dsh-experimental-hard-ledger</code>.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B16">
+    <summary><span class="bug-id">B16</span><span class="bug-title">ToolRuntime im lặng khi thiếu systemPrompt</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p><code>ctx.tools</code> undefined trong test dù đã <code>ctx.plugin(ToolRuntime)</code>; mọi tool test fail <code>Cannot read properties of undefined (reading 'execute')</code>.</p></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p><code>ToolRuntime</code> khai <code>static inject = ['systemPrompt']</code>; boot thiếu SystemPrompt khiến plugin không bao giờ hoàn tất. Debug bằng script standalone (<code>ctx.get('tools') === undefined</code>). Fix: thêm <code>ctx.plugin(SystemPrompt)</code> vào harness.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B17">
+    <summary><span class="bug-id">B17</span><span class="bug-title">Value schema DSL từ chối required ở root node</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><pre><code>JsonSchemaError: unsupported JSON schema: schema.required is not supported by the value schema DSL</code></pre></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p>Trong output schema, <code>required: true</code> chỉ hợp lệ trên property node (như GOAL_VALUE_SCHEMA của tool-goal), không hợp lệ trên root. Bỏ <code>required: true</code> ở 4 root object.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B18">
+    <summary><span class="bug-id">B18</span><span class="bug-title">Dữ liệu FIRST thời draft: SI:S trong maxComposed</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>Test exhaustive fail: build max vector từ fragment <code>SC:H/SI:S/SA:S/</code> rồi parse lại bị từ chối vì <code>metrics.js</code> của chính FIRST không liệt kê S cho SI/SA base.</p></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p>Reference dùng fragment chỉ để tính severity distance (qua <code>extractValueMetric</code>), không parse lại. Spec final chuyển Safety sang <code>MSI:S</code>/<code>MSA:S</code>. Test helper dịch fragment: SI:S trở thành SI:N + MSI:S, và <code>m()</code> của reference đọc lại đúng qua modified-override. Sau fix: 270/270 macrovector khớp lookup chính xác.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B19">
+    <summary><span class="bug-id">B19</span><span class="bug-title">Tự đánh giá sai về macro 002200 và cơ chế ignorable</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Hai correction</div><p>(1) Tôi thiết kế test quanh macro <code>002200</code> "reachable nhưng thiếu entry" rồi tự kiểm chứng ra là SAI: với VC:L/VI:L/VA:L thì cả ba cặp H-H của EQ6 đều không thỏa nên eq6=1, macro thật là <code>002201</code> (có entry, 6.9). Hai nhánh throw trong scoreVector là defensive không thể chạm bằng vector hợp lệ, đánh dấu <code>v8 ignore</code> có reason.</p>
+      <p>(2) Tôi append event với option <code>{ ignorable: true }</code> nhưng <code>Session.append()</code> không nhận option này (signature: type, data, surface-options cho surface events). Event in-repo KHÔNG tự đánh dấu ignorable; marker chỉ dành cho external plugin events (migration v3-to-v4 rename <code>plugin:&lt;type&gt;</code> + ignorable). Sửa append về 2 args, sửa record persistence prose và README cho đúng contract required-on-read: build cũ refuse thay vì skip.</p></div>
+    </div>
+  </details>
+
+
+  <details class="bug" id="bug-B20">
+    <summary><span class="bug-id">B20</span><span class="bug-title">gen-tool-catalog không tự quét package mới</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>ME gate từ chối link tool-catalog: fragment <code>deepseek-aidsh-experimental-hard-tools</code> không trỏ tới H2 nào trong <code>docs/tool-catalog.md</code> dù <code>gen-tool-catalog</code> chạy và báo wrote.</p></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p>Generator duyệt một manifest khai tay (<code>TOOL_PACKAGES</code> trong <code>scripts/gen-tool-catalog.ts</code>), mỗi entry có <code>mount()</code> boot tối thiểu. Thêm entry hard-tools với mount: HardLedger + CatalogShell (stub shell extends Service, không cast) + HardVerifier + HardTools. Hai bug con trong lúc làm: chèn entry trùng note làm hỏng cú pháp (đã dọn), và mount boot lại SessionProjectionRegistry đã có trong shared boot causing duplicate service registration (bỏ 4 plugin thừa).</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B21">
+    <summary><span class="bug-id">B21</span><span class="bug-title">classifyRuns: runs rỗng bị xếp confirmed</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>Test đơn giản hóa <code>classifyRuns</code> với <code>runs: []</code> nhận verdict <code>confirmed</code> thay vì refuted.</p></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p><code>passCount === runs.length</code> đúng khi cả hai bằng 0. Sửa: guard <code>runs.length === 0</code> trả refuted "no runs were executed" ngay đầu; nhánh <code>first === undefined</code> trở thành defensive với v8 ignore. Đây là bug thật do test mới bắt được, sửa ở source chứ không phải sửa test.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B22">
+    <summary><span class="bug-id">B22</span><span class="bug-title">Chiến lược coverage: ignore có reason cho nhánh defensive</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Ghi nhận</div><p>Bốn nhóm nhánh không thể chạm qua public API được đánh dấu <code>v8 ignore</code> kèm reason (theo docs/testing.md): guard lookup-missing và no-qualifying-vector trong cvss4 (exhaustive suite chứng minh 270/270 macro có entry), clamp âm/dương (giá trị refine luôn nằm giữa hai lookup bound), eq3 fragment arm (eq3=2 chỉ compose với eq6=1), và surface replay-failure của ledger. Các nhánh reachable đều được test thật.</p></div>
+    </div>
+  </details>
+
+
+  <details class="bug" id="bug-B23">
+    <summary><span class="bug-id">B23</span><span class="bug-title">Docs governance cho service mới: 5 lớp gate kế tiếp nhau</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Chuỗi lỗi</div><p>Service <code>ctx.hardLedger</code>/<code>ctx.hardVerifier</code> mới chạm 5 gate docs lần lượt, mỗi gate chỉ ra lỗi kế tiếp: (1) signature type-link coverage cần 11 type vào <code>TYPE_LINK_EXEMPTIONS</code>; (2) partition violation cần <code>SERVICE_PAGE</code> trỏ trang subsystems; (3) trang mới cần marker <code>BEGIN/END cordis-surface</code> khớp exact; (4) doc-graphs cần <code>SERVICE_ROLES</code> classification; (5) site check cần hàng trong <code>docs/subsystems/README.md</code> cho mỗi trang.</p></div>
+      <div class="field"><div class="f-label">Fix</div><p>Làm đủ cả 5 lớp: exemptions bảng, SERVICE_PAGE, trang <code>docs/subsystems/hard-harness.{md,zh.md}</code> + i18n record + README rows, SERVICE_ROLES entries. Mỗi lớp đều pass riêng trước khi lớp kế tiếp bộc lộ.</p></div>
+    </div>
+  </details>
+
+  <details class="bug" id="bug-B24">
+    <summary><span class="bug-id">B24</span><span class="bug-title">Pairing checker so cấu trúc catalog theo vị trí tuyệt đối</span><span class="bug-glyph">›</span></summary>
+    <div class="bug-body">
+      <div class="field"><div class="f-label">Symptom</div><p>Thêm section hard-tools vào <code>tool-catalog.zh.md</code> mà checker vẫn fail: heading depth lệch, code block json lệch (module vs prompt vs job_id), link target lệch. Sửa bằng cách đặt đúng heading text vẫn không đủ.</p></div>
+      <div class="field"><div class="f-label">Root cause + fix</div><p>Checker so sánh cặp file theo vị trí tuyệt đối của mọi heading + code block + link, nên (a) section zh phải mang nguyên json schema + source link y như EN (json là language-neutral), (b) thứ tự H2 section phải khớp EN tuyệt đối. File zh cũ có 7 section (schedule..subagent-control) nằm cuối file khác thứ tự EN. Fix: chèn block EN verbatim vào đúng vị trí + di chuyển block 7 section về đúng thứ tự. Cuối cùng: <code>869 pair(s) checked, all consistent</code>. Bài học: trang zh song song maintained-by-hand phải mirror cả cấu trúc, không chỉ nội dung dịch.</p></div>
+    </div>
+  </details>
+
+  </div>
+</section>
+
+<section id="governance">
+  <h2><span class="h2-index">05</span>Persistence governance</h2>
+  <p class="intro">Phần này giải thích vì sao một dòng <code>MessageSourceMap</code> lại cần một record acknowledgement, theo cơ chế có sẵn của repo.</p>
+  <ul class="plain">
+    <li>Session log là nguồn sự thật; mọi message đều persist trường <code>source</code>, union các variant được trích thành schema roots cho <code>user/message</code>, <code>developer/message</code>, <code>agent/inbox/spliced</code>, <code>session/title-llm-request</code>.</li>
+    <p></p>
+    <li>Policy <code>session-source-attribution</code> (khai qua tag <code>@persistenceSource</code> trên <code>MessageBase.source</code> trong <code>packages/llm/llm/src/message.ts</code> và tag <code>@persistenceAttribution</code> trên producer property) cho phép thêm kind mới như <em>attribution-only change</em>, same-version: reader cũ giữ nguyên message mà không cần biết producer, reader mới chấp nhận log thiếu kind.</li>
+    <p></p>
+    <li>Không gắn tag, classifier xếp là <code>union-variants-changed</code> cần version bump; gắn tag đúng quy trình thì cùng thay đổi là same-version. Cả hai trạng thái đều đã chạy thật trong phiên (trước và sau fix).</li>
+  </ul>
+  <p>Record chốt tại <a href="../../docs/persistence-changes/2026-10-04-hard-stopgate-attribution.md"><code>docs/persistence-changes/2026-10-04-hard-stopgate-attribution.md</code></a>, 4 root transitions, prose en/zh đủ summary/compatibility/verification, không còn placeholder.</p>
+</section>
+
+<section id="gates">
+  <h2><span class="h2-index">06</span>Kết quả gates cuối PR1</h2>
+  <p class="intro">Output nguyên văn của lần chạy cuối, ngày 2026-10-04.</p>
+  <table>
+    <thead><tr><th>Gate</th><th>Kết quả</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td>vitest 3 package mới</td><td><span class="chip pass">pass</span></td><td><code>Test Files 3 passed (3) / Tests 21 passed (21)</code>; coverage per-file 100% cho mission + stopgate src</td></tr>
+      <tr><td>typecheck (Host + Client)</td><td><span class="chip pass">pass</span></td><td><code>TYPECHECK_EXIT=0</code></td></tr>
+      <tr><td>lint (oxlint, 5175 files)</td><td><span class="chip pass">pass</span></td><td><code>Found 0 warnings and 0 errors</code></td></tr>
+      <tr><td>doc-sync (42 sub-gates)</td><td><span class="chip pass">pass</span></td><td><code>run-gates: 42 passed, 0 failed, 0 skipped in 89.96s</code></td></tr>
+      <tr><td>verify-persistence-changes</td><td><span class="chip pass">pass</span></td><td><code>persistence changes: 62 roots match 9 history records</code></td></tr>
+      <tr><td>constraints / duplication / verify-export-jsdoc</td><td><span class="chip pass">pass</span></td><td><code>Found 0 clones</code>; JSDoc <code>every exported name ... documented</code></td></tr>
+      <tr><td>3 README gates + translation pairing</td><td><span class="chip pass">pass</span></td><td><code>322 README(s) checked ... all conform</code>; <code>322 English package README Summaries are within 100 words</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="pr2-live">
+  <h2><span class="h2-index">07</span>PR2 live: ledger, tools, verifier, CVSS 4.0</h2>
+  <p class="intro">Section này cập nhật realtime trong lúc làm việc. Mọi mục chuyển trạng thái đều kèm evidence khi hoàn thành.</p>
+  <div id="pr2-content">
+  <div class="callout"><strong>Kết quả cuối:</strong> ba package mới (hard-ledger, hard-verifier, hard-tools) + hạ tầng docs đầy đủ (subsystem page, tool catalog en/zh, config catalog, 2 persistence acknowledgement records). Một bug thật được test mới bắt được và sửa ở source: classifyRuns xếp runs-rỗng vào confirmed (B21). Kiến trúc nâng cấp giữa chừng sang session projection sau khi phát hiện snapshotEvents bị deprecated cho code mới (B19.2).</div>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody id="pr2-rows">
+      <tr><td>Nhận yêu cầu PR2 từ user</td><td><span class="chip pass">xong</span></td><td>Phạm vi: hard-ledger (typed session events + ledger log-derived), hard-tools (4 model-facing tools), hard-verifier (sandbox PoC runner + verdict + CVSS 4.0 recompute + dedup fingerprint)</td></tr>
+      <tr><td>Khảo sát API shell seam, session.append, SessionEventMap merge</td><td><span class="chip pass">xong</span></td><td><code>session.append(type, data, {ignorable})</code>; merge qua <code>declare module '@deepseek-ai/dsh-session/types'</code>; shell seam <code>resolve(request) → execute(spec) → result()</code>; <code>ignorable</code> semantics từ <code>packages/core/session/src/types.ts:83</code> (adding ordinary event types does not bump format version)</td></tr>
+      <tr><td>hard-ledger: events + service</td><td><span class="chip pass">xong</span></td><td>10/10 tests pass; 5 event <code>hard/*</code> ignorable; ids F-n/H-n gán từ log; openWork fold</td></tr>
+      <tr><td>Lấy data + thuật toán CVSS 4.0 chính thức của FIRST</td><td><span class="chip pass">xong</span></td><td>Vendored verbatim (BSD-2-Clause): <code>cvss_lookup.js</code> (275 dòng macrovector→score), <code>maxComposed</code>, <code>maxSeverity</code>, <code>macroVector()</code>, <code>cvss_score()</code> từ repo <code>FIRSTdotorg/cvss-v4-calculator</code>; kế hoạch test: self-consistency sweep trên toàn bộ ~372 macrovector keys</td></tr>
+      <tr><td>hard-verifier: cvss4 + fingerprint + classify (pure modules)</td><td><span class="chip pass">xong</span></td><td>16/16 tests pass, trong đó test exhaustive chạy đúng 270/270 macrovector của bảng FIRST. Bug port đáng chú ý: fragment draft-era <code>SI:S</code> trong maxComposed phải dịch thành <code>MSI:S</code> khi build max vector theo spec final (m() của reference đọc qua modified-override); hai nhánh defensive trong scoreVector đánh dấu <code>v8 ignore</code> có reason vì không thể chạm bằng vector hợp lệ (đã debug: vector nghi vấn rơi vào macro <code>002201</code> có entry, không phải <code>002200</code>)</td></tr>
+      <tr><td>hard-verifier: PoC runner qua shell seam</td><td><span class="chip pass">xong</span></td><td>Service <code>hardVerifier</code> inject shell + ledger; hợp đồng bằng chứng cơ học: exit 0 + stdout chứa <code>HARD-PASS &lt;claimHash&gt;</code>; runs/timeout/stdoutMaxBytes/pocWorkdir là Config; duplicate root cause confirmed bị từ chối không tốn chạy</td></tr>
+      <tr><td>hard-tools: submit_finding / hypothesis / mark_coverage</td><td><span class="chip pass">xong</span></td><td>4 tool đăng ký trên <code>ctx.tools</code>; submit chạy verify đồng bộ rồi trả verdict JSON; 8/8 tests</td></tr>
+      <tr><td>Registration + generators + persistence ack cho event mới</td><td><span class="chip pass">xong</span></td><td>5 event được classify <code>root added (same-version allowed)</code>; record <code>2026-10-04-hard-ledger-events</code>; gate pass <code>67 roots match 10 records</code></td></tr>
+      <tr><td>Nâng cấp kiến trúc: ledger chuyển sang session projection</td><td><span class="chip pass">xong</span></td><td><code>snapshotEvents()</code> bị deprecated cho code mới (Agent Note 2026-09-09); ledger đọc qua projection <code>hardLedger</code> — pure fold 5 events, framework restore lúc resume và advance mỗi commit (bug <a href="#bug-B19">B19</a> mục 2)</td></tr>
+      <tr><td>READMEs + gates full</td><td><span class="chip pass">xong</span></td><td>ME gate 325 READMEs conform; tool catalog có section hard-tools (en + zh verbatim); persistence 67 roots/10 records; typecheck 0 lỗi; lint 0/0; duplication 0 clones; <strong>67/67 tests</strong> (6 packages); coverage per-file <strong>100%</strong> cả 3 package PR2; doc-sync <strong>42/42</strong>; pairing 869 pairs consistent</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-04. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
+</main>
+</div>
+
+<script>
+  const filter = document.getElementById('bug-filter');
+  const bugs = Array.from(document.querySelectorAll('details.bug'));
+  const count = document.getElementById('bug-count');
+  function applyFilter() {
+    const q = filter.value.trim().toLowerCase();
+    let visible = 0;
+    for (const bug of bugs) {
+      const match = q === '' || bug.textContent.toLowerCase().includes(q);
+      bug.classList.toggle('hidden', !match);
+      if (match) visible += 1;
+    }
+    count.textContent = visible + '/' + bugs.length + ' lỗi';
+  }
+  filter.addEventListener('input', applyFilter);
+  applyFilter();
+
+  const links = Array.from(document.querySelectorAll('nav.toc a'));
+  const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      for (const a of links) a.classList.remove('active');
+      const link = byId.get(entry.target.id);
+      if (link) link.classList.add('active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  targets.forEach(t => observer.observe(t));
+</script>
+</body>
+</html>

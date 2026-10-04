@@ -32,6 +32,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`, `grep` | `ctx.tools`, `ctx.subprocess`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments. |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_mark_coverage`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1376,6 +1377,191 @@ Update the current goal.
 Source: [`packages/goal/tool-goal/src/index.ts`](../packages/goal/tool-goal/src/index.ts)
 
 create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds.
+
+<a id="deepseek-aidsh-experimental-hard-tools"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-tools`
+
+### `hard_mark_coverage`
+
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "string",
+      "description": "Module or directory swept, target-repo relative."
+    },
+    "bug_class": {
+      "type": "string",
+      "description": "Bug class swept in this cell."
+    },
+    "verdict": {
+      "type": "string",
+      "description": "Cell verdict.",
+      "enum": [
+        "cleared",
+        "suspicious",
+        "uncovered"
+      ]
+    },
+    "declared_sinks": {
+      "type": "array",
+      "description": "Sink sites inspected, as file:symbol references; required for cleared."
+    }
+  },
+  "required": [
+    "module",
+    "bug_class",
+    "verdict"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_submit_finding`
+
+Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself; a finding only counts as confirmed when every run exits zero and prints the exact line HARD-PASS claim-hash on stdout. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short finding title."
+    },
+    "bug_class": {
+      "type": "string",
+      "description": "Bug class, matching the mission class list."
+    },
+    "component": {
+      "type": "string",
+      "description": "Component, module, or file the claim is about."
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Containing function or symbol, when known; strengthens dedup."
+    },
+    "claim": {
+      "type": "string",
+      "description": "The claimed vulnerability, concrete enough to test."
+    },
+    "cvss_vector": {
+      "type": "string",
+      "description": "CVSS:4.0/... vector string for the finding."
+    },
+    "cvss_score": {
+      "type": "number",
+      "description": "The score you believe the vector computes."
+    },
+    "poc_path": {
+      "type": "string",
+      "description": "Repository-relative path of the PoC script. It must print HARD-PASS sha256-of-claim on stdout and exit zero when the claim holds."
+    },
+    "hypothesis_id": {
+      "type": "string",
+      "description": "H-n id this finding confirms, when it tests a hypothesis."
+    }
+  },
+  "required": [
+    "title",
+    "bug_class",
+    "component",
+    "claim",
+    "cvss_vector",
+    "cvss_score",
+    "poc_path"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_sweep_summary`
+
+Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "phase": {
+      "type": "string",
+      "description": "A: systematic source-sink sweep. B: deep-reading pass.",
+      "enum": [
+        "A",
+        "B"
+      ]
+    },
+    "cells_touched": {
+      "type": "number",
+      "description": "Coverage cells touched this pass."
+    },
+    "new_findings": {
+      "type": "number",
+      "description": "Confirmed findings this pass produced."
+    },
+    "empty_proof": {
+      "type": "string",
+      "description": "Required when new_findings is zero: the refuted hypothesis or cleared cell."
+    }
+  },
+  "required": [
+    "phase",
+    "cells_touched",
+    "new_findings"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_update_hypothesis`
+
+Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "hypothesis_id": {
+      "type": "string",
+      "description": "H-n id to transition; omit to propose a new hypothesis."
+    },
+    "statement": {
+      "type": "string",
+      "description": "The hypothesis, concrete enough to test or refute."
+    },
+    "status": {
+      "type": "string",
+      "description": "New lifecycle status.",
+      "enum": [
+        "proposed",
+        "testing",
+        "confirmed",
+        "refuted",
+        "deferred"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "description": "Required for refuted and deferred: the evidence or retry condition."
+    }
+  },
+  "required": [
+    "statement",
+    "status"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof.
 
 <a id="deepseek-aidsh-tool-schedule"></a>
 

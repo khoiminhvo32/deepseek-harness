@@ -1238,6 +1238,83 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'hardLedger',
+    summary: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, and open-work state from the projection.',
+    description: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, and open-work state from the projection.',
+    methods: [
+      {
+        signature: 'proposeFinding(agent: Agent, request: Omit<HardFindingProposedData, \'id\'>): HardFindingId',
+        description: 'Append one validated finding-proposal record and return its id.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the validated finding fields; id assigned from the projection.' }],
+        returns: 'the assigned finding id.',
+      },
+      {
+        signature: 'recordVerdict(agent: Agent, data: HardFindingVerdictData): void',
+        description: 'Append the verifier\'s executed outcome for one proposed finding.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the verdict payload to persist.' }],
+      },
+      {
+        signature: 'writeHypothesis( agent: Agent, request: { id?: string; statement: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId',
+        description: 'Propose a new hypothesis or transition an existing one through its lifecycle.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'statement, status, optional existing id, and conditional reason.' }],
+        returns: 'the assigned or confirmed hypothesis id.',
+      },
+      {
+        signature: 'markCoverage(agent: Agent, request: HardCoverageCellData): void',
+        description: 'Append one coverage cell verdict, replacing any prior verdict for the cell.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the cell coordinates, verdict, and declared sink sites.' }],
+      },
+      {
+        signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
+        description: 'Append one completed sweep summary.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the sweep phase, counters, and conditional empty proof.' }],
+      },
+      {
+        signature: 'findings(agent: Agent): readonly HardLedgerFindingEntry[]',
+        description: 'Findings folded from the projection, proposal plus latest verdict when present.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per proposal in id order.',
+      },
+      {
+        signature: 'hypotheses(agent: Agent): readonly HardHypothesisStateData[]',
+        description: 'Hypotheses folded to their latest state per id.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per hypothesis id.',
+      },
+      {
+        signature: 'coverage(agent: Agent): readonly HardCoverageCellData[]',
+        description: 'Coverage cells folded to their latest verdict per module and class.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per module and bug-class cell.',
+      },
+      {
+        signature: 'sweepCount(agent: Agent, phase: \'A\' | \'B\'): number',
+        description: 'Count of recorded sweeps by phase, for the rotation cadence.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }, { name: 'phase', description: 'the sweep phase to count.' }],
+        returns: 'the number of summaries recorded for the phase.',
+      },
+      {
+        signature: 'openWork(agent: Agent): string[]',
+        description: 'Model-facing open work summary: pending verifications and unresolved states.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'bounded human-readable work items, empty when nothing is open.',
+      },
+    ],
+  },
+  {
+    key: 'hardVerifier',
+    summary: 'The hard-harness verifier on the `hardVerifier` key: rejects duplicates, executes proofs of effect through the shell seam, recomputes CVSS 4.0 scores against the claimed ones, and records the durable verdict.',
+    description: 'The hard-harness verifier on the `hardVerifier` key: rejects duplicates, executes proofs of effect through the shell seam, recomputes CVSS 4.0 scores against the claimed ones, and records the durable verdict.',
+    methods: [
+      {
+        signature: 'async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>',
+        description: 'Verify one proposed finding: reject duplicates, recompute CVSS, execute the configured number of PoC runs through the shell seam, classify, and append the durable verdict.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger receives the verdict.' }, { name: 'proposed', description: 'the proposal record to verify.' }],
+        returns: 'the appended verdict record.',
+      },
+    ],
+  },
+  {
     key: 'hmr',
     summary: 'Hot reload service with Cordis-compatible module configuration and events.',
     description: 'Hot reload service with Cordis-compatible module configuration and events.',
@@ -5371,6 +5448,50 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'GrantRecord',
     declaration: 'export interface GrantRecord {\n    readonly kind: \'grant\';\n    readonly payload: unknown;\n}',
+  },
+  {
+    name: 'HardCoverageCellData',
+    declaration: 'export interface HardCoverageCellData {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: HardCoverageVerdict;\n    readonly declaredSinks: readonly string[];\n}',
+  },
+  {
+    name: 'HardCoverageVerdict',
+    declaration: 'export type HardCoverageVerdict = \'cleared\' | \'suspicious\' | \'uncovered\';',
+  },
+  {
+    name: 'HardFindingId',
+    declaration: 'export type HardFindingId = Branded<\'HardFindingId\'>;',
+  },
+  {
+    name: 'HardFindingProposedData',
+    declaration: 'export interface HardFindingProposedData {\n    readonly id: HardFindingId;\n    readonly title: string;\n    readonly bugClass: string;\n    readonly component: string;\n    readonly claim: string;\n    readonly cvssVector: string;\n    readonly cvssClaimed: number;\n    readonly pocPath: string;\n    readonly claimHash: string;\n    readonly fingerprint: string;\n    readonly hypothesisId?: HardHypothesisId;\n}',
+  },
+  {
+    name: 'HardFindingVerdictData',
+    declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n}',
+  },
+  {
+    name: 'HardHypothesisId',
+    declaration: 'export type HardHypothesisId = Branded<\'HardHypothesisId\'>;',
+  },
+  {
+    name: 'HardHypothesisStateData',
+    declaration: 'export interface HardHypothesisStateData {\n    readonly id: HardHypothesisId;\n    readonly statement: string;\n    readonly status: HardHypothesisStatus;\n    readonly reason?: string;\n}',
+  },
+  {
+    name: 'HardHypothesisStatus',
+    declaration: 'export type HardHypothesisStatus = \'proposed\' | \'testing\' | \'confirmed\' | \'refuted\' | \'deferred\';',
+  },
+  {
+    name: 'HardLedgerFindingEntry',
+    declaration: 'export interface HardLedgerFindingEntry {\n    readonly proposed: HardFindingProposedData;\n    readonly verdict?: HardFindingVerdictData;\n}',
+  },
+  {
+    name: 'HardSweepSummaryData',
+    declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n}',
+  },
+  {
+    name: 'HardVerdict',
+    declaration: 'export type HardVerdict = \'confirmed\' | \'refuted\' | \'flaky\';',
   },
   {
     name: 'HookBudget',

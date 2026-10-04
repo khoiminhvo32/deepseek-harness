@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-ledger/README.md
+/:
+  en: c1e209401cbb0a29
+  zh: dd8f41d102d8a8cc
+/deepseek-ai-dsh-experimental-hard-ledger:
+  en: fca3f57a2e137220
+  zh: c8050e0a15903cbb
+/deepseek-ai-dsh-experimental-hard-ledger/summary:
+  en: 9d556dd3da31ddf5
+  zh: c8048a4c629f16ba
+/deepseek-ai-dsh-experimental-hard-ledger/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-ledger/use-this-package:
+  en: b70ffb2b0869b491
+  zh: e82794bdb91b9cf0
+/deepseek-ai-dsh-experimental-hard-ledger/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-ledger/understand-the-implementation/design:
+  en: a4e6d7fc70eb95ec
+  zh: 9baf30b4b7e3122b
+/deepseek-ai-dsh-experimental-hard-ledger/understand-the-implementation/source-map:
+  en: 97171a427e26a81c
+  zh: 83be556dfdcc7be0
+/deepseek-ai-dsh-experimental-hard-ledger/model-experience:
+  en: 5ac910e2509c7dcd
+  zh: 5ac910e2509c7dcd
+/deepseek-ai-dsh-experimental-hard-ledger/model-experience/kv-cache-effect:
+  en: 1210ec5263467703
+  zh: 1210ec5263467703
+/deepseek-ai-dsh-experimental-hard-ledger/known-limitations-and-deferred-work:
+  en: 41a97dddca43e00a
+  zh: 0b72f67bcbdab4d3
+/deepseek-ai-dsh-experimental-hard-ledger/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

@@ -108,6 +108,22 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'hardLedger',
+    pkg: 'hard-ledger',
+    title: 'Log-derived findings, hypotheses, coverage, and sweep state',
+    mode: 'seam',
+    consumers: ['hard-tools', 'hard-verifier', 'hard-stopgate'],
+    note: 'Validates and appends hard/* session events and serves the hardLedger session projection; ids are assigned from projected counts.',
+  },
+  {
+    key: 'hardVerifier',
+    pkg: 'hard-verifier',
+    title: 'Executed proofs of effect with recomputed CVSS 4.0 scores',
+    mode: 'seam',
+    consumers: ['hard-tools'],
+    note: 'Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger.',
+  },
+  {
     key: 'hmr',
     pkg: 'hmr',
     title: 'Serialized module and configuration reloads',

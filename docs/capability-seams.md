@@ -7,6 +7,12 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
+  pkg_hard_ledger["hard-ledger"]
+  svc_hardLedger["ctx.hardLedger<br/>Log-derived findings, hypotheses, coverage, and sweep state"]
+  pkg_hard_tools["hard-tools"]
+  pkg_hard_verifier["hard-verifier"]
+  pkg_hard_stopgate["hard-stopgate"]
+  svc_hardVerifier["ctx.hardVerifier<br/>Executed proofs of effect with recomputed CVSS 4.0 scores"]
   pkg_hmr["hmr"]
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
@@ -334,6 +340,8 @@ flowchart LR
   pkg_fs_sandbox --> svc_fs
   pkg_fs_ssh --> svc_fs
   pkg_goal --> svc_goals
+  pkg_hard_ledger --> svc_hardLedger
+  pkg_hard_verifier --> svc_hardVerifier
   pkg_hmr --> svc_hmr
   pkg_host_directory_picker --> svc_directoryPicker
   pkg_host_directory_picker_browse --> svc_directoryPicker
@@ -463,6 +471,10 @@ flowchart LR
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
+  svc_hardLedger --> pkg_hard_stopgate
+  svc_hardLedger --> pkg_hard_tools
+  svc_hardLedger --> pkg_hard_verifier
+  svc_hardVerifier --> pkg_hard_tools
   svc_hmr --> pkg_app_boot
   svc_jobs --> pkg_api_job_controller
   svc_jobs --> pkg_tool_bash
@@ -571,6 +583,8 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.hardLedger` | `seam` | `hard-ledger` | - | `hard-tools`, `hard-verifier`, `hard-stopgate` | - | Validates and appends hard/* session events and serves the hardLedger session projection; ids are assigned from projected counts. |
+| `ctx.hardVerifier` | `seam` | `hard-verifier` | - | `hard-tools` | - | Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
 | `ctx.pluginRegistryProbe` | `core` | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | Races public registry responses on the Host; the Client owns the initial registry recommendation. |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |

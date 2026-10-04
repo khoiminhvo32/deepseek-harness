@@ -140,6 +140,8 @@
   <a href="#pr2-live" id="nav-pr2">PR2 live</a>
   <div class="toc-divider">Nhật ký</div>
   <a href="#push">Push lên fork</a>
+  <div class="toc-divider">PR3</div>
+  <a href="#pr3-live">PR3 live</a>
 </nav>
 
 <main>
@@ -167,6 +169,7 @@
       <tr><td>PR2: ledger + tools + verifier + CVSS 4.0</td><td><span class="chip pass">xong, 55/55 tests</span></td><td><a href="#pr2-live">section 09</a>; toàn bộ gates xanh</td></tr>
       <tr><td>Chạy thử headless bằng user</td><td><span class="chip fail">lệnh mẫu sai</span></td><td>Bug <a href="#bug-B14">B14</a>: process substitution bị <code>readFileSync</code> chặn, đã có lệnh sửa</td></tr>
       <tr><td>Push PR1 + PR2 lên fork GitHub</td><td><span class="chip pass">xong</span></td><td><a href="#push">section 08</a>: stack 2 branch trên <code>khoiminhvo32/deepseek-harness</code>, commit đầu mỗi branch <code>feat/hard-harness-pr1</code> + <code>feat/hard-harness-pr2</code></td></tr>
+      <tr><td>PR3: standby + handoff</td><td><span class="chip pass">xong, 98/98 tests hard</span></td><td><a href="#pr3-live">section 09</a>; doc-sync 42/42; persistence 69 roots / 11 records; coverage 100% 3 package</td></tr>
     </tbody>
   </table>
 </section>
@@ -579,6 +582,32 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
     </tbody>
   </table>
   <div class="callout"><strong>Lưu ý trung thực:</strong> commit PR1 là commit trung gian phục vụ review — các catalog sinh tự động (config-catalog, capability-seams, event-producer-consumer, persistence-catalog) chứa nội dung của cả hai PR nên nằm gọn trong commit PR2, do đó nếu chạy gates tại đúng commit PR1 (không tính tip) thì doc gates chưa đủ. Tip của <code>feat/hard-harness-pr2</code> trùng khớp byte-đối-byte với working tree đã chạy xanh toàn bộ gates (67/67 tests, typecheck 0, lint 0/0, doc-sync 42/42, coverage 100%).</div>
+</section>
+
+<section id="pr3-live">
+  <h2><span class="h2-index">09</span>PR3 live: standby, handoff, stopgate standby-aware</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR3 (2026-10-05). Mỗi mục kèm evidence khi hoàn thành.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Khảo sát seam: request-error, schedule, compaction, session/event</td><td><span class="chip pass">xong</span></td><td><code>agent/request-error</code> là waterfall ({agent, failure: LlmFailure{code,status,providerRetryAfterMs}}, next → retry/terminal); mã <code>QUOTA</code>/<code>ACCOUNT_QUOTA</code> từ <code>packages/llm/llm/src/error.ts</code>; llm-retry chỉ retry mã trong policy nên QUOTA rơi tới; <code>turn-stopping</code> KHÔNG chạy trên turn kết thúc bằng lỗi (dispatch nằm sau step thành công) — vô hiệu hóa rủi ro steering-loop chống quota</td></tr>
+      <tr><td>Phát hiện kiến trúc: <code>ctx.schedule</code> không headless-capable</td><td><span class="chip pass">xong</span></td><td>README schedule: "cannot be mounted alone in a headless or SDK-only composition" (đòi Host Web session controller + storage). Chốt lệch thiết kế §8.5 có chủ đích: standby dùng timer in-process + projection bền (pattern goal-round-driver), không dùng ctx.schedule. Ghi trong README hạn chế "In-process waits"</td></tr>
+      <tr><td>Phát hiện: không có announce('compact') trong runtime</td><td><span class="chip pass">xong</span></td><td>grep toàn repo: chỉ 'startup' (register) và 'resume' (restore) được publish; source 'compact' tồn tại trong type nhưng không call-site → goal KHÔNG disarm sau compaction → không cần mission re-arm-on-compact (sợ hãi ban đầu vô căn cứ, đã verify trước khi code)</td></tr>
+      <tr><td>hard-standby: cron + wake resolution (pure)</td><td><span class="chip pass">xong</span></td><td><code>src/cron.ts</code> 5 trường Vixie UTC (lists/ranges/steps, OR dom/dow), next-match scan-bounded 2766 ngày; <code>src/wake.ts</code>: retryAfter → cron → cap, mọi wait capped maxStandbyHours; cap giữ vai trò cadence last-resort (lệch nhỏ so với "fails loud" trong design — chọn phương án bounded-retry, ghi trong README)</td></tr>
+      <tr><td>hard-standby: projection + plugin</td><td><span class="chip pass">xong</span></td><td>Projection <code>hardStandby</code> (fold scheduled/woke, stateVersion 1); request-error listener: chỉ root agent + goal active + chưa pending; timer Map theo agent id, chain qua trần setTimeout 2^31-1; disposed hủy timer; resume re-arm từ projection; wake: active+armed → followup, active+disarmed + under cap → resume rồi followup, paused/blocked/complete/capped → skip có reason; plugin unload hủy toàn bộ timer</td></tr>
+      <tr><td>hard-handoff: compaction observer + builder</td><td><span class="chip pass">xong</span></td><td>Nghe <code>session/event</code>, chỉ thành công (<code>error</code> absent) trên <code>compaction/end</code>; builder thuần từ ledger folds + goal view (không đọc file/scan log); maxItems cap 32 + bound 240 ký tự/t_item; inject qua <code>agent.inject</code> (điểm compaction contract cho phép)</td></tr>
+      <tr><td>stopgate standby-aware (design §8.5)</td><td><span class="chip pass">xong</span></td><td>Đọc <code>stateOf(session,'hardStandby')?.scheduled?.wakeAt</code> (undefined khi standby không mount → không đổi hành vi); pending = wakeAt &gt; now ⇒ không steer; test pin cả 3 phía</td></tr>
+      <tr><td>Bug B25: schemastery không có .optional()</td><td><span class="chip pass">fix</span></td><td><code>z.string().optional()</code> nổ runtime "<em>optional is not a function</em>"; idiom repo (verifier): để <code>z.string()</code> trần, type giữ <code>?</code>, omission = unset</td></tr>
+      <tr><td>Bug B26: session.log private + kiểu brand trong test</td><td><span class="chip pass">fix</span></td><td>Test đọc log qua <code>ctx.on('session/event')</code> (post-commit feed, đúng contract) thay vì <code>session.log</code>; compactionId/SessionSeq dùng brand constructor</td></tr>
+      <tr><td>Bug B27: gate no-unknown-casts chặn <code>as unknown</code> trong test</td><td><span class="chip pass">fix</span></td><td>Theo quy tắc "Trust TypeScript at typed boundaries": bỏ 2 typeof-guard trong resolveConfig (kiểu sai do schemastery chặn ở Loader, test qua harness), giữ value-checks; verify-no-unknown-casts pass "no new assertions"</td></tr>
+      <tr><td>Bug B28: git stash pop xung đột khi kiểm chứng fail có sẵn</td><td><span class="chip pass">fix + bài học</span></td><td>Stash để chạy test trên cây sạch khiến pop va chạm với pnpm-lock; phục hồi bằng <code>git checkout stash -- pnpm-lock.yaml</code> + pop, đủ 34 file; bài học: dùng worktree thay stash (đã dùng cho mọi verify sau đó)</td></tr>
+      <tr><td>Bug B29: 2 spec latent cũ từ PR1/PR2</td><td><span class="chip pass">fix</span></td><td><code>release/families.spec.ts</code> thiếu 8 package hard trong expected publish set; <code>gen-tool-catalog.spec.ts</code> thiếu 4 tool hard — chỉ lộ khi chạy suite rộng; đã bổ sung đúng alphabetical/publish-order</td></tr>
+      <tr><td>Persistence: 1 record gộp thay vì 2 record tách</td><td><span class="chip pass">xong</span></td><td>Công cụ <code>persistence-changes --record</code> bắt TOÀN BỘ diff chưa ack (2 event roots + 4 attribution roots) trong 1 lần; không cách tách trong tool → 1 record <code>2026-10-05-hard-standby-handoff-persistence</code> same-version, prose en/zh đầy đủ; gate: 69 roots / 11 records</td></tr>
+      <tr><td>Docs wiring: generators + README rows + subsystem</td><td><span class="chip pass">xong</span></td><td>gen-config-catalog (2 config mới), gen-plugin-packages (packages.md +2), gen-doc-graphs (event-producer-consumer +2 events), persistence-formats --write, experimental README +2 hàng en/zh + i18n re-record, subsystem hard-harness +2 plugin (en/zh), bundle README + patch 4 plugin, zh config-catalog link locale đúng</td></tr>
+      <tr><td>Gates cuối PR3</td><td><span class="chip pass">xong</span></td><td>98/98 tests hard packages (10 file) + families 32/32 + tool-catalog 10/10; doc-sync <strong>42/42</strong>; persistence 69/11; typecheck 0 lỗi; lint 0/0; duplication 0 clones; coverage per-file 100% hard-standby/hard-handoff/hard-stopgate (v8 ignore có reason cho nhánh defensive); verify-no-unknown-casts pass</td></tr>
+      <tr><td>Các fail môi trường có sẵn (không phải PR3)</td><td><span class="chip pass">đối chứng</span></td><td>Chạy trên worktree sạch tại HEAD pr2: rescope-vendor 16 vấn đề, verify-repository-references (partial clone), http-proxy bypass, browser-use stagehand ×2 — đều fail y hệt ⇒ pre-existing sandbox hạn chế, không phải hồi quy của PR3</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-05. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>

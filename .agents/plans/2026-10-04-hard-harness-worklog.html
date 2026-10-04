@@ -138,6 +138,8 @@
   <a href="#gates">Kết quả gates</a>
   <div class="toc-divider">PR2</div>
   <a href="#pr2-live" id="nav-pr2">PR2 live</a>
+  <div class="toc-divider">Nhật ký</div>
+  <a href="#push">Push lên fork</a>
 </nav>
 
 <main>
@@ -164,6 +166,7 @@
       <tr><td>Persistence ack cho source kind</td><td><span class="chip pass">xong</span></td><td><code>docs/persistence-changes/2026-10-04-hard-stopgate-attribution.md</code>, gate pass 62 roots / 9 records</td></tr>
       <tr><td>PR2: ledger + tools + verifier + CVSS 4.0</td><td><span class="chip pass">xong, 55/55 tests</span></td><td><a href="#pr2-live">section 09</a>; toàn bộ gates xanh</td></tr>
       <tr><td>Chạy thử headless bằng user</td><td><span class="chip fail">lệnh mẫu sai</span></td><td>Bug <a href="#bug-B14">B14</a>: process substitution bị <code>readFileSync</code> chặn, đã có lệnh sửa</td></tr>
+      <tr><td>Push PR1 + PR2 lên fork GitHub</td><td><span class="chip pass">xong</span></td><td><a href="#push">section 08</a>: stack 2 branch trên <code>khoiminhvo32/deepseek-harness</code>, commit <code>64aae4ec15</code> + <code>2164e66393</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -561,7 +564,24 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </div>
 </section>
 
-<div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-04. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
+<section id="push">
+  <h2><span class="h2-index">08</span>Push lên fork GitHub (2026-10-05)</h2>
+  <p class="intro">Theo yêu cầu của chủ repo, toàn bộ thay đổi PR1 + PR2 được đẩy lên fork cá nhân. Không tạo PR nào về upstream <code>deepseek-ai/deepseek-harness</code>.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Bằng chứng</th></tr></thead>
+    <tbody>
+      <tr><td>Fork + remote</td><td><span class="chip pass">xong</span></td><td><code>gh repo fork --remote</code> với tài khoản <code>khoiminhvo32</code> (đã verify <code>gh auth status</code> trước đó); remote <code>origin</code> trỏ về fork, repo gốc thành <code>upstream</code></td></tr>
+      <tr><td>Chia 2 commit đúng phạm vi PR</td><td><span class="chip pass">xong</span></td><td>File dùng chung (tsconfig.base/host, README experimental en/zh + i18n record, composition-reference <code>packages.md</code>, SENTENCE_MODEL_EXPERIENCE) được cắt subset theo PR; <code>pnpm-lock.yaml</code> regenerate bằng <code>pnpm install --lockfile-only</code> cho đúng 3 package PR1 (+81 dòng); bản ghi pairing viết lại bằng <code>verify-translation-pairing --write</code></td></tr>
+      <tr><td>Commit PR1</td><td><span class="chip pass">xong</span></td><td><code>64aae4ec15</code> <em>feat(experimental): hard mission, stop-gate, and bundle</em> — 36 file; branch <code>feat/hard-harness-pr1</code>; kèm design doc; pre-commit lefthook pass (pairing 5 pairs, lint 0/0, whitespace, notices)</td></tr>
+      <tr><td>Commit PR2</td><td><span class="chip pass">xong</span></td><td><code>2164e66393</code> <em>feat(experimental): hard ledger, verifier, and tools</em> — 70 file; branch <code>feat/hard-harness-pr2</code> xếp trên PR1; khôi phục nguyên trạng working tree đã verify gates; pre-commit pass (pairing 11 pairs, lint 0/0)</td></tr>
+      <tr><td>Loại khỏi commit</td><td><span class="chip pass">xong</span></td><td><code>.zcodeignore</code> (config tool cục bộ, untracked) — <code>git status</code> sau 2 commit sạch trừ đúng file này</td></tr>
+      <tr><td>Push</td><td><span class="chip pass">xong</span></td><td><code>git push -u origin feat/hard-harness-pr1 feat/hard-harness-pr2</code>; pre-push hook typecheck <code>tsconfig.client.json</code> pass (53s); cả 2 branch track origin</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><strong>Lưu ý trung thực:</strong> commit PR1 là commit trung gian phục vụ review — các catalog sinh tự động (config-catalog, capability-seams, event-producer-consumer, persistence-catalog) chứa nội dung của cả hai PR nên nằm gọn trong commit PR2, do đó nếu chạy gates tại đúng commit PR1 (không tính tip) thì doc gates chưa đủ. Tip của <code>feat/hard-harness-pr2</code> trùng khớp byte-đối-byte với working tree đã chạy xanh toàn bộ gates (67/67 tests, typecheck 0, lint 0/0, doc-sync 42/42, coverage 100%).</div>
+</section>
+
+<div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-05. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>
 

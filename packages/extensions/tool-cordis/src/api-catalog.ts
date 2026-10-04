@@ -1312,6 +1312,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'agent', description: 'the live agent whose ledger receives the verdict.' }, { name: 'proposed', description: 'the proposal record to verify.' }],
         returns: 'the appended verdict record.',
       },
+      {
+        signature: 'async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>',
+        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, or a grep without misses returns `undefined` and changes nothing.',
+        parameters: [{ name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
+        returns: 'the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.',
+      },
     ],
   },
   {
@@ -5080,6 +5086,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CordisRuntimeTreeReader',
     declaration: 'export interface CordisRuntimeTreeReader {\n    getTree(): Promise<CordisRuntimeTree>;\n}',
+  },
+  {
+    name: 'CoverageAuditCell',
+    declaration: 'export interface CoverageAuditCell {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: \'cleared\' | \'suspicious\' | \'uncovered\';\n    readonly declaredSinks: readonly string[];\n}',
+  },
+  {
+    name: 'CoverageReopenRecord',
+    declaration: 'export interface CoverageReopenRecord {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: \'suspicious\';\n    readonly declaredSinks: readonly string[];\n}',
   },
   {
     name: 'CreateAgentOptions',

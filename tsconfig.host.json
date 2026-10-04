@@ -492,6 +492,8 @@
     { "path": "./packages/experimental/hard-bundle" },
     { "path": "./packages/experimental/hard-standby" },
     { "path": "./packages/experimental/hard-handoff" },
+    { "path": "./packages/experimental/hard-rounds" },
+    { "path": "./packages/experimental/hard-deepread" },
     { "path": "./apps/cli" },
     { "path": "./apps/desktop-host" },
     { "path": "./apps/desktop/tsconfig.host.json" }

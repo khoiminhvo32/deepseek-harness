@@ -142,6 +142,8 @@
   <a href="#push">Push lên fork</a>
   <div class="toc-divider">PR3</div>
   <a href="#pr3-live">PR3 live</a>
+  <div class="toc-divider">PR4</div>
+  <a href="#pr4-live">PR4 live</a>
 </nav>
 
 <main>
@@ -170,6 +172,7 @@
       <tr><td>Chạy thử headless bằng user</td><td><span class="chip fail">lệnh mẫu sai</span></td><td>Bug <a href="#bug-B14">B14</a>: process substitution bị <code>readFileSync</code> chặn, đã có lệnh sửa</td></tr>
       <tr><td>Push PR1 + PR2 lên fork GitHub</td><td><span class="chip pass">xong</span></td><td><a href="#push">section 08</a>: stack 2 branch trên <code>khoiminhvo32/deepseek-harness</code>, commit đầu mỗi branch <code>feat/hard-harness-pr1</code> + <code>feat/hard-harness-pr2</code></td></tr>
       <tr><td>PR3: standby + handoff</td><td><span class="chip pass">xong, 98/98 tests hard</span></td><td><a href="#pr3-live">section 09</a>; doc-sync 42/42; persistence 69 roots / 11 records; coverage 100% 3 package</td></tr>
+      <tr><td>PR4: rounds + deepread + coverage cross-check</td><td><span class="chip pass">xong, 147/147 tests</span></td><td><a href="#pr4-live">section 10</a>; doc-sync 42/42; persistence 71 roots / 12 records; bundle 6 plugin</td></tr>
     </tbody>
   </table>
 </section>
@@ -606,6 +609,25 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
       <tr><td>Docs wiring: generators + README rows + subsystem</td><td><span class="chip pass">xong</span></td><td>gen-config-catalog (2 config mới), gen-plugin-packages (packages.md +2), gen-doc-graphs (event-producer-consumer +2 events), persistence-formats --write, experimental README +2 hàng en/zh + i18n re-record, subsystem hard-harness +2 plugin (en/zh), bundle README + patch 4 plugin, zh config-catalog link locale đúng</td></tr>
       <tr><td>Gates cuối PR3</td><td><span class="chip pass">xong</span></td><td>98/98 tests hard packages (10 file) + families 32/32 + tool-catalog 10/10; doc-sync <strong>42/42</strong>; persistence 69/11; typecheck 0 lỗi; lint 0/0; duplication 0 clones; coverage per-file 100% hard-standby/hard-handoff/hard-stopgate (v8 ignore có reason cho nhánh defensive); verify-no-unknown-casts pass</td></tr>
       <tr><td>Các fail môi trường có sẵn (không phải PR3)</td><td><span class="chip pass">đối chứng</span></td><td>Chạy trên worktree sạch tại HEAD pr2: rescope-vendor 16 vấn đề, verify-repository-references (partial clone), http-proxy bypass, browser-use stagehand ×2 — đều fail y hệt ⇒ pre-existing sandbox hạn chế, không phải hồi quy của PR3</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="pr4-live">
+  <h2><span class="h2-index">10</span>PR4 live: rounds, deepread, coverage cross-check</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR4 (2026-10-05). Mỗi mục kèm evidence khi hoàn thành.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Chốt kiến trúc: tái sử dụng goal-round-driver thay vì fork</td><td><span class="chip pass">xong</span></td><td>Design viết "round driver (theo pattern goal-round-driver)"; quy tắc repo "prefer maintained over hand-rolling when it deletes owned code" → hard-rounds KHÔNG tự reserve/fence mà quan sát các goal round mà driver có sẵn đã admitting (user/message source kind 'goal'), chỉ bổ sung: round events, context injection, A/B phase, stepsPerRound cap. Fence/reserve/count-cap là của driver — hai bên không thể diverge trên admission semantics</td></tr>
+      <tr><td>Bug B30: reentrancy của session append feed</td><td><span class="chip pass">fix</span></td><td>Append bên trong listener <code>session/event</code> nổ "session append cannot reenter while another append is being published" (feed chạy TRONG entry.appending=true); debug bằng tsx script có dụng cụ; fix: đẩy round/start + inject sang <code>queueMicrotask</code>, test drain microtask trước assert</td></tr>
+      <tr><td>hard-rounds: accounting + A/B + step cap</td><td><span class="chip pass">xong</span></td><td><code>hard/round/start</code> {round, phase, openWorkCount} + inject <code>&lt;hard_round n/max&gt;</code> kèm phase instruction + open work (10 items); phaseFor: B khi round % (N+1) == 0; đếm step/start, chạm stepsPerRound → <code>agent.cancel({kind:'hook'})</code> qua turn-stopping; turn/end → <code>hard/round/end</code> {round, steps, reason 'closed'|'step-cap'}; 7/7 tests gồm tuần tự 4 vòng A/A/A/B</td></tr>
+      <tr><td>hard-deepread: Phase B contract section</td><td><span class="chip pass">xong</span></td><td>Section <code>hard:deep-read</code> (HARD_DEEP_READ: 710 trong SECTION_ORDERS): 6-section flow doc (entry points, dataflow, trust boundaries, state machines, assumptions, suspicious quirks), lưu <code>.dsh-hard/flow/&lt;module&gt;.md</code>, fan-out cap <code>maxModulesPerPass</code> (mặc định 6, 1–16), lifecycle hypothesis proposed → testing (falsification step) → confirmed cần executed evidence; pass không quirk vẫn phải hard_sweep_summary + emptyProof; "guidance, not machinery" — fan-out chạy qua tool subagent có sẵn</td></tr>
+      <tr><td>Coverage cross-check grep (design §6) trong hard-verifier</td><td><span class="chip pass">xong</span></td><td>17 bug class × sink-pattern ERE (protocol cố định, không tunable) trong <code>src/sink-patterns.ts</code>; <code>auditCoverage(cell)</code>: chỉ cell `cleared` + class có pattern + được sample deterministic theo hash(module\u0000class) với <code>coverageSpotCheckPercent</code> (mặc định 20, 0–100, 0 = tắt); grep -rInE qua shell seam; sink chưa khai báo → cell reopen `suspicious` với đúng các match làm bằng chứng; hook vào tool <code>hard_mark_coverage</code> (schema thêm reopenedSinks, luôn có mặt)</td></tr>
+      <tr><td>Bug B31: TS2719 dual-identity qua biên lib/src</td><td><span class="chip pass">fix</span></td><td>HardCoverageVerdict trôi giữa hard-ledger lib/types và src khiến execute của tool không gán được; fix 3 lớp: enum literal trong parameter schema, structural interface (CoverageAuditCell/CoverageReopenRecord) thay type flow qua biên, mutable array khi trả reopenedSinks; bỏ luôn COVERAGE_VERDICTS qua biên</td></tr>
+      <tr><td>Bug B32: domain merge không tự nạp</td><td><span class="chip pass">fix</span></td><td>rounds index quên <code>import type {} from './domain.ts'</code> → SessionEventMap thiếu hard/round/* trong chương trình typecheck (test runtime vẫn pass vì merge phụ thuộc thứ tự import); probe test dùng structural cast thay so sánh enum</td></tr>
+      <tr><td>Persistence + bundle + docs</td><td><span class="chip pass">xong</span></td><td>Record <code>2026-10-05-hard-round-events</code> (2 roots, same-version) → 71 roots / 12 records; bundle 6 plugin (deps + patch + test); README en/zh ×2 + i18n records; experimental README +2 hàng; subsystem page +rounds/deepread/cross-check; TYPE_LINK_EXEMPTIONS +2 (CoverageAuditCell/ReopenRecord → hard-verifier README); families.spec +2; generators regen</td></tr>
+      <tr><td>Gates cuối PR4</td><td><span class="chip pass">xong</span></td><td>147/147 tests (13 file); doc-sync <strong>42/42</strong>; persistence 71/12; typecheck 0; lint 0/0; duplication 0; coverage 100% các file hard mới; unknown-casts pass</td></tr>
     </tbody>
   </table>
 </section>

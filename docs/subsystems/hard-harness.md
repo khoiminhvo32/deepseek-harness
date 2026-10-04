@@ -2,7 +2,7 @@
 
 English | [中文](hard-harness.zh.md)
 
-Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.md) steers the turn boundary back to work while an armed goal stands, the [standby](../../packages/experimental/hard-standby/README.md) waits out terminal quota failures and wakes the mission at the reset time, and the [handoff](../../packages/experimental/hard-handoff/README.md) injects the durable ledger summary after each successful compaction.
+Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.md) steers the turn boundary back to work while an armed goal stands, the [standby](../../packages/experimental/hard-standby/README.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
 
 ## Ledger state
 
@@ -125,6 +125,18 @@ The hard-harness verifier on the `hardVerifier` key: rejects duplicates, execute
  * @returns the appended verdict record.
  */
 async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>
+
+/**
+ * Deterministic cross-check of one `cleared` coverage cell: re-grep the
+ * module against the bug class's fixed sink patterns and reopen the cell
+ * as `suspicious` when undeclared sink sites surface. Sampling follows the
+ * configured spot-check percent by cell hash; an unsampled cell, a
+ * non-cleared cell, a class without patterns, or a grep without misses
+ * returns `undefined` and changes nothing.
+ * @param cell - the coverage cell the model just marked `cleared`.
+ * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
+ */
+async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
 ```
 
 Types: [Agent](core.md)

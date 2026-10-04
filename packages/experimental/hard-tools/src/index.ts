@@ -12,7 +12,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
-import type { HardHypothesisStatus, HardCoverageVerdict } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
 
 export const name = 'hard-tools'
 export const inject = ['tools', 'hardLedger', 'hardVerifier']
@@ -24,7 +24,6 @@ export interface Config {}
 export const Config: z<Config> = z.object({})
 
 const HYPOTHESIS_STATUSES: readonly HardHypothesisStatus[] = ['proposed', 'testing', 'confirmed', 'refuted', 'deferred']
-const COVERAGE_VERDICTS: readonly HardCoverageVerdict[] = ['cleared', 'suspicious', 'uncovered']
 
 const SUBMIT_DESCRIPTION = 'Submit one vulnerability finding for harness verification. The harness executes '
   + 'the proof of concept itself; a finding only counts as confirmed when every run exits zero and prints '
@@ -197,7 +196,7 @@ export function apply(ctx: Context, _config: Config): void {
     parameters: {
       module: { type: 'string', required: true, description: 'Module or directory swept, target-repo relative.' },
       bug_class: { type: 'string', required: true, description: 'Bug class swept in this cell.' },
-      verdict: { type: 'string', required: true, enum: [...COVERAGE_VERDICTS], description: 'Cell verdict.' },
+      verdict: { type: 'string', required: true, enum: ['cleared', 'suspicious', 'uncovered'], description: 'Cell verdict.' },
       declared_sinks: {
         type: 'array', description: 'Sink sites inspected, as file:symbol references; required for cleared.',
       },
@@ -214,20 +213,27 @@ export function apply(ctx: Context, _config: Config): void {
               verdict: { type: 'string', required: true },
             },
           },
+          reopenedSinks: { type: 'array', required: true, description: 'Undeclared sink sites the cross-check grep found; empty when the cell stands.' },
         },
       } as const,
       render: renderJson,
     },
     execute(args, exec) {
-      if (exec.agent === undefined) throw new Error('hard_mark_coverage requires a live agent')
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_mark_coverage requires a live agent')
       const declaredSinks = (args.declared_sinks ?? []).filter((sink): sink is string => typeof sink === 'string')
-      ledger.markCoverage(exec.agent, {
-        module: args.module,
-        bugClass: args.bug_class,
-        verdict: args.verdict,
-        declaredSinks,
+      const cell = { module: args.module, bugClass: args.bug_class, verdict: args.verdict, declaredSinks }
+      ledger.markCoverage(agent, cell)
+      return verifier.auditCoverage(cell).then((reopened) => {
+        if (reopened !== undefined) ledger.markCoverage(agent, reopened)
+        const coverage = reopened === undefined
+          ? { module: cell.module, bugClass: cell.bugClass, verdict: cell.verdict }
+          : { module: reopened.module, bugClass: reopened.bugClass, verdict: reopened.verdict }
+        return {
+          coverage,
+          reopenedSinks: reopened === undefined ? [] : [...reopened.declaredSinks],
+        }
       })
-      return Promise.resolve({ coverage: { module: args.module, bugClass: args.bug_class, verdict: args.verdict } })
     },
     presentCall: args => present(`Coverage ${args.module} x ${args.bug_class}: ${args.verdict}`, args.module),
   }))

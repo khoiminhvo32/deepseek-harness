@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-05-hard-round-events.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-05-hard-round-events.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-05-hard-round-events:
+  en: 03b90acc0c6a7b61
+  zh: ad6bcdc1442db8d7
+/2026-10-05-hard-round-events/summary:
+  en: 09e23c0e6c7747c8
+  zh: b7a6ddfdd149201c
+/2026-10-05-hard-round-events/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-05-hard-round-events/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-05-hard-round-events/compatibility:
+  en: 97b6a77d93d4df62
+  zh: 884388cd8c0479b5
+/2026-10-05-hard-round-events/verification:
+  en: b355d4d552bd5d6e
+  zh: 1cb12737551a7630
+/2026-10-05-hard-round-events/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

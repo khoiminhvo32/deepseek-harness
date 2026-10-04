@@ -50,10 +50,12 @@ Experimental prototypes may change their contracts and carry no support promise.
 | [`hard-stopgate`](hard-stopgate/README.md) | Steers the turn boundary back to work while an armed goal is active | — |
 | [`hard-standby`](hard-standby/README.md) | Waits out terminal quota failures on a bounded schedule and wakes the mission | — |
 | [`hard-handoff`](hard-handoff/README.md) | Injects the durable ledger summary after each successful compaction | — |
+| [`hard-rounds`](hard-rounds/README.md) | Round accounting, A/B rotation, and the per-round step budget over the goal-round driver | — |
+| [`hard-deepread`](hard-deepread/README.md) | The Phase B deep-reading contract: flow documents and subagent fan-out | — |
 | [`hard-ledger`](hard-ledger/README.md) | Durable findings, hypotheses, coverage, and sweep state over `hard/*` session events | `ctx.hardLedger` |
 | [`hard-verifier`](hard-verifier/README.md) | Executes findings' proofs of effect and recomputes their CVSS 4.0 scores | `ctx.hardVerifier` |
 | [`hard-tools`](hard-tools/README.md) | Model-facing finding, hypothesis, coverage, and sweep tools | registers tools on `ctx.tools` |
-| [`hard-bundle`](hard-bundle/README.md) | Optional hard-agent composition of the mission, stop gate, standby, and handoff | — |
+| [`hard-bundle`](hard-bundle/README.md) | Optional hard-agent composition of the six hard plugins | — |
 | [`webworker-packer`](webworker-packer/README.md) | Builds the gzip-compressed VFS image consumed by the browser worker preview | library and CLI — no ctx key |
 | [`webworker-runtime`](webworker-runtime/README.md) | Runs the harness plugin tree inside a dedicated browser worker | library and worker entry — no ctx key |
 

@@ -6,6 +6,7 @@
  * @module @deepseek-ai/dsh-experimental-hard-verifier
  */
 
+import { createHash } from 'node:crypto'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -13,6 +14,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { HardFindingProposedData, HardFindingVerdictData } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
+import { SINK_PATTERNS } from './sink-patterns.ts'
 import { classifyRuns } from './verdict.ts'
 import type { PoCRunRecord } from './verdict.ts'
 // Loads the declaration-merged `shell` Context key this service executes through.
@@ -27,6 +29,9 @@ export const DEFAULT_VERIFIER_TIMEOUT_SECONDS = 120
 /** Default foreground stdout capture budget per run, in bytes. */
 export const DEFAULT_STDOUT_MAX_BYTES = 65536
 
+/** Default share of `cleared` coverage cells the cross-check re-greps, in percent. */
+export const DEFAULT_COVERAGE_SPOT_CHECK_PERCENT = 20
+
 /** Verifier plugin config. */
 export interface Config {
   /**
@@ -40,6 +45,12 @@ export interface Config {
   stdoutMaxBytes?: number
   /** Working directory for PoC execution; defaults to the shell provider's own. */
   pocWorkdir?: string
+  /**
+   * Share of `cleared` coverage cells the deterministic cross-check re-greps,
+   * in percent. Cells are sampled by their own module and class hash, so the
+   * same cell is always sampled or always skipped; `0` disables the check.
+   */
+  coverageSpotCheckPercent?: number
 }
 
 /** Schemastery config for the verifier. */
@@ -48,6 +59,7 @@ export const Config: z<Config> = z.object({
   timeoutSeconds: z.number().step(1).min(1).max(3600).default(DEFAULT_VERIFIER_TIMEOUT_SECONDS),
   stdoutMaxBytes: z.number().step(1).min(1024).default(DEFAULT_STDOUT_MAX_BYTES),
   pocWorkdir: z.string(),
+  coverageSpotCheckPercent: z.number().step(1).min(0).max(100).default(DEFAULT_COVERAGE_SPOT_CHECK_PERCENT),
 })
 
 /** Fully materialized verifier settings. */
@@ -56,6 +68,7 @@ interface ResolvedConfig {
   readonly timeoutSeconds: number
   readonly stdoutMaxBytes: number
   readonly pocWorkdir?: string
+  readonly coverageSpotCheckPercent: number
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -75,11 +88,16 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (config.pocWorkdir !== undefined && config.pocWorkdir.trim().length === 0) {
     throw new TypeError('pocWorkdir must not be blank when provided')
   }
+  const coverageSpotCheckPercent = config.coverageSpotCheckPercent ?? DEFAULT_COVERAGE_SPOT_CHECK_PERCENT
+  if (!Number.isSafeInteger(coverageSpotCheckPercent) || coverageSpotCheckPercent < 0 || coverageSpotCheckPercent > 100) {
+    throw new TypeError('coverageSpotCheckPercent must be a safe integer from 0 through 100')
+  }
   return {
     runs,
     timeoutSeconds,
     stdoutMaxBytes,
     ...config.pocWorkdir === undefined ? {} : { pocWorkdir: config.pocWorkdir },
+    coverageSpotCheckPercent,
   }
 }
 
@@ -101,6 +119,37 @@ function recomputeCvss(proposed: HardFindingProposedData): { computed: number; m
     )
   }
   return { computed, match: Math.abs(computed - proposed.cvssClaimed) < 1e-9 }
+}
+
+/** Structural coverage-cell input for the cross-check; bridges ledger-type identities across package builds. */
+export interface CoverageAuditCell {
+  readonly module: string
+  readonly bugClass: string
+  readonly verdict: 'cleared' | 'suspicious' | 'uncovered'
+  readonly declaredSinks: readonly string[]
+}
+
+/** Structural reopening record the cross-check produces for a failed audit. */
+export interface CoverageReopenRecord {
+  readonly module: string
+  readonly bugClass: string
+  readonly verdict: 'suspicious'
+  readonly declaredSinks: readonly string[]
+}
+
+/**
+ * Deterministic sampling of one coverage cell: the hash of its module and
+ * class decides the spot check, so the same cell is always sampled or always
+ * skipped and the check never depends on wall-clock randomness.
+ * @param cell - the coverage cell under test.
+ * @param percent - the share of cells to sample, 0 through 100.
+ * @returns true when the cross-check inspects this cell.
+ */
+export function sampleCellForSpotCheck(cell: { module: string; bugClass: string }, percent: number): boolean {
+  if (percent <= 0) return false
+  if (percent >= 100) return true
+  const digest = createHash('sha256').update(`${cell.module}\u0000${cell.bugClass}`).digest()
+  return (digest[0] ?? 255) * 100 < percent * 256
 }
 
 /**
@@ -184,9 +233,43 @@ export class HardVerifier extends Service {
     ledger.recordVerdict(agent, verdict)
     return verdict
   }
+
+  /**
+   * Deterministic cross-check of one `cleared` coverage cell: re-grep the
+   * module against the bug class's fixed sink patterns and reopen the cell
+   * as `suspicious` when undeclared sink sites surface. Sampling follows the
+   * configured spot-check percent by cell hash; an unsampled cell, a
+   * non-cleared cell, a class without patterns, or a grep without misses
+   * returns `undefined` and changes nothing.
+   * @param cell - the coverage cell the model just marked `cleared`.
+   * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
+   */
+  async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined> {
+    if (cell.verdict !== 'cleared') return undefined
+    const patterns = SINK_PATTERNS[cell.bugClass]
+    if (patterns === undefined || patterns.length === 0) return undefined
+    if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
+    const config = this.resolved
+    const spec = this.ctx.shell.resolve({
+      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)} 2>/dev/null || true`,
+      timeoutMs: config.timeoutSeconds * 1000,
+      stdoutMaxBytes: config.stdoutMaxBytes,
+      ...config.pocWorkdir === undefined ? {} : { workdir: config.pocWorkdir },
+    })
+    const execution = await this.ctx.shell.execute(spec)
+    const result = await execution.result()
+    if (result.timedOut || result.aborted || result.exitCode !== 0) return undefined
+    const missed = result.stdout.text.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => line.includes(sink)))
+      .slice(0, 8)
+    if (missed.length === 0) return undefined
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed }
+  }
 }
 
 export { parseVector, scoreVector, macroVector, severityBand } from './cvss4.ts'
+export { SINK_PATTERNS } from './sink-patterns.ts'
 export { claimHash, rootFingerprint } from './fingerprint.ts'
 export { classifyRuns, runSatisfied } from './verdict.ts'
 export type { PoCRunRecord } from './verdict.ts'

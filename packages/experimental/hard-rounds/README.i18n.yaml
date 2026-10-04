@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-rounds/README.md
+/:
+  en: 150256842f23c36d
+  zh: 12bb3b88576a8a51
+/deepseek-ai-dsh-experimental-hard-rounds:
+  en: 2fe2af9ed647bd1f
+  zh: e484b738e8585ad1
+/deepseek-ai-dsh-experimental-hard-rounds/summary:
+  en: fd77b90a9381acee
+  zh: 4f1eeaa1dad766e6
+/deepseek-ai-dsh-experimental-hard-rounds/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-rounds/use-this-package:
+  en: 0e1ee41e0b3bfc1b
+  zh: da2029d401f8db76
+/deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation/design:
+  en: ae256fc3bed9f59c
+  zh: 6a03d54b753e3203
+/deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation/source-map:
+  en: 43774df95421eda7
+  zh: 4ccd92effc96e6d3
+/deepseek-ai-dsh-experimental-hard-rounds/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-rounds/model-experience/injected-context:
+  en: 0a38a6ef751fc5d5
+  zh: 0a38a6ef751fc5d5
+/deepseek-ai-dsh-experimental-hard-rounds/model-experience/injected-context/what-the-model-sees:
+  en: 7a748489f494167d
+  zh: ca17fb6dca5e4977
+/deepseek-ai-dsh-experimental-hard-rounds/model-experience/injected-context/token-effect:
+  en: b701e236a98809d2
+  zh: 8851214938258ddc
+/deepseek-ai-dsh-experimental-hard-rounds/model-experience/injected-context/kv-cache-effect:
+  en: 55f27a815f89a071
+  zh: 8006dc5eba1ae8a0
+/deepseek-ai-dsh-experimental-hard-rounds/known-limitations-and-deferred-work:
+  en: 529ed1719bef9ab4
+  zh: feb34422172cfe6d
+/deepseek-ai-dsh-experimental-hard-rounds/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

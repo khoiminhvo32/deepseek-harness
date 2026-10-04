@@ -190,9 +190,11 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-client-ui-voice-input` | no | Record speech and insert editable text into the conversation draft |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` | yes | Experimental computer use through an installed Cua Driver MCP executable |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | no | Experimental computer-use provider embedding the Cua Driver native npm SDK |
+| `@deepseek-ai/dsh-experimental-hard-deepread` | yes | The deep-reading pass template for the hard mission: flow-document contract and subagent fan-out guidance |
 | `@deepseek-ai/dsh-experimental-hard-handoff` | yes | Injects a durable ledger handoff after each successful compaction so the mission resumes with verified facts |
 | `@deepseek-ai/dsh-experimental-hard-ledger` | yes | Durable findings, hypotheses, and coverage ledger over typed hard/* session events |
 | `@deepseek-ai/dsh-experimental-hard-mission` | yes | Arms the configured long-running objective as a durable session goal and teaches the mission contract through a system-prompt section |
+| `@deepseek-ai/dsh-experimental-hard-rounds` | yes | Round accounting for the hard mission: A/B rotation, open-work injection, and the per-round step budget over the shipped goal-round driver |
 | `@deepseek-ai/dsh-experimental-hard-standby` | yes | Waits out terminal quota failures on a bounded schedule and wakes the mission when the window resets |
 | `@deepseek-ai/dsh-experimental-hard-stopgate` | yes | Keeps an armed goal's session working by steering a continuation order whenever the turn tries to close early |
 | `@deepseek-ai/dsh-experimental-hard-tools` | yes | Model-facing hard-harness tools: verified finding submission, hypothesis lifecycle, coverage cells, and sweep summaries |

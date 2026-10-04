@@ -292,6 +292,22 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(1)
   })
 
+  it('reopens a cleared cell whose cross-check grep finds undeclared sinks', async () => {
+    const { ctx, root } = await harness(
+      { exitCode: 0, stdoutText: 'src/db/exec.ts:9: exec(userCmd)\n' },
+      { runs: 1, coverageSpotCheckPercent: 100 },
+    )
+    const reopened = resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'cmdi', verdict: 'cleared',
+      declared_sinks: ['src/db/query.ts:42 rawQuery()'],
+    }, root.agent))
+    expect(reopened.coverage).toMatchObject({ module: 'src/db', verdict: 'suspicious' })
+    expect(reopened.reopenedSinks).toEqual(['src/db/exec.ts:9: exec(userCmd)'])
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([
+      expect.objectContaining({ verdict: 'suspicious', declaredSinks: ['src/db/exec.ts:9: exec(userCmd)'] }),
+    ])
+  })
+
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {
     const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
     const omitted = resultJson(await execute(ctx, 'hard_mark_coverage', {

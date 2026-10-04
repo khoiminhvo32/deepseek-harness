@@ -9,7 +9,7 @@ import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
-import HardVerifier, { claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import HardVerifier, { claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { Config as VerifierConfig } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { HardFindingId } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -273,6 +273,65 @@ describe('hard verifier verdict units', () => {
       claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
     })
     expect(aborted.reason).toBe('the PoC was aborted before settling')
+  })
+})
+
+/** One cleared cell for the cross-check tests. */
+const clearedCell = {
+  module: 'src/auth',
+  bugClass: 'cmdi',
+  verdict: 'cleared' as const,
+  declaredSinks: ['src/auth/login.ts:10 system('],
+}
+
+describe('hard verifier coverage cross-check', () => {
+  it('samples deterministically by cell and respects the bounds', () => {
+    expect(sampleCellForSpotCheck(clearedCell, 0)).toBe(false)
+    expect(sampleCellForSpotCheck(clearedCell, 100)).toBe(true)
+    expect(sampleCellForSpotCheck(clearedCell, 20)).toBe(sampleCellForSpotCheck(clearedCell, 20))
+  })
+
+  it('skips non-cleared cells, unknown classes, and unsampled cells without running the shell', async () => {
+    const unsampled = await harness([], { coverageSpotCheckPercent: 0 })
+    expect(await unsampled.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+    expect(unsampled.shell.runs).toEqual([])
+
+    const sampled = await harness([], { coverageSpotCheckPercent: 100 })
+    expect(await sampled.ctx.hardVerifier.auditCoverage({ ...clearedCell, verdict: 'suspicious' })).toBeUndefined()
+    expect(await sampled.ctx.hardVerifier.auditCoverage({ ...clearedCell, bugClass: 'no-such-class' })).toBeUndefined()
+    expect(sampled.shell.runs).toEqual([])
+  })
+
+  it('reopens a cleared cell whose grep surfaces undeclared sinks', async () => {
+    const { ctx, shell } = await harness(
+      [{ exitCode: 0, stdoutText: 'src/auth/exec.ts:5: exec(userCmd)\nsrc/auth/login.ts:10 system(cmd)\n' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const reopened = await ctx.hardVerifier.auditCoverage(clearedCell)
+    expect(reopened).toEqual({
+      module: 'src/auth',
+      bugClass: 'cmdi',
+      verdict: 'suspicious',
+      declaredSinks: ['src/auth/exec.ts:5: exec(userCmd)'],
+    })
+    expect(shell.runs[0]?.command).toContain('grep -rInE')
+    expect(shell.runs[0]?.command).toContain('src/auth')
+  })
+
+  it('leaves the cell alone when every match was declared or the run failed', async () => {
+    const declared = await harness(
+      [{ exitCode: 0, stdoutText: 'src/auth/login.ts:10 system(cmd)\n' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    expect(await declared.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+
+    const failed = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
+    expect(await failed.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+  })
+
+  it('validates the spot-check percent fail-loud', () => {
+    expect(() => new HardVerifier(new Context(), { coverageSpotCheckPercent: 101 }))
+      .toThrow('coverageSpotCheckPercent must be a safe integer from 0 through 100')
   })
 })
 

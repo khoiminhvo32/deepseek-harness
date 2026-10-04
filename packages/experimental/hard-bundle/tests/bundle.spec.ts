@@ -1,4 +1,4 @@
-/** The optional hard bundle mounts the mission, stop gate, standby, and handoff plugins as one layer. */
+/** The optional hard bundle mounts the mission, stop gate, standby, handoff, rounds, and deep-read plugins as one layer. */
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import * as yaml from 'js-yaml'
 
 describe('Hard bundle', () => {
-  it('publishes one layer containing the mission, the stop gate, the standby, and the handoff', () => {
+  it('publishes one layer containing the six hard plugins', () => {
     const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
       publishConfig: { access: string }
       dsh: { bundle: { patch: string } }
@@ -15,8 +15,10 @@ describe('Hard bundle', () => {
     expect(manifest.publishConfig.access).toBe('public')
     expect(manifest.dsh.bundle.patch).toBe('./cordis.patch.yml')
     expect(manifest.dependencies).toEqual({
+      '@deepseek-ai/dsh-experimental-hard-deepread': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-handoff': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-mission': 'workspace:*',
+      '@deepseek-ai/dsh-experimental-hard-rounds': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-stopgate': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-standby': 'workspace:*',
     })
@@ -31,6 +33,8 @@ describe('Hard bundle', () => {
       { id: 'hard-stopgate', name: '@deepseek-ai/dsh-experimental-hard-stopgate' },
       { id: 'hard-standby', name: '@deepseek-ai/dsh-experimental-hard-standby' },
       { id: 'hard-handoff', name: '@deepseek-ai/dsh-experimental-hard-handoff' },
+      { id: 'hard-rounds', name: '@deepseek-ai/dsh-experimental-hard-rounds' },
+      { id: 'hard-deepread', name: '@deepseek-ai/dsh-experimental-hard-deepread' },
     ] }])
   })
 

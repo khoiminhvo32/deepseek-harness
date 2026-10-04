@@ -993,6 +993,26 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-deepread -->
+<a id="deepseek-aidsh-experimental-hard-deepread"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-deepread`
+
+- `inject`: `systemPrompt`
+- `source`: [`packages/experimental/hard-deepread/src/index.ts:23`](../packages/experimental/hard-deepread/src/index.ts)
+
+```ts config-catalog
+/** Deep-read plugin config. */
+export interface Config {
+  /**
+   * Maximum modules one deep-reading pass may fan out; the bound keeps one
+   * Phase B round from spawning an unbounded subagent fleet.
+   */
+  maxModulesPerPass?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-deepread -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-handoff -->
 <a id="deepseek-aidsh-experimental-hard-handoff"></a>
 
@@ -1052,6 +1072,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-mission -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-rounds -->
+<a id="deepseek-aidsh-experimental-hard-rounds"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-rounds`
+
+- `inject`: `agents` · `goals` · `hardLedger` · `sessionProjections`
+- `source`: [`packages/experimental/hard-rounds/src/index.ts:49`](../packages/experimental/hard-rounds/src/index.ts)
+
+```ts config-catalog
+/** Rounds module config. */
+export interface Config {
+  /**
+   * Model-step budget per round turn; the turn is cancelled at the cap so one
+   * runaway round cannot consume the whole round allowance.
+   */
+  stepsPerRound?: number
+  /**
+   * Systematic passes between deep-reading passes under the A/B rotation.
+   * Keep it equal to the mission's `deepReadEveryN`; the two values are
+   * separate on purpose so the driver can rotate without reading plugin
+   * config, but divergent values produce divergent cadence.
+   */
+  deepReadEveryN?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-rounds -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-standby -->
 <a id="deepseek-aidsh-experimental-hard-standby"></a>
@@ -1124,7 +1171,7 @@ export interface Config {}
 ## `@deepseek-ai/dsh-experimental-hard-verifier`
 
 - `inject`: `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-verifier/src/index.ts:31`](../packages/experimental/hard-verifier/src/index.ts)
+- `source`: [`packages/experimental/hard-verifier/src/index.ts:36`](../packages/experimental/hard-verifier/src/index.ts)
 
 ```ts config-catalog
 /** Verifier plugin config. */
@@ -1140,6 +1187,12 @@ export interface Config {
   stdoutMaxBytes?: number
   /** Working directory for PoC execution; defaults to the shell provider's own. */
   pocWorkdir?: string
+  /**
+   * Share of `cleared` coverage cells the deterministic cross-check re-greps,
+   * in percent. Cells are sampled by their own module and class hash, so the
+   * same cell is always sampled or always skipped; `0` disables the check.
+   */
+  coverageSpotCheckPercent?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-verifier -->
@@ -3479,7 +3532,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:249`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */

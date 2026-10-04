@@ -101,6 +101,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/experimental/webworker-packer': { kind: 'none', reason: 'Build-time image writer; its output reaches a model only through the tree the worker then boots.' },
   'packages/experimental/inspector': { kind: 'none', reason: 'Developer diagnostics transport; it observes runtime activity without changing model requests.' },
   'packages/experimental/inspector-profile': { kind: 'none', reason: 'The bundle mounts developer inspection plugins without contributing model context.' },
+  'packages/experimental/hard-bundle': { kind: 'none', reason: 'The bundle composes the hard mission and stop-gate plugins without adding model context of its own.' },
   'packages/experimental/session-inspector': { kind: 'none', reason: 'The conversation view entries add no model-facing input.' },
   'packages/client/ui-slots': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-attachment': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },

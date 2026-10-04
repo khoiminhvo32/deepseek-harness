@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-mission/README.md
+/:
+  en: b2824c6f1162b303
+  zh: 627ac0fc6e58b364
+/deepseek-ai-dsh-experimental-hard-mission:
+  en: 166f24bff85226d3
+  zh: e6722d60132c3a22
+/deepseek-ai-dsh-experimental-hard-mission/summary:
+  en: d4272c4114008379
+  zh: 5c4a41ab74087566
+/deepseek-ai-dsh-experimental-hard-mission/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-mission/use-this-package:
+  en: 395b618eb2e298cb
+  zh: 253efa41ae67fd58
+/deepseek-ai-dsh-experimental-hard-mission/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-mission/understand-the-implementation/design:
+  en: d77b603fd5fe31da
+  zh: 01284c28d4bad997
+/deepseek-ai-dsh-experimental-hard-mission/understand-the-implementation/source-map:
+  en: d616109d44675842
+  zh: 3c99f2bbf90b8f33
+/deepseek-ai-dsh-experimental-hard-mission/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-mission/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: cf78b9dd5596495f
+/deepseek-ai-dsh-experimental-hard-mission/model-experience/system-prompt/what-the-model-sees:
+  en: 2f417da7dc9ce5f1
+  zh: 2045c19ec6d89f20
+/deepseek-ai-dsh-experimental-hard-mission/model-experience/system-prompt/what-the-model-sees/mission-contract:
+  en: 8800b46c29285510
+  zh: 8800b46c29285510
+/deepseek-ai-dsh-experimental-hard-mission/model-experience/system-prompt/token-effect:
+  en: 06bd4a6a5471d9a8
+  zh: b18303e20e471ece
+/deepseek-ai-dsh-experimental-hard-mission/model-experience/system-prompt/kv-cache-effect:
+  en: 72ba558c4d6f7ba9
+  zh: 0f7eef2b42c90ee7
+/deepseek-ai-dsh-experimental-hard-mission/known-limitations-and-deferred-work:
+  en: 5260a6d70fac26f9
+  zh: 8512acddf1734a12
+/deepseek-ai-dsh-experimental-hard-mission/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

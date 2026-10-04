@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-bundle/README.md
+/:
+  en: 6f3ae62ad3c9f088
+  zh: 25043de2775009e0
+/deepseek-ai-dsh-experimental-hard-bundle:
+  en: 5d1226a497899302
+  zh: c0bc605f0debc2c7
+/deepseek-ai-dsh-experimental-hard-bundle/summary:
+  en: 9cef20527aad2855
+  zh: 1e7b8c263dd49bf7
+/deepseek-ai-dsh-experimental-hard-bundle/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-bundle/use-this-package:
+  en: 0634c92b7d8d4465
+  zh: ad65240ff59a73ae
+/deepseek-ai-dsh-experimental-hard-bundle/understand-the-implementation:
+  en: 70ea8113739b0152
+  zh: 743ac732bf827079
+/deepseek-ai-dsh-experimental-hard-bundle/model-experience:
+  en: 661baf7bcae2897f
+  zh: 661baf7bcae2897f
+/deepseek-ai-dsh-experimental-hard-bundle/model-experience/kv-cache-effect:
+  en: f33230f7de0b482a
+  zh: f33230f7de0b482a
+/deepseek-ai-dsh-experimental-hard-bundle/known-limitations-and-deferred-work:
+  en: c6bbfeb8508e1700
+  zh: 5227bc5d25e59aaa
+/deepseek-ai-dsh-experimental-hard-bundle/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

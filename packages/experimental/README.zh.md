@@ -46,6 +46,9 @@ kind: "package-group"
 | [`session-inspector`](session-inspector/README.zh.md) | 展示原始 Session 日志与 Chat 节点的 Sidebar 表格 | — |
 | [`inspector-profile`](inspector-profile/README.zh.md) | 用于 Session 日志与 Chat 节点检查的可选 Web 组合包 | — |
 | [`tool-agent-team`](tool-agent-team/README.zh.md) | 让模型创建、发消息与协调 teammate 的九个工具 | 按作用域注册工具到 `ctx.tools` |
+| [`hard-mission`](hard-mission/README.zh.md) | 将配置的目标武装为持久目标，并传达任务契约 | — |
+| [`hard-stopgate`](hard-stopgate/README.zh.md) | 在已武装目标成立期间把回合边界重新推回工作 | — |
+| [`hard-bundle`](hard-bundle/README.zh.md) | 任务与停止门的可选 hard-agent 组合包 | — |
 | [`webworker-packer`](webworker-packer/README.zh.md) | 构建浏览器 worker 预览所消费的 gzip 压缩虚拟文件系统（VFS）镜像 | 库与 CLI（命令行界面），不使用 ctx key |
 | [`webworker-runtime`](webworker-runtime/README.zh.md) | 在专用浏览器 worker 中运行 harness 插件树 | 库与 worker 入口，不使用 ctx key |
 

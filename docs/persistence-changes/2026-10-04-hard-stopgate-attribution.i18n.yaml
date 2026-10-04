@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-04-hard-stopgate-attribution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-04-hard-stopgate-attribution.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-04-hard-stopgate-attribution:
+  en: c0700bdb4a324360
+  zh: 9e08c5fea1d05e40
+/2026-10-04-hard-stopgate-attribution/summary:
+  en: 105bbd80de02ec4e
+  zh: 715519df43c036ca
+/2026-10-04-hard-stopgate-attribution/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-04-hard-stopgate-attribution/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-04-hard-stopgate-attribution/compatibility:
+  en: c98293b3defc291d
+  zh: 224331dd38253488
+/2026-10-04-hard-stopgate-attribution/verification:
+  en: a3075f3f141ed740
+  zh: b70343b64643fb65
+/2026-10-04-hard-stopgate-attribution/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

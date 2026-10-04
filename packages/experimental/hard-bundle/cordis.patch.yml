@@ -1,0 +1,7 @@
+- insert:
+    - id: hard-mission
+      name: '@deepseek-ai/dsh-experimental-hard-mission'
+      config:
+        objective: ''
+    - id: hard-stopgate
+      name: '@deepseek-ai/dsh-experimental-hard-stopgate'

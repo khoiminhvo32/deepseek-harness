@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-stopgate/README.md
+/:
+  en: 293aa7f715b5100e
+  zh: f1bf7039f6a60948
+/deepseek-ai-dsh-experimental-hard-stopgate:
+  en: 827c732865ece205
+  zh: a183d41f12801f83
+/deepseek-ai-dsh-experimental-hard-stopgate/summary:
+  en: a1abee5e3cd45d28
+  zh: 1611888254f0e39b
+/deepseek-ai-dsh-experimental-hard-stopgate/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-stopgate/use-this-package:
+  en: 4a3ad33be5f9efb0
+  zh: 528319aa90f7c324
+/deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation/design:
+  en: 522ee1052f37a883
+  zh: ca0d58d76a3203b4
+/deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation/source-map:
+  en: 86de5b1c40d2574b
+  zh: dc164b2c7cdf567a
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages:
+  en: d30c15023e7c4413
+  zh: d30c15023e7c4413
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/what-the-model-sees:
+  en: 7ec04f54936f4a38
+  zh: 06a24af3700391c6
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/what-the-model-sees/continuation-order:
+  en: 8420b5dc6b01373d
+  zh: 8420b5dc6b01373d
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/token-effect:
+  en: 8218c4de35386acf
+  zh: 06469227d98b61b1
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/kv-cache-effect:
+  en: 361fdbd64ac752ff
+  zh: a05b918bd2afb4d5
+/deepseek-ai-dsh-experimental-hard-stopgate/known-limitations-and-deferred-work:
+  en: 3320f97022399433
+  zh: a8d16a633d196a34
+/deepseek-ai-dsh-experimental-hard-stopgate/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

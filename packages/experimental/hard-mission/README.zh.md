@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## Use this package
 
-当部署拥有一个长期目标（例如对固定目标仓库的持续漏洞研究）时，将该插件与目标服务一同挂载。目标必须显式配置；空白目标会使加载失败。
+当部署拥有一个长期目标（例如对固定目标仓库的持续漏洞研究）时，将该插件与目标服务一同挂载。objective 与 target 均为必填；空白 objective、相对的 `target.repoPath`，或不是 git 仓库的目标都会使加载失败。
 
 ```yaml
 - id: hard-mission
@@ -33,7 +33,14 @@ kind: "package-reference"
     objective: 'Find and verify every authentication bypass in the target repository'
     maxGoalRounds: 64
     deepReadEveryN: 3
+    target:
+      repoPath: /abs/path/to/target-repo
+      commit: HEAD
+      moduleDepth: 2
+      excludeGlobs: ['node_modules/**', 'vendor/**', 'dist/**', 'build/**']
 ```
+
+`target.repoPath` 为必填且必须是绝对路径。加载时插件通过 `git rev-parse` 解析 `target.commit`（默认 `HEAD`），用 `git ls-files` 列出已跟踪文件——因此 `.gitignore` 免费得到尊重、枚举绑定到被固定的提交——再经 `target.excludeGlobs`（根锚定 glob）过滤，并按路径前 `target.moduleDepth`（默认 2）个目录段分组幸存者；仓库根部的文件成为模块 `.`。幸存模块为零或多于 500 个都会使加载失败；前者需要放行文件，后者应调低 `moduleDepth` 或排除更多目录树。结果已排序并去重，因此对同一提交重新武装会得到逐字节相同的矩阵，账本将其作为覆盖分母。
 
 `bugClasses` 默认为具有机械 source-to-sink 语义的全部 OWASP Top 10 类别清单（sqli、xss、cmdi、path-traversal、open-redirect、deserialization、ssrf、authn、authn-bypass、login-bypass、oauth-bypass、session、authz、crypto-misuse、misconfig、dependencies、race）；空列表会从契约中移除类别清单。不安全设计与安全日志没有机械的 source-sink 对，保留在深度阅读过程。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-mission)是全部受支持字段的唯一权威来源。
 
@@ -48,13 +55,15 @@ kind: "package-reference"
 ### Design
 
 - **创建时武装。** 插件监听 `agent/created`，仅当来源为 `startup`、该代理是注册表根代理且当前没有目标时，才通过 `ctx.goals.create` 武装目标。其他来源、子代理与既有目标一律不动，目标服务对持久会话的恢复并解除武装策略保持权威。
+- **加载时固定目标。** 在任何代理存在之前，`apply` 通过 shell 接缝解析目标提交并枚举覆盖矩阵（先 `git rev-parse`，再 `git ls-files`），因此错误配置的目标——仓库缺失、提交无法解析、无幸存模块或矩阵过大——在加载即失败，而不是武装一个没有分母的任务。矩阵承载于账本折叠的增量 `hard/mission/armed` 会话事件。
 - **单一契约区段。** `hard:mission` 区段从解析后的配置渲染目标、系统化扫描类别清单与深度阅读节奏。它是静态文本：仅当部署配置变化时才会变化。
 
 ### Source map
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：配置、契约渲染、区段注册、启动时武装 |
+| [`src/index.ts`](src/index.ts) | 插件入口：配置、契约渲染、区段注册、启动时武装、目标固定 |
+| [`src/modules.ts`](src/modules.ts) | 对已跟踪路径的纯模块分组与排除 glob 过滤 |
 
 </details>
 
@@ -90,7 +99,7 @@ This session carries one durable goal and keeps working toward it across turns. 
 
 - **仅在启动时武装** — 恢复或清除后的会话保留目标服务恢复的（已解除武装的）目标；恢复与配额待机唤醒时的自动重新武装属于 hard-standby 插件。
 - **完成路径依赖目标工具** — 契约指名 `update_goal action complete`；未挂载 `dsh-tool-goal` 的组合必须由其他消费方提供该操作。
-- **无完成评估器** — 本插件只负责武装与引导；完成认证推迟到 hard 停止门与验证器包。
+- **无完成评估器** — 本插件只负责武装与引导；完成认证推迟到 hard 停止门与验证器包。矩阵是未来完成门要消费的分母。
 
 <a id="dev-note"></a>
 ### 开发备注

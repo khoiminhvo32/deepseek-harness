@@ -1,6 +1,8 @@
 /** Keyless end-to-end hard-profile run: stop-gate steering, refuted fabrications
- * including the echo trap, a model-written proof, and the coverage cross-check. */
+ * including the echo trap, a model-written proof, the coverage cross-check, and
+ * the armed target matrix. */
 
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -59,6 +61,13 @@ describe('dsh --profile hard fabrication traps', () => {
       await mkdir(join(cwd, 'src'), { recursive: true })
       await writeFile(join(cwd, 'src', 'reports.js'), REPORTS_SOURCE)
       await writeFile(join(cwd, 'src', 'session.js'), SESSION_SOURCE)
+      // The target is a real git repository so the mission pins the commit and
+      // enumerates the tracked modules at load time.
+      const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+      git('init', '--quiet')
+      git('add', '-A')
+      git('-c', 'user.name=hard-e2e', '-c', 'user.email=hard@e2e', 'commit', '--quiet', '-m', 'seed')
+      const commit = git('rev-parse', 'HEAD').trim()
 
       const home = join(cwd, '.dsh')
       const sessions = join(home, 'sessions')
@@ -86,6 +95,8 @@ describe('dsh --profile hard fabrication traps', () => {
         '- id: hard-mission',
         '  config:',
         `    objective: '${MISSION}'`,
+        '    target:',
+        `      repoPath: '${cwd}'`,
         '- id: hard-verifier',
         '  config:',
         '    coverageSpotCheckPercent: 100',
@@ -123,6 +134,19 @@ describe('dsh --profile hard fabrication traps', () => {
       expect(execution.stderr).not.toContain('did not activate')
 
       const sessionFiles = records(await readSessionLog(sessions))
+      // The mission pinned the target and armed the coverage matrix from the
+      // tracked tree: both planted sources group into the single src module.
+      const armed = sessionFiles.find(event => event.type === 'hard/mission/armed')?.data as {
+        targetRepo: string
+        commit: string
+        modules: string[]
+        bugClasses: string[]
+      } | undefined
+      expect(armed).toBeDefined()
+      expect(armed?.targetRepo).toBe(cwd)
+      expect(armed?.commit).toBe(commit)
+      expect(armed?.modules).toEqual(['src'])
+      expect(armed?.bugClasses.length).toBeGreaterThan(0)
       // The stop gate steered the premature clean claim back to work.
       const steerings = sessionFiles.filter(event => event.type === 'user/message')
         .filter((event) => {

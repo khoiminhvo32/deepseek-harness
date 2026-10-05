@@ -8,5 +8,6 @@ header:
   pin: true
 workspace:
   final: true
+  setup: git-repo
 replay:
   override: true

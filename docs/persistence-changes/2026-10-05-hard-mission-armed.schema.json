@@ -1,0 +1,100 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/mission/armed",
+      "kind": "event",
+      "event": "hard/mission/armed",
+      "surface": false,
+      "digest": "dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClasses",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "commit",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "modules",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "objective",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "targetRepo",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/mission/armed"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

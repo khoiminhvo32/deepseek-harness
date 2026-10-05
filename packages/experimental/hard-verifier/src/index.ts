@@ -237,24 +237,29 @@ export class HardVerifier extends Service {
   /**
    * Deterministic cross-check of one `cleared` coverage cell: re-grep the
    * module against the bug class's fixed sink patterns and reopen the cell
-   * as `suspicious` when undeclared sink sites surface. Sampling follows the
+   * as `suspicious` when undeclared sink sites surface. The grep runs from
+   * the pinned target repository the armed coverage matrix records, so the
+   * module path is always target-repo relative. Sampling follows the
    * configured spot-check percent by cell hash; an unsampled cell, a
-   * non-cleared cell, a class without patterns, or a grep without misses
-   * returns `undefined` and changes nothing.
+   * non-cleared cell, a class without patterns, a missing matrix, or a grep
+   * without misses returns `undefined` and changes nothing.
+   * @param agent - the live agent whose ledger matrix anchors the grep.
    * @param cell - the coverage cell the model just marked `cleared`.
    * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
    */
-  async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined> {
+  async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined> {
     if (cell.verdict !== 'cleared') return undefined
     const patterns = SINK_PATTERNS[cell.bugClass]
     if (patterns === undefined || patterns.length === 0) return undefined
     if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
+    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
+    if (targetRepo === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
       command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)} 2>/dev/null || true`,
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
-      ...config.pocWorkdir === undefined ? {} : { workdir: config.pocWorkdir },
+      workdir: targetRepo,
     })
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()

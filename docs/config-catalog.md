@@ -1034,7 +1034,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:53`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:55`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config; reserved for future thresholds. */
@@ -1047,8 +1047,8 @@ export interface Config {}
 
 ## `@deepseek-ai/dsh-experimental-hard-mission`
 
-- `inject`: `agents` · `goals` · `systemPrompt`
-- `source`: [`packages/experimental/hard-mission/src/index.ts:53`](../packages/experimental/hard-mission/src/index.ts)
+- `inject`: `agents` · `goals` · `systemPrompt` · `shell` · `hardLedger`
+- `source`: [`packages/experimental/hard-mission/src/index.ts:92`](../packages/experimental/hard-mission/src/index.ts)
 
 ```ts config-catalog
 /** Mission plugin config. */
@@ -1067,6 +1067,23 @@ export interface Config {
   bugClasses?: string[]
   /** Number of systematic passes between deep-reading passes. */
   deepReadEveryN?: number
+  /** The target repository pinned and enumerated when the goal arms. */
+  target: TargetConfig
+}
+
+/** The pinned target repository the coverage matrix enumerates. */
+export interface TargetConfig {
+  /**
+   * Absolute path of the target git repository. Required and non-blank: a
+   * mission without a target has no coverage denominator and fails loudly.
+   */
+  repoPath: string
+  /** Ref or sha to pin; resolved to the full commit sha at arm time. */
+  commit?: string
+  /** Directory segments per coverage module, 1 through 6. */
+  moduleDepth?: number
+  /** Root-anchored globs excluded from the tracked-file enumeration. */
+  excludeGlobs?: string[]
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-mission -->

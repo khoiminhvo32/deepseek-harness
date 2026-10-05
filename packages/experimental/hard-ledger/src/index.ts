@@ -21,9 +21,10 @@ import type {
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
+  HardMissionArmedData,
   HardSweepSummaryData,
 } from './types.ts'
-import type { HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
+import type { HardCoverageMatrix, HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
 import { hardLedgerProjectionDefinition } from './projection.ts'
 import './domain.ts'
 
@@ -36,11 +37,12 @@ export type {
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
+  HardMissionArmedData,
   HardSweepSummaryData,
   HardVerdict,
 } from './types.ts'
 export { applyHardLedgerProjection, emptyHardLedgerState, hardLedgerProjectionDefinition } from './projection.ts'
-export type { HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
+export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 
 declare module '@deepseek-ai/cordis' {
   /** The log-derived hard-harness ledger service. */
@@ -58,9 +60,13 @@ export const Config: z<Config> = z.object({})
 /** Maximum characters retained for bounded reason and statement text. */
 export const HARD_TEXT_LIMIT = 2000
 
+/** Maximum coverage matrix rows one arming record may carry. */
+export const HARD_MATRIX_MODULE_LIMIT = 500
+
 /**
  * The hard-harness ledger: validates and appends `hard/*` events, and serves
- * findings, hypotheses, coverage, and open-work state from the projection.
+ * findings, hypotheses, coverage, the armed coverage matrix, and open-work
+ * state from the projection.
  */
 export class HardLedger extends Service {
   static inject = ['sessionProjections']
@@ -71,6 +77,44 @@ export class HardLedger extends Service {
     super(ctx, 'hardLedger')
     ctx.sessionProjections.register(hardLedgerProjectionDefinition)
     void config
+  }
+
+  /**
+   * Append the mission arming record: the pinned target and the enumerated
+   * coverage matrix axes. The mission plugin appends it once, right after
+   * the goal is created.
+   * @param agent - the live agent whose session receives the record.
+   * @param data - the armed payload to persist.
+   */
+  recordMissionArmed(agent: Agent, data: HardMissionArmedData): void {
+    this.assertText('objective', data.objective)
+    this.assertText('targetRepo', data.targetRepo)
+    if (!/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(data.commit)) {
+      throw new HarnessError('commit must be a full lowercase hex sha', 'HARD_LEDGER_INVALID_COMMIT')
+    }
+    const modules = [...data.modules]
+    if (modules.length === 0) {
+      throw new HarnessError('modules must list at least one module', 'HARD_LEDGER_EMPTY_MATRIX')
+    }
+    if (modules.length > HARD_MATRIX_MODULE_LIMIT) {
+      throw new HarnessError(
+        `modules must not exceed ${HARD_MATRIX_MODULE_LIMIT} rows`, 'HARD_LEDGER_MATRIX_TOO_LARGE',
+      )
+    }
+    for (const module of modules) this.assertText('modules[]', module)
+    const sorted = [...modules].sort()
+    if (sorted.some((module, index) => module !== modules[index])
+      || new Set(modules).size !== modules.length) {
+      throw new HarnessError('modules must be sorted and deduplicated', 'HARD_LEDGER_UNSORTED_MATRIX')
+    }
+    for (const bugClass of data.bugClasses) this.assertText('bugClasses[]', bugClass)
+    agent.session.append('hard/mission/armed', {
+      objective: data.objective,
+      targetRepo: data.targetRepo,
+      commit: data.commit,
+      modules,
+      bugClasses: [...data.bugClasses],
+    })
   }
 
   /**
@@ -258,7 +302,55 @@ export class HardLedger extends Service {
   }
 
   /**
-   * Model-facing open work summary: pending verifications and unresolved states.
+   * The coverage matrix folded from the mission arming record.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the matrix axes and pinned target, or `undefined` when no
+   *   arming record exists (legacy log, or the mission plugin is not mounted).
+   */
+  coverageMatrix(agent: Agent): HardCoverageMatrix | undefined {
+    return this.state(agent.session).matrix
+  }
+
+  /**
+   * Coverage progress over the matrix: matrix cells holding a verdict,
+   * of the whole matrix. Cells outside the matrix never count.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
+   */
+  coverageProgress(agent: Agent): { verdicted: number; total: number } {
+    const matrix = this.state(agent.session).matrix
+    if (matrix === undefined) return { verdicted: 0, total: 0 }
+    const rows = new Set(matrix.modules)
+    const columns = new Set(matrix.bugClasses)
+    const verdicted = new Set(this.state(agent.session).coverage
+      .filter(cell => rows.has(cell.module) && columns.has(cell.bugClass))
+      .map(cell => `${cell.module}\u0000${cell.bugClass}`))
+    return { verdicted: verdicted.size, total: rows.size * columns.size }
+  }
+
+  /**
+   * Matrix cells with no verdict yet, in deterministic module-then-class order.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one entry per uncovered matrix cell, empty without a matrix.
+   */
+  uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[] {
+    const matrix = this.state(agent.session).matrix
+    if (matrix === undefined) return []
+    const verdicted = new Set(this.state(agent.session).coverage
+      .map(cell => `${cell.module}\u0000${cell.bugClass}`))
+    const uncovered: { module: string; bugClass: string }[] = []
+    for (const module of matrix.modules) {
+      for (const bugClass of matrix.bugClasses) {
+        if (!verdicted.has(`${module}\u0000${bugClass}`)) uncovered.push({ module, bugClass })
+      }
+    }
+    return uncovered.sort((left, right) =>
+      (left.module + '\u0000' + left.bugClass) < (right.module + '\u0000' + right.bugClass) ? -1 : 1)
+  }
+
+  /**
+   * Model-facing open work summary: pending verifications, unresolved
+   * states, and coverage cells that still owe work.
    * @param agent - the live agent whose ledger state is read.
    * @returns bounded human-readable work items, empty when nothing is open.
    */
@@ -273,6 +365,18 @@ export class HardLedger extends Service {
     for (const hypothesis of this.state(agent.session).hypotheses) {
       if (hypothesis.status === 'proposed' || hypothesis.status === 'testing' || hypothesis.status === 'deferred') {
         work.push(`hypothesis ${hypothesis.id} is ${hypothesis.status}`)
+      }
+    }
+    const uncovered = this.uncoveredCells(agent)
+    if (uncovered.length > 0) {
+      work.push(`${uncovered.length} coverage cell(s) have no verdict yet`)
+      for (const cell of uncovered.slice(0, 5)) {
+        work.push(`cell ${cell.module} × ${cell.bugClass} has no verdict`)
+      }
+    }
+    for (const cell of this.state(agent.session).coverage) {
+      if (cell.verdict === 'suspicious') {
+        work.push(`cell ${cell.module} × ${cell.bugClass} is suspicious: re-verify the declared sinks`)
       }
     }
     return work

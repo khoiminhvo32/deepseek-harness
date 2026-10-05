@@ -126,7 +126,27 @@ describe('hard rounds accounting', () => {
     expect(root.injected).toHaveLength(1)
     expect(root.injected[0]).toContain('<hard_round 1/9> phase A')
     expect(root.injected[0]).toContain('- finding F-1 awaits verification')
+    expect(root.injected[0]).not.toContain('Coverage:')
     expect(root.inbox.nextStep).toHaveLength(1)
+  })
+
+  it('reports the coverage denominator in the round context once a matrix is armed', async () => {
+    const { ctx, root } = await harness()
+    const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'find bugs',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['src', 'src/auth'],
+      bugClasses: ['cmdi', 'sqli'],
+    })
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'sqli', verdict: 'uncovered', declaredSinks: [] })
+
+    admitRound(root.agent, goal, 1)
+    await drain()
+    expect(root.injected[0]).toContain('Coverage: 2/4 cells verdicted.')
+    expect(root.injected[0]).toContain('2 coverage cell(s) have no verdict yet')
   })
 
   it('rotates to the deep-reading phase after every N systematic rounds', async () => {

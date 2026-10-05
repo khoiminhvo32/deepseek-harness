@@ -34,7 +34,7 @@ describe('Hard bundle', () => {
       {
         id: 'hard-mission',
         name: '@deepseek-ai/dsh-experimental-hard-mission',
-        config: { objective: '' },
+        config: { objective: '', target: { repoPath: '', commit: 'HEAD' } },
       },
       { id: 'hard-stopgate', name: '@deepseek-ai/dsh-experimental-hard-stopgate' },
       { id: 'hard-standby', name: '@deepseek-ai/dsh-experimental-hard-standby' },

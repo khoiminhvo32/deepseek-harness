@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-ledger` 拥有 hard harness 的持久方法论状态：五个增量 `hard/*` 会话事件（finding 提案与验证器结论、假设生命周期、覆盖单元、扫描摘要），以及负责校验、追加并折叠这些事件的 `ctx.hardLedger` 服务。会话日志是唯一存储；id 从日志分配，所有折叠都从日志派生。
+`dsh-experimental-hard-ledger` 拥有 hard harness 的持久方法论状态：增量 `hard/*` 会话事件（finding 提案与验证器结论、假设生命周期、覆盖单元、扫描摘要，以及任务武装记录），以及负责校验、追加并折叠这些事件的 `ctx.hardLedger` 服务。会话日志是唯一存储；id 从日志分配，所有折叠都从日志派生。
 
 ## 目录
 
@@ -43,17 +43,18 @@ kind: "package-reference"
 
 ### Design
 
-- **日志派生状态。** `findings`、`hypotheses`、`coverage`、`sweepCount` 与 `openWork` 读取 `hardLedger` 会话投影——对五个事件的纯折叠，框架在恢复时重建并随每次提交增量推进；没有并行存储，日志保持唯一事实来源，fork/重启行为天然跟随会话。
+- **日志派生状态。** `findings`、`hypotheses`、`coverage`、`sweepCount`、`coverageMatrix` 与 `openWork` 读取 `hardLedger` 会话投影——对 `hard/*` 事件的纯折叠，框架在恢复时重建并随每次提交增量推进；没有并行存储，日志保持唯一事实来源，fork/重启行为天然跟随会话。
 - **从日志分配顺序 id。** `F-<n>` 与 `H-<n>` 计数器统计各自类型的历史事件；假设迁移会对照日志中已存在的 id 校验成员资格。
-- **增量事件，无需格式升级。** 五个事件都是纯增量 root：无表面、信封或头变化，任何既有事件形态不变，因此词汇增长无需格式升级。早于该词汇表的构建会拒绝此类日志而非误读，这正是仓库内事件要求的读取契约。
+- **增量事件，无需格式升级。** 这些事件都是纯增量 root：无表面、信封或头变化，任何既有事件形态不变，因此词汇增长无需格式升级。早于该词汇表的构建会拒绝此类日志而非误读，这正是仓库内事件要求的读取契约。
 - **有界文本。** 自由文本字段上限 2000 字符；`refuted` 与 `deferred` 假设的 reason 字段、零发现扫描的 `emptyProof` 均为必填。
+- **来自武装记录的覆盖分母。** mission 插件追加一条 `hard/mission/armed` 事件，携带已固定的目标仓库、解析后的提交 sha、已排序的模块行与 bug 类别列。折叠把它存为矩阵；`coverageProgress` 按 `modules × bugClasses` 统计已有结论的单元，`uncoveredCells` 以确定顺序列出仍欠工作的单元，`openWork` 同时点名未覆盖与可疑单元，让停止门与轮次上下文看到剩余扫描。矩阵外的单元永不计数；没有武装记录的日志保持旧有形状——空结果，不抛错。
 
 ### Source map
 
 | File | Role |
 |---|---|
 | [`src/types.ts`](src/types.ts) | 纯事件负载词汇 |
-| [`src/domain.ts`](src/domain.ts) | 五个 `hard/*` 事件的 `SessionEventMap` 合并 |
+| [`src/domain.ts`](src/domain.ts) | `hard/*` 事件的 `SessionEventMap` 合并 |
 | [`src/projection.ts`](src/projection.ts) | 会话投影单元：纯折叠、状态 schema、定义 |
 | [`src/index.ts`](src/index.ts) | `HardLedger` 服务：校验、追加、投影读取、未完成工作摘要 |
 

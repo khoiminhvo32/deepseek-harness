@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-05-hard-mission-armed.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-05-hard-mission-armed.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-05-hard-mission-armed:
+  en: f6c1668b045d6040
+  zh: 788c22be6eecdfd1
+/2026-10-05-hard-mission-armed/summary:
+  en: 468a9061069c204d
+  zh: 96e731ac6034c2ca
+/2026-10-05-hard-mission-armed/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-05-hard-mission-armed/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-05-hard-mission-armed/compatibility:
+  en: 42e93f61dad249eb
+  zh: 0887638de3d6df4a
+/2026-10-05-hard-mission-armed/verification:
+  en: 26cc2dfe35e813ea
+  zh: a7050c967e430ac8
+/2026-10-05-hard-mission-armed/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

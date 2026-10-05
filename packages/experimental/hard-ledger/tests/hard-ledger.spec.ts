@@ -281,6 +281,87 @@ describe('hard ledger projection units', () => {
   })
 })
 
+describe('hard ledger coverage matrix', () => {
+  /** Arm one three-module, two-class matrix on the harness root. */
+  function armMatrix(ctx: Context, root: StubAgent): void {
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['.', 'src', 'src/parser'],
+      bugClasses: ['cmdi', 'sqli'],
+    })
+  }
+
+  it('folds the arming record into the matrix and counts verdicted cells over the total', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.coverageMatrix(root.agent)).toBeUndefined()
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 0, total: 0 })
+    expect(ctx.hardLedger.uncoveredCells(root.agent)).toEqual([])
+
+    armMatrix(ctx, root)
+    expect(ctx.hardLedger.coverageMatrix(root.agent)).toEqual({
+      modules: ['.', 'src', 'src/parser'],
+      bugClasses: ['cmdi', 'sqli'],
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+    })
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 0, total: 6 })
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
+    ctx.hardLedger.markCoverage(root.agent, { module: 'outside', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 1, total: 6 })
+    expect(ctx.hardLedger.uncoveredCells(root.agent)).toEqual([
+      { module: '.', bugClass: 'cmdi' },
+      { module: '.', bugClass: 'sqli' },
+      { module: 'src', bugClass: 'sqli' },
+      { module: 'src/parser', bugClass: 'cmdi' },
+      { module: 'src/parser', bugClass: 'sqli' },
+    ])
+  })
+
+  it('lists uncovered and suspicious cells as open work, and keeps legacy logs unchanged', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
+
+    armMatrix(ctx, root)
+    const open = ctx.hardLedger.openWork(root.agent)
+    expect(open[0]).toContain('6 coverage cell(s) have no verdict yet')
+    expect(open).toContain('cell . × cmdi has no verdict')
+
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: [] })
+    const after = ctx.hardLedger.openWork(root.agent)
+    expect(after).toContain('cell src × sqli is suspicious: re-verify the declared sinks')
+    expect(after).not.toContain('cell src × cmdi has no verdict')
+  })
+
+  it('rejects invalid arming records with stable codes', async () => {
+    const { ctx, root } = await harness()
+    const armed = {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['src'],
+      bugClasses: ['cmdi'],
+    }
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, commit: 'HEAD' }) })
+      .toThrow('commit must be a full lowercase hex sha')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, modules: [] }) })
+      .toThrow('modules must list at least one module')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, modules: Array.from({ length: 501 }, (_, index) => `m${index}`),
+    }) }).toThrow('modules must not exceed 500 rows')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, modules: ['b', 'a'] }) })
+      .toThrow('modules must be sorted and deduplicated')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, modules: ['a', 'a'] }) })
+      .toThrow('modules must be sorted and deduplicated')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, bugClasses: ['ok', ' '] }) })
+      .toThrow('bugClasses[] must be a non-empty string')
+    ctx.hardLedger.recordMissionArmed(root.agent, armed)
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 0, total: 1 })
+  })
+})
+
 describe('hard ledger service shape', () => {
   it('is a default-exported service on the hardLedger key', async () => {
     const { ctx } = await harness()

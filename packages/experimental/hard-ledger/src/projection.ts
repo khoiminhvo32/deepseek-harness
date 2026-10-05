@@ -1,8 +1,9 @@
 /**
- * Session-projection unit for the hard ledger: a pure fold over the five
- * `hard/*` event types maintaining findings, hypotheses, coverage cells, and
- * sweep counters, so resumed sessions restore ledger state without scanning
- * the log (per the synchronous-read deprecation decision).
+ * Session-projection unit for the hard ledger: a pure fold over the `hard/*`
+ * event types maintaining findings, hypotheses, coverage cells, sweep
+ * counters, and the armed coverage matrix, so resumed sessions restore
+ * ledger state without scanning the log (per the synchronous-read
+ * deprecation decision).
  * @module
  */
 
@@ -57,12 +58,21 @@ const coverageSchema = zod.object({
   declaredSinks: zod.array(zod.string().min(1)).readonly(),
 })
 
+/** Validates one folded mission arming record: the pinned target and the matrix axes. */
+const matrixSchema = zod.object({
+  modules: zod.array(zod.string().min(1)).readonly(),
+  bugClasses: zod.array(zod.string()).readonly(),
+  targetRepo: zod.string().min(1),
+  commit: zod.string().regex(/^[0-9a-f]{40}$|^[0-9a-f]{64}$/u),
+})
+
 /** Validates persisted projection state before it seeds a fold. */
 export const hardLedgerStateSchema = zod.object({
   findings: zod.array(zod.object({ proposed: proposedSchema, verdict: verdictSchema.optional() })),
   hypotheses: zod.array(hypothesisSchema),
   coverage: zod.array(coverageSchema),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
+  matrix: matrixSchema.optional(),
   failure: zod.string().min(1).nullable(),
 })
 
@@ -102,6 +112,16 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
     }
     case 'hard/sweep/summary':
       return { ...state, sweeps: { ...state.sweeps, [event.data.phase]: state.sweeps[event.data.phase] + 1 } }
+    case 'hard/mission/armed':
+      return {
+        ...state,
+        matrix: {
+          modules: [...event.data.modules],
+          bugClasses: [...event.data.bugClasses],
+          targetRepo: event.data.targetRepo,
+          commit: event.data.commit,
+        },
+      }
     default:
       return state
   }
@@ -123,6 +143,9 @@ export function emptyHardLedgerState(): HardLedgerProjectionState {
   })
 }
 
+/** The coverage matrix folded from the mission arming record, when one exists. */
+export type HardCoverageMatrix = NonNullable<HardLedgerProjectionState['matrix']>
+
 /** The host-only projection unit registered by the hard-ledger service. */
 export const hardLedgerProjectionDefinition = {
   key: 'hardLedger',
@@ -135,7 +158,9 @@ export const hardLedgerProjectionDefinition = {
     failure: null,
   }),
   apply: applyHardLedgerProjection,
-  stateVersion: 1,
+  // Version 2 adds the optional coverage matrix; the bump forces a full log
+  // rebuild so matrices recorded before the upgrade are recovered on resume.
+  stateVersion: 2,
 } satisfies ProjectionDefinition<'hardLedger', HardLedgerProjectionState>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

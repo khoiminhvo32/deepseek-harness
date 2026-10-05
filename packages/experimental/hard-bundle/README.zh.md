@@ -31,6 +31,8 @@ kind: "package-bundle"
     id: hard-mission
     config:
       objective: 'Find and verify every authentication bypass in the target repository'
+    target:
+      repoPath: /abs/path/to/target-repo
 ```
 
 目标工具与目标服务来自 `dsh-base`；本组合包只添加任务、停止门、待机与交接。
@@ -62,7 +64,7 @@ None; the bundle adds no request content of its own.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **空白目标刻意导致加载失败** — 随附行携带 `objective: ''`；启用该组合包的部署必须通过自己的补丁提供目标。
+- **空白目标或目标仓库刻意导致加载失败** — 随附行携带 `objective: ''` 与 `target.repoPath: ''`；启用该组合包的部署必须通过自己的补丁提供两者。
 - **Headless 优先** — 该组合包面向 CLI 与 headless profile 组合插件；hard 会话的 Web/桌面呈现将推迟。
 
 <a id="dev-note"></a>

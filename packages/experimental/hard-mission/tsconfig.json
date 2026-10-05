@@ -8,23 +8,13 @@
     "src"
   ],
   "references": [
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../core/agent"
-    },
-    {
-      "path": "../../core/system-prompt"
-    },
-    {
-      "path": "../../goal/goal"
-    }
+    { "path": "../../../vendor/cosmokit" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/system-prompt" },
+    { "path": "../../goal/goal" },
+    { "path": "../../shell/shell" },
+    { "path": "../hard-ledger" }
   ]
 }

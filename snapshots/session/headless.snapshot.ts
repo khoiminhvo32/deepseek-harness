@@ -77,7 +77,7 @@ function snapshotMode(value: string | undefined): SnapshotMode {
 }
 
 const mode = snapshotMode(process.env.DSH_SNAPSHOT)
-const RUNTIME_WORKSPACE_ENTRIES = ['.agents', '.dsh', '.snapshot-patches'] as const
+const RUNTIME_WORKSPACE_ENTRIES = ['.agents', '.dsh', '.snapshot-patches', '.git'] as const
 
 interface JsonObject {
   [key: string]: unknown
@@ -475,6 +475,23 @@ async function seedWorkspace(scenario: HeadlessScenario, cwd: string): Promise<v
 }
 
 const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
+  /** Turn the seeded workspace into the deterministic git repo the target pinning enumerates. */
+  async 'git-repo'(cwd) {
+    const run = (args: string[], env?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync> => spawnSync('git', ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
+    })
+    expect(run(['init', '--quiet']).status).toBe(0)
+    expect(run(['add', '-A']).status).toBe(0)
+    // Fixed identity and raw epoch dates keep the seeded commit sha — and the
+    // armed matrix recorded from it — identical across runs and machines.
+    const commit = run(['-c', 'user.name=hard-snapshot', '-c', 'user.email=hard@snapshot',
+      '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'seed'], {
+      GIT_AUTHOR_DATE: '1767225600 +0000',
+      GIT_COMMITTER_DATE: '1767225600 +0000',
+    })
+    expect(commit.status).toBe(0)
+  },
   async 'windows-acl-skill'(cwd) {
     const target = join(cwd, '.dsh', 'skills', 'diagnose-windows-sandbox-acl', 'SKILL.md')
     await mkdir(dirname(target), { recursive: true })

@@ -45,6 +45,7 @@
 | `event:hard/finding/proposed` | event | `191eb7fd027003b069fbd1f4fd567fff129cc3f767f238a88fb26ad4def9df83` | [`{ type: "hard/finding/proposed" }`](#persistence-type-sha256-191eb7fd027003b069fbd1f4fd567fff129cc3f767f238a88fb26ad4def9df83) |
 | `event:hard/finding/verdict` | event | `d14c7ff86caaf48e763fbd5d1e8e25e776bb4b35913ed345b7b04cb72166e1bc` | [`{ type: "hard/finding/verdict" }`](#persistence-type-sha256-d14c7ff86caaf48e763fbd5d1e8e25e776bb4b35913ed345b7b04cb72166e1bc) |
 | `event:hard/hypothesis/state` | event | `b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1` | [`{ type: "hard/hypothesis/state" }`](#persistence-type-sha256-b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1) |
+| `event:hard/mission/armed` | event | `dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1` | [`{ type: "hard/mission/armed" }`](#persistence-type-sha256-dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1) |
 | `event:hard/round/end` | event | `9c8583a2e073f7ddb70f3ae373b1916e1c75f9c7e338078bd09b3a59df203cfc` | [`{ type: "hard/round/end" }`](#persistence-type-sha256-9c8583a2e073f7ddb70f3ae373b1916e1c75f9c7e338078bd09b3a59df203cfc) |
 | `event:hard/round/start` | event | `ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c` | [`{ type: "hard/round/start" }`](#persistence-type-sha256-ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c) |
 | `event:hard/standby/scheduled` | event | `7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f` | [`{ type: "hard/standby/scheduled" }`](#persistence-type-sha256-7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f) |
@@ -577,7 +578,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'hard/coverage/cell': HardCoverageCellData
 ```
 
-来源：[`packages/experimental/hard-ledger/src/domain.ts:29`](../packages/experimental/hard-ledger/src/domain.ts)
+来源：[`packages/experimental/hard-ledger/src/domain.ts:36`](../packages/experimental/hard-ledger/src/domain.ts)
 
 <a id="hardfindingproposed--log-only"></a>
 
@@ -591,7 +592,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'hard/finding/proposed': HardFindingProposedData
 ```
 
-来源：[`packages/experimental/hard-ledger/src/domain.ts:23`](../packages/experimental/hard-ledger/src/domain.ts)
+来源：[`packages/experimental/hard-ledger/src/domain.ts:30`](../packages/experimental/hard-ledger/src/domain.ts)
 
 <a id="hardfindingverdict--log-only"></a>
 
@@ -602,7 +603,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'hard/finding/verdict': HardFindingVerdictData
 ```
 
-来源：[`packages/experimental/hard-ledger/src/domain.ts:25`](../packages/experimental/hard-ledger/src/domain.ts)
+来源：[`packages/experimental/hard-ledger/src/domain.ts:32`](../packages/experimental/hard-ledger/src/domain.ts)
 
 <a id="hardhypothesisstate--log-only"></a>
 
@@ -613,7 +614,22 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'hard/hypothesis/state': HardHypothesisStateData
 ```
 
-来源：[`packages/experimental/hard-ledger/src/domain.ts:27`](../packages/experimental/hard-ledger/src/domain.ts)
+来源：[`packages/experimental/hard-ledger/src/domain.ts:34`](../packages/experimental/hard-ledger/src/domain.ts)
+
+<a id="hardmissionarmed--log-only"></a>
+
+#### `hard/mission/armed` — log-only
+
+```ts persistence-catalog
+/**
+ * Mission armed with the pinned target and the enumerated coverage
+ * matrix axes; the mission plugin appends it once right after the goal
+ * is created, and the ledger folds it into the coverage matrix.
+ */
+'hard/mission/armed': HardMissionArmedData
+```
+
+来源：[`packages/experimental/hard-ledger/src/domain.ts:25`](../packages/experimental/hard-ledger/src/domain.ts)
 
 <a id="hardroundend--log-only"></a>
 
@@ -674,7 +690,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'hard/sweep/summary': HardSweepSummaryData
 ```
 
-来源：[`packages/experimental/hard-ledger/src/domain.ts:31`](../packages/experimental/hard-ledger/src/domain.ts)
+来源：[`packages/experimental/hard-ledger/src/domain.ts:38`](../packages/experimental/hard-ledger/src/domain.ts)
 
 ### `hook/*`
 
@@ -2069,6 +2085,14 @@ SHA-256: `539702ecb130e299ea6c3e5801e0a5388860f6f3ee9419f38947dae51803f1de`
 SHA-256: `f1770c070bc94b9478b1384f07503bf4f8b9be5ec3340787c7e3cc93bf0769e5`
 
 `"hard/hypothesis/state"`
+
+<a id="persistence-type-sha256-93cfdaa4cbaee01b65af96aff76a3852128eb4dc58e6de7b1c8adbdb12235a3f"></a>
+
+### `"hard/mission/armed"`
+
+SHA-256: `93cfdaa4cbaee01b65af96aff76a3852128eb4dc58e6de7b1c8adbdb12235a3f`
+
+`"hard/mission/armed"`
 
 <a id="persistence-type-sha256-45d8c2c425b535297d9d35b87795c56ca2046a84c8884260f24fac9b4ea87cde"></a>
 
@@ -3976,6 +4000,26 @@ SHA-256: `3ea29d03a30a59c68cb27fc1fbe96a1febe63edc5d0b26e1bb26894ddc1a24cd`
 - `"proposed"`
 - `"refuted"`
 - `"testing"`
+
+<a id="persistence-type-sha256-96336441d668615a5cfbdf8d918e7909c2d133cf24e2d5fe3216d77d95100dd5"></a>
+
+<a id="persistence-type-hardmissionarmeddata"></a>
+
+<a id="persistence-type-packagesexperimentalhard-ledgersrctypestshardmissionarmeddata"></a>
+
+### `HardMissionArmedData`
+
+SHA-256: `96336441d668615a5cfbdf8d918e7909c2d133cf24e2d5fe3216d77d95100dd5`
+
+来源：[`packages/experimental/hard-ledger/src/types.ts:92`](../packages/experimental/hard-ledger/src/types.ts)
+
+| 属性 | 存在性 | 类型 |
+|---|---|---|
+| `bugClasses` | 必需 | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
+| `commit` | 必需 | `string` |
+| `modules` | 必需 | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
+| `objective` | 必需 | `string` |
+| `targetRepo` | 必需 | `string` |
 
 <a id="persistence-type-sha256-cdbe5a7dc077d41dd41fb38da03b1d08f155474431c47c9afcd50f72fe013c67"></a>
 
@@ -9025,6 +9069,22 @@ SHA-256: `b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1`
 | `seq` | 必需 | `number` |
 | `time` | 必需 | `number` |
 | `type` | 必需 | `"hard/hypothesis/state"` |
+
+<a id="persistence-type-sha256-dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1"></a>
+
+<a id="persistence-type-eventhardmissionarmed"></a>
+
+### `{ type: "hard/mission/armed" }`
+
+SHA-256: `dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1`
+
+| 属性 | 存在性 | 类型 |
+|---|---|---|
+| `data` | 必需 | [`HardMissionArmedData`](#persistence-type-sha256-96336441d668615a5cfbdf8d918e7909c2d133cf24e2d5fe3216d77d95100dd5) |
+| `ignorable` | 可选 | `true` |
+| `seq` | 必需 | `number` |
+| `time` | 必需 | `number` |
+| `type` | 必需 | `"hard/mission/armed"` |
 
 <a id="persistence-type-sha256-9c8583a2e073f7ddb70f3ae373b1916e1c75f9c7e338078bd09b3a59df203cfc"></a>
 

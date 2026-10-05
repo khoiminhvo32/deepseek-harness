@@ -297,6 +297,13 @@ describe('hard_update_hypothesis and methodology tools', () => {
       { exitCode: 0, stdoutText: 'src/db/exec.ts:9: exec(userCmd)\n' },
       { runs: 1, coverageSpotCheckPercent: 100 },
     )
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/db'],
+      bugClasses: ['cmdi'],
+    })
     const reopened = resultJson(await execute(ctx, 'hard_mark_coverage', {
       module: 'src/db', bug_class: 'cmdi', verdict: 'cleared',
       declared_sinks: ['src/db/query.ts:42 rawQuery()'],

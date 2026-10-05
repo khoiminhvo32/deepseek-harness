@@ -6,11 +6,13 @@ Experimental hard-harness services keep one long-running objective alive in a se
 
 ## Running the profile
 
-The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. Supply the objective either as the CLI task or through a profile patch overriding the `hard-mission` row's `objective` (the bundle ships a blank one and fails the load until a real objective is set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`.
+The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. Supply the objective and the target repository through a profile patch overriding the `hard-mission` row's `objective` and `target.repoPath` (the bundle ships blanks and fails the load until real values are set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`.
 
 ## Ledger state
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
+
+The coverage matrix comes from the mission's arming record: at load the mission plugin pins the configured target repository (resolving `target.commit` to its full sha) and enumerates the tracked modules with `git ls-files`, so the denominator respects `.gitignore` and reproduces byte-for-byte on the same commit. The matrix rides one additive `hard/mission/armed` event; `coverageProgress` counts verdicts over the `modules × bugClasses` cells, `uncoveredCells` lists the cells that still owe work, and `openWork` names both uncovered and suspicious cells.
 
 ## Proof-of-effect contract
 
@@ -32,9 +34,18 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.hardLedger` — `HardLedger`
 
-The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, and open-work state from the projection.
+The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.
 
 ```ts cordis-catalog
+/**
+ * Append the mission arming record: the pinned target and the enumerated
+ * coverage matrix axes. The mission plugin appends it once, right after
+ * the goal is created.
+ * @param agent - the live agent whose session receives the record.
+ * @param data - the armed payload to persist.
+ */
+recordMissionArmed(agent: Agent, data: HardMissionArmedData): void
+
 /**
  * Append one validated finding-proposal record and return its id.
  * @param agent - the live agent whose session receives the record.
@@ -102,7 +113,31 @@ coverage(agent: Agent): readonly HardCoverageCellData[]
 sweepCount(agent: Agent, phase: 'A' | 'B'): number
 
 /**
- * Model-facing open work summary: pending verifications and unresolved states.
+ * The coverage matrix folded from the mission arming record.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the matrix axes and pinned target, or `undefined` when no
+ *   arming record exists (legacy log, or the mission plugin is not mounted).
+ */
+coverageMatrix(agent: Agent): HardCoverageMatrix | undefined
+
+/**
+ * Coverage progress over the matrix: matrix cells holding a verdict,
+ * of the whole matrix. Cells outside the matrix never count.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
+ */
+coverageProgress(agent: Agent): { verdicted: number; total: number }
+
+/**
+ * Matrix cells with no verdict yet, in deterministic module-then-class order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one entry per uncovered matrix cell, empty without a matrix.
+ */
+uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
+
+/**
+ * Model-facing open work summary: pending verifications, unresolved
+ * states, and coverage cells that still owe work.
  * @param agent - the live agent whose ledger state is read.
  * @returns bounded human-readable work items, empty when nothing is open.
  */
@@ -133,14 +168,17 @@ async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindi
 /**
  * Deterministic cross-check of one `cleared` coverage cell: re-grep the
  * module against the bug class's fixed sink patterns and reopen the cell
- * as `suspicious` when undeclared sink sites surface. Sampling follows the
+ * as `suspicious` when undeclared sink sites surface. The grep runs from
+ * the pinned target repository the armed coverage matrix records, so the
+ * module path is always target-repo relative. Sampling follows the
  * configured spot-check percent by cell hash; an unsampled cell, a
- * non-cleared cell, a class without patterns, or a grep without misses
- * returns `undefined` and changes nothing.
+ * non-cleared cell, a class without patterns, a missing matrix, or a grep
+ * without misses returns `undefined` and changes nothing.
+ * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param cell - the coverage cell the model just marked `cleared`.
  * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
  */
-async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
+async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
 ```
 
 Types: [Agent](core.md)

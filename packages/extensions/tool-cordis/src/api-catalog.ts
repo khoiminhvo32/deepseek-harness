@@ -1239,9 +1239,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'hardLedger',
-    summary: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, and open-work state from the projection.',
-    description: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, and open-work state from the projection.',
+    summary: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
+    description: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
     methods: [
+      {
+        signature: 'recordMissionArmed(agent: Agent, data: HardMissionArmedData): void',
+        description: 'Append the mission arming record: the pinned target and the enumerated coverage matrix axes. The mission plugin appends it once, right after the goal is created.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the armed payload to persist.' }],
+      },
       {
         signature: 'proposeFinding(agent: Agent, request: Omit<HardFindingProposedData, \'id\'>): HardFindingId',
         description: 'Append one validated finding-proposal record and return its id.',
@@ -1294,8 +1299,26 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the number of summaries recorded for the phase.',
       },
       {
+        signature: 'coverageMatrix(agent: Agent): HardCoverageMatrix | undefined',
+        description: 'The coverage matrix folded from the mission arming record.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the matrix axes and pinned target, or `undefined` when no arming record exists (legacy log, or the mission plugin is not mounted).',
+      },
+      {
+        signature: 'coverageProgress(agent: Agent): { verdicted: number; total: number }',
+        description: 'Coverage progress over the matrix: matrix cells holding a verdict, of the whole matrix. Cells outside the matrix never count.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the verdicted count and the matrix cell total, `0/0` without a matrix.',
+      },
+      {
+        signature: 'uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]',
+        description: 'Matrix cells with no verdict yet, in deterministic module-then-class order.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one entry per uncovered matrix cell, empty without a matrix.',
+      },
+      {
         signature: 'openWork(agent: Agent): string[]',
-        description: 'Model-facing open work summary: pending verifications and unresolved states.',
+        description: 'Model-facing open work summary: pending verifications, unresolved states, and coverage cells that still owe work.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'bounded human-readable work items, empty when nothing is open.',
       },
@@ -1313,9 +1336,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the appended verdict record.',
       },
       {
-        signature: 'async auditCoverage(cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>',
-        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, or a grep without misses returns `undefined` and changes nothing.',
-        parameters: [{ name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
+        signature: 'async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>',
+        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. The grep runs from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, a missing matrix, or a grep without misses returns `undefined` and changes nothing.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
         returns: 'the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.',
       },
     ],
@@ -5468,6 +5491,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface HardCoverageCellData {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: HardCoverageVerdict;\n    readonly declaredSinks: readonly string[];\n}',
   },
   {
+    name: 'HardCoverageMatrix',
+    declaration: 'export type HardCoverageMatrix = NonNullable<HardLedgerProjectionState[\'matrix\']>;',
+  },
+  {
     name: 'HardCoverageVerdict',
     declaration: 'export type HardCoverageVerdict = \'cleared\' | \'suspicious\' | \'uncovered\';',
   },
@@ -5498,6 +5525,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardLedgerFindingEntry',
     declaration: 'export interface HardLedgerFindingEntry {\n    readonly proposed: HardFindingProposedData;\n    readonly verdict?: HardFindingVerdictData;\n}',
+  },
+  {
+    name: 'HardLedgerProjectionState',
+    declaration: 'export type HardLedgerProjectionState = zod.infer<typeof hardLedgerStateSchema>;',
+  },
+  {
+    name: 'HardMissionArmedData',
+    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n}',
   },
   {
     name: 'HardSweepSummaryData',

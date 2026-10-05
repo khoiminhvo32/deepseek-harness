@@ -103,12 +103,23 @@ function phaseOrder(phase: 'A' | 'B'): string {
 }
 
 /** The model-facing round context injected after the admitted round message. */
-function roundContext(round: number, maxRounds: number, phase: 'A' | 'B', openWork: readonly string[]): string {
+function roundContext(
+  round: number,
+  maxRounds: number,
+  phase: 'A' | 'B',
+  openWork: readonly string[],
+  coverage: { verdicted: number; total: number } | undefined,
+): string {
   const work = openWork.length > 0
     ? `Open work from the ledger:\n${openWork.slice(0, 10).map(item => `- ${item}`).join('\n')}${openWork.length > 10 ? `\n(+${openWork.length - 10} more)` : ''}`
     : 'The ledger reports no open work; start the next coverage cell or hypothesis.'
+  const coverageLine = coverage === undefined || coverage.total === 0
+    ? undefined
+    : `Coverage: ${coverage.verdicted}/${coverage.total} cells verdicted.`
   return `<hard_round ${round}/${maxRounds}> phase ${phase}\n`
-    + `${phaseOrder(phase)}\n${work}\n`
+    + `${phaseOrder(phase)}\n`
+    + (coverageLine === undefined ? '' : `${coverageLine}\n`)
+    + `${work}\n`
     + 'Record progress with the hard tools; do not stop while concrete work remains.'
 }
 
@@ -139,6 +150,8 @@ export function apply(ctx: Context, config: Config): void {
       const round = event.data.source.round
       const phase = phaseFor(round, resolved.deepReadEveryN)
       const openWork = ctx.hardLedger.openWork(agent)
+      const matrix = ctx.hardLedger.coverageMatrix(agent)
+      const coverage = matrix === undefined ? undefined : ctx.hardLedger.coverageProgress(agent)
       rounds.set(session, {
         round,
         maxRounds: goal.maxGoalRounds,
@@ -151,7 +164,7 @@ export function apply(ctx: Context, config: Config): void {
       queueMicrotask(() => {
         session.append('hard/round/start', { round, phase, openWorkCount: openWork.length })
         agent.inject(createUserMessage({
-          content: [{ type: 'text', text: roundContext(round, goal.maxGoalRounds, phase, openWork) }],
+          content: [{ type: 'text', text: roundContext(round, goal.maxGoalRounds, phase, openWork, coverage) }],
           source: { kind: 'hard-round' },
         }))
       })

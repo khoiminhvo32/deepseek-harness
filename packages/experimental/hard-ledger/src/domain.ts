@@ -11,11 +11,18 @@ import type {
   HardFindingProposedData,
   HardFindingVerdictData,
   HardHypothesisStateData,
+  HardMissionArmedData,
   HardSweepSummaryData,
 } from './types.ts'
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
+    /**
+     * Mission armed with the pinned target and the enumerated coverage
+     * matrix axes; the mission plugin appends it once right after the goal
+     * is created, and the ledger folds it into the coverage matrix.
+     */
+    'hard/mission/armed': HardMissionArmedData
     /**
      * A proposed finding awaiting verifier execution; the verifier owns the
      * matching `hard/finding/verdict`.

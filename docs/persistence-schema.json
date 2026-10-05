@@ -11511,6 +11511,100 @@
       }
     },
     {
+      "key": "event:hard/mission/armed",
+      "kind": "event",
+      "event": "hard/mission/armed",
+      "surface": false,
+      "digest": "dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClasses",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "commit",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "modules",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "objective",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "targetRepo",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/mission/armed"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:hard/round/end",
       "kind": "event",
       "event": "hard/round/end",
@@ -27222,6 +27316,11 @@
       ]
     },
     {
+      "digest": "93cfdaa4cbaee01b65af96aff76a3852128eb4dc58e6de7b1c8adbdb12235a3f",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "93d38436347f67c9022aacbc4472e283d722bcab8eb73fc376aaf7b6a6b9fb35",
       "names": [],
       "sources": []
@@ -27242,6 +27341,15 @@
       "digest": "95c0e88fcf0bafb2087f912ad9e2369de6ae6530cc0c4c2772c96205b57f7f60",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "96336441d668615a5cfbdf8d918e7909c2d133cf24e2d5fe3216d77d95100dd5",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:92"
+      ]
     },
     {
       "digest": "9645cf93769a6dfb227bd400bd6cb9fa7bab9140f4a851e4ae92514ade6e3114",
@@ -28311,6 +28419,11 @@
     },
     {
       "digest": "dbdafceb9a900183cccc80596498d386f3bf7bddead2b8cfde68453aa4739edc",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "dc11307aaf8f65502dd82718a38d0215b5beded7561880bc4a268d9bd6d468b1",
       "names": [],
       "sources": []
     },

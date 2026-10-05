@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-mission` arms the configured objective as a durable session goal and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and declare completion only through the goal tools. It arms fresh root agents on `startup` only; resumed, cleared, compacted, and child agents keep their own goal state.
+`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and declare completion only through the goal tools. Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, and appends the `hard/mission/armed` session event once. It arms fresh root agents on `startup` only; resumed, cleared, compacted, and child agents keep their own goal state.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the plugin beside the goal service when a deployment owns one long-lived objective, such as continuous vulnerability research over a pinned target repository. The objective must be configured; a blank objective fails the load.
+Mount the plugin beside the goal service when a deployment owns one long-lived objective, such as continuous vulnerability research over a pinned target repository. The objective and the target are required; a blank objective, a relative `target.repoPath`, or a target that is not a git repository fails the load.
 
 ```yaml
 - id: hard-mission
@@ -33,7 +33,14 @@ Mount the plugin beside the goal service when a deployment owns one long-lived o
     objective: 'Find and verify every authentication bypass in the target repository'
     maxGoalRounds: 64
     deepReadEveryN: 3
+    target:
+      repoPath: /abs/path/to/target-repo
+      commit: HEAD
+      moduleDepth: 2
+      excludeGlobs: ['node_modules/**', 'vendor/**', 'dist/**', 'build/**']
 ```
+
+`target.repoPath` is required and must be absolute. At load the plugin resolves `target.commit` (default `HEAD`) through `git rev-parse`, lists the tracked files with `git ls-files` — so `.gitignore` is respected for free and the enumeration is tied to the pinned commit — filters them through `target.excludeGlobs` (root-anchored globs), and groups the survivors by their first `target.moduleDepth` (default 2) directory segments; a repository-root file becomes the module `.`. Zero surviving modules or more than 500 modules fail the load; lower `moduleDepth` or exclude more trees in the latter case. The result is sorted and deduplicated, so re-arming over the same commit reproduces the identical matrix, and the ledger serves it as the coverage denominator.
 
 `bugClasses` defaults to the systematic-pass list of every OWASP Top 10 class with mechanical source-to-sink semantics (sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race); an empty list removes the class list from the contract. Insecure design and security logging have no mechanical source-sink pair and stay in the deep-reading pass. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-mission) is the exhaustive source for every accepted field.
 
@@ -48,13 +55,15 @@ Mount the plugin beside the goal service when a deployment owns one long-lived o
 ### Design
 
 - **Arming at creation.** The plugin listens on `agent/created` and arms a goal through `ctx.goals.create` only when the source is `startup`, the agent is a registry root, and no goal is current. Every other source, child agent, or existing goal is left untouched, so the goal service's restore-and-disarm policy for persisted sessions stays authoritative.
+- **Target pinning at load.** Before any agent exists, `apply` resolves the target commit and enumerates the coverage matrix through the shell seam (`git rev-parse`, then `git ls-files`), so a misconfigured target — missing repository, unresolvable commit, no surviving module, or an oversized matrix — fails the load instead of arming a mission without a denominator. The matrix rides the additive `hard/mission/armed` session event the ledger folds.
 - **One contract section.** The `hard:mission` section renders the objective, the systematic-pass class list, and the deep-reading cadence from the resolved config. It is static text: it changes only when the deployment configuration changes.
 
 ### Source map
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config, contract rendering, section registration, startup arming |
+| [`src/index.ts`](src/index.ts) | Plugin entry: config, contract rendering, section registration, startup arming, target pinning |
+| [`src/modules.ts`](src/modules.ts) | Pure module grouping and exclusion-glob filtering over tracked paths |
 
 </details>
 
@@ -90,7 +99,7 @@ Prefix-stable while the plugin scope and configuration are unchanged. Activation
 
 - **Startup-only arming** — a resumed or cleared session keeps the goal service's restored (disarmed) goal; automatic re-arming on resume and on quota standby wake belongs to the hard-standby plugin.
 - **Completion path assumes the goal tools** — the contract names `update_goal action complete`; a composition without `dsh-tool-goal` must surface that action through another consumer.
-- **No completion evaluator** — arming and guidance only; certification of completion is deferred to the hard stop gate and verifier packages.
+- **No completion evaluator** — arming and guidance only; certification of completion is deferred to the hard stop gate and verifier packages. The matrix is the denominator the future completion gate will consume.
 
 <a id="dev-note"></a>
 ### Dev Note

@@ -87,3 +87,17 @@ export interface HardSweepSummaryData {
   /** Required for an empty sweep: the refuted hypothesis or cleared cell evidence. */
   readonly emptyProof?: string
 }
+
+/** Mission arming record: the pinned target and the coverage matrix axes. */
+export interface HardMissionArmedData {
+  /** The durable objective the armed goal carries. */
+  readonly objective: string
+  /** Absolute path of the target repository the modules enumerate. */
+  readonly targetRepo: string
+  /** Full commit sha the enumeration pinned at arm time, never a ref. */
+  readonly commit: string
+  /** Sorted, deduplicated module names — the coverage matrix rows. */
+  readonly modules: readonly string[]
+  /** Bug class names swept in the systematic pass — the coverage matrix columns. */
+  readonly bugClasses: readonly string[]
+}

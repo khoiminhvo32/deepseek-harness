@@ -30,6 +30,9 @@
       name: '@deepseek-ai/dsh-experimental-hard-mission'
       config:
         objective: 'Hunt vulnerabilities in this repository; only verified findings count.'
+        target:
+          # The seeded workspace is the target git repository the session runs in.
+          repoPath: !!js process.cwd()
     - id: hard-stopgate
       name: '@deepseek-ai/dsh-experimental-hard-stopgate'
     - id: hard-standby

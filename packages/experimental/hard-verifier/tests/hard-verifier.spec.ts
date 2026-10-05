@@ -291,6 +291,22 @@ const clearedCell = {
   declaredSinks: ['src/auth/login.ts:10 system('],
 }
 
+/** The pinned commit sha shape the arming record requires. */
+const pinnedSha = 'a'.repeat(40)
+
+/** Arm the primary root's ledger with a one-module coverage matrix rooted at targetRepo. */
+function armMatrix(ctx: Context, targetRepo: string): Agent {
+  const root = root0Agent(ctx)
+  ctx.hardLedger.recordMissionArmed(root, {
+    objective: 'hunt bugs in the target repository',
+    targetRepo,
+    commit: pinnedSha,
+    modules: ['src/auth'],
+    bugClasses: ['cmdi'],
+  })
+  return root
+}
+
 describe('hard verifier coverage cross-check', () => {
   it('samples deterministically by cell and respects the bounds', () => {
     expect(sampleCellForSpotCheck(clearedCell, 0)).toBe(false)
@@ -298,23 +314,27 @@ describe('hard verifier coverage cross-check', () => {
     expect(sampleCellForSpotCheck(clearedCell, 20)).toBe(sampleCellForSpotCheck(clearedCell, 20))
   })
 
-  it('skips non-cleared cells, unknown classes, and unsampled cells without running the shell', async () => {
+  it('skips non-cleared cells, unknown classes, unsampled cells, and missing matrices without running the shell', async () => {
     const unsampled = await harness([], { coverageSpotCheckPercent: 0 })
-    expect(await unsampled.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+    const unsampledRoot = root0Agent(unsampled.ctx)
+    expect(await unsampled.ctx.hardVerifier.auditCoverage(unsampledRoot, clearedCell)).toBeUndefined()
     expect(unsampled.shell.runs).toEqual([])
 
     const sampled = await harness([], { coverageSpotCheckPercent: 100 })
-    expect(await sampled.ctx.hardVerifier.auditCoverage({ ...clearedCell, verdict: 'suspicious' })).toBeUndefined()
-    expect(await sampled.ctx.hardVerifier.auditCoverage({ ...clearedCell, bugClass: 'no-such-class' })).toBeUndefined()
+    const sampledRoot = root0Agent(sampled.ctx)
+    expect(await sampled.ctx.hardVerifier.auditCoverage(sampledRoot, { ...clearedCell, verdict: 'suspicious' })).toBeUndefined()
+    expect(await sampled.ctx.hardVerifier.auditCoverage(sampledRoot, { ...clearedCell, bugClass: 'no-such-class' })).toBeUndefined()
+    expect(await sampled.ctx.hardVerifier.auditCoverage(sampledRoot, clearedCell)).toBeUndefined()
     expect(sampled.shell.runs).toEqual([])
   })
 
-  it('reopens a cleared cell whose grep surfaces undeclared sinks', async () => {
+  it('reopens a cleared cell whose grep surfaces undeclared sinks, anchored at the pinned target repo', async () => {
     const { ctx, shell } = await harness(
       [{ exitCode: 0, stdoutText: 'src/auth/exec.ts:5: exec(userCmd)\nsrc/auth/login.ts:10 system(cmd)\n' }],
       { coverageSpotCheckPercent: 100 },
     )
-    const reopened = await ctx.hardVerifier.auditCoverage(clearedCell)
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, clearedCell)
     expect(reopened).toEqual({
       module: 'src/auth',
       bugClass: 'cmdi',
@@ -323,6 +343,7 @@ describe('hard verifier coverage cross-check', () => {
     })
     expect(shell.runs[0]?.command).toContain('grep -rInE')
     expect(shell.runs[0]?.command).toContain('src/auth')
+    expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
   })
 
   it('leaves the cell alone when every match was declared or the run failed', async () => {
@@ -330,10 +351,12 @@ describe('hard verifier coverage cross-check', () => {
       [{ exitCode: 0, stdoutText: 'src/auth/login.ts:10 system(cmd)\n' }],
       { coverageSpotCheckPercent: 100 },
     )
-    expect(await declared.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+    const declaredRoot = armMatrix(declared.ctx, '/tmp/hard-target')
+    expect(await declared.ctx.hardVerifier.auditCoverage(declaredRoot, clearedCell)).toBeUndefined()
 
     const failed = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
-    expect(await failed.ctx.hardVerifier.auditCoverage(clearedCell)).toBeUndefined()
+    const failedRoot = armMatrix(failed.ctx, '/tmp/hard-target')
+    expect(await failed.ctx.hardVerifier.auditCoverage(failedRoot, clearedCell)).toBeUndefined()
   })
 
   it('validates the spot-check percent fail-loud', () => {

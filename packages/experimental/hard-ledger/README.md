@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-ledger` owns the durable methodology state of the hard harness: five additive `hard/*` session events (finding proposals and verifier verdicts, hypothesis lifecycle, coverage cells, sweep summaries) plus the `ctx.hardLedger` service that validates, appends, and folds them. The session log is the only store; ids are assigned from the log and every fold derives from it.
+`dsh-experimental-hard-ledger` owns the durable methodology state of the hard harness: additive `hard/*` session events (finding proposals and verifier verdicts, hypothesis lifecycle, coverage cells, sweep summaries, and the mission arming record) plus the `ctx.hardLedger` service that validates, appends, and folds them. The session log is the only store; ids are assigned from the log and every fold derives from it.
 
 ## Table of Contents
 
@@ -43,17 +43,18 @@ The service key is `hardLedger`. Append-side helpers validate fail-loud with sta
 
 ### Design
 
-- **Log-derived state.** `findings`, `hypotheses`, `coverage`, `sweepCount`, and `openWork` read the `hardLedger` session projection, a pure fold over the five events that the framework restores at resume and advances incrementally on every commit; there is no parallel store, so the log remains the single source of truth and fork/restart behavior follows the session for free.
+- **Log-derived state.** `findings`, `hypotheses`, `coverage`, `sweepCount`, `coverageMatrix`, and `openWork` read the `hardLedger` session projection, a pure fold over the `hard/*` events that the framework restores at resume and advances incrementally on every commit; there is no parallel store, so the log remains the single source of truth and fork/restart behavior follows the session for free.
 - **Sequential ids from the log.** `F-<n>` and `H-<n>` counters count prior events of their type; hypothesis transitions verify membership against ids already present in the log.
-- **Additive events, no format bump.** The five events are purely additive roots: no surface, envelope, or header change and no existing event changes shape, so vocabulary growth needs no format bump. Older builds refuse such logs instead of misreading them, the required-on-read contract for in-repo events.
+- **Additive events, no format bump.** The events are purely additive roots: no surface, envelope, or header change and no existing event changes shape, so vocabulary growth needs no format bump. Older builds refuse such logs instead of misreading them, the required-on-read contract for in-repo events.
 - **Bounded text.** Free-text fields cap at 2000 characters; reason fields for `refuted` and `deferred` hypotheses and `emptyProof` for zero-finding sweeps are mandatory.
+- **Coverage denominator from the arming record.** The mission plugin appends one `hard/mission/armed` event carrying the pinned target repository, the resolved commit sha, the sorted module rows, and the bug-class columns. The fold stores it as the matrix; `coverageProgress` counts verdicts over `modules × bugClasses`, `uncoveredCells` lists the cells that still owe work in deterministic order, and `openWork` names both uncovered and suspicious cells so the stop gate and the round context see the remaining sweep. Cells outside the matrix never count, and a log without an arming record keeps the legacy shape: empty results, no throw.
 
 ### Source map
 
 | File | Role |
 |---|---|
 | [`src/types.ts`](src/types.ts) | Pure event payload vocabulary |
-| [`src/domain.ts`](src/domain.ts) | `SessionEventMap` merge for the five `hard/*` events |
+| [`src/domain.ts`](src/domain.ts) | `SessionEventMap` merge for the `hard/*` events |
 | [`src/projection.ts`](src/projection.ts) | Session-projection unit: pure fold, state schema, definition |
 | [`src/index.ts`](src/index.ts) | `HardLedger` service: validation, appends, projection reads, open-work summary |
 

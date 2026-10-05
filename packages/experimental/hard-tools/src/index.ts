@@ -224,7 +224,7 @@ export function apply(ctx: Context, _config: Config): void {
       const declaredSinks = (args.declared_sinks ?? []).filter((sink): sink is string => typeof sink === 'string')
       const cell = { module: args.module, bugClass: args.bug_class, verdict: args.verdict, declaredSinks }
       ledger.markCoverage(agent, cell)
-      return verifier.auditCoverage(cell).then((reopened) => {
+      return verifier.auditCoverage(agent, cell).then((reopened) => {
         if (reopened !== undefined) ledger.markCoverage(agent, reopened)
         const coverage = reopened === undefined
           ? { module: cell.module, bugClass: cell.bugClass, verdict: cell.verdict }

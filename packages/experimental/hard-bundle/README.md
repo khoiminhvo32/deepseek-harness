@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Enable this optional bundle to mount all nine hard plugins as one layer: `hard-mission` arms the configured objective as a durable session goal, `hard-stopgate` steers the turn boundary back to work while that goal stands, `hard-standby` waits out terminal quota failures and wakes the mission at the reset time, and `hard-handoff` injects the durable ledger summary after each successful compaction. The bundle ships with a blank objective and fails the load until the deployment supplies one through its own patch.
+Enable this optional bundle to mount all nine hard plugins as one layer: `hard-mission` arms the configured objective as a durable session goal, `hard-stopgate` steers the turn boundary back to work while that goal stands, `hard-standby` waits out terminal quota failures and wakes the mission at the reset time, and `hard-handoff` injects the durable ledger summary after each successful compaction. The bundle ships with a blank objective and a blank target repo path, and fails the load until the deployment supplies both through its own patch.
 
 ## Table of Contents
 
@@ -24,13 +24,15 @@ Enable this optional bundle to mount all nine hard plugins as one layer: `hard-m
 <a id="use-this-package"></a>
 ## Use this package
 
-Insert the bundle's patch layer after `dsh-base` and override the mission objective from your composition, for example through `cordis.patch.yml`:
+Insert the bundle's patch layer after `dsh-base` and override the mission objective and target from your composition, for example through `cordis.patch.yml`:
 
 ```yaml
 - overwrite:
     id: hard-mission
     config:
       objective: 'Find and verify every authentication bypass in the target repository'
+    target:
+      repoPath: /abs/path/to/target-repo
 ```
 
 The goal tools and the goal service come from `dsh-base`; this bundle adds only the mission, the stop gate, the standby, and the handoff.
@@ -43,7 +45,7 @@ The goal tools and the goal service come from `dsh-base`; this bundle adds only 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the `hard-mission` row with a blank objective — a deliberate loud failure until the deployment sets a real one — and the ledger, verifier, tools, stop-gate, standby, handoff, rounds, and deep-read rows with default config. Each plugin owns its behavior and lifetime; see [hard-mission](../hard-mission/README.md), [hard-stopgate](../hard-stopgate/README.md), [hard-standby](../hard-standby/README.md), [hard-handoff](../hard-handoff/README.md), [hard-rounds](../hard-rounds/README.md), and [hard-deepread](../hard-deepread/README.md).
+[`cordis.patch.yml`](cordis.patch.yml) inserts the `hard-mission` row with a blank objective and a blank target repo path — a deliberate loud failure until the deployment sets both — and the ledger, verifier, tools, stop-gate, standby, handoff, rounds, and deep-read rows with default config. Each plugin owns its behavior and lifetime; see [hard-mission](../hard-mission/README.md), [hard-stopgate](../hard-stopgate/README.md), [hard-standby](../hard-standby/README.md), [hard-handoff](../hard-handoff/README.md), [hard-rounds](../hard-rounds/README.md), and [hard-deepread](../hard-deepread/README.md).
 
 </details>
 
@@ -62,7 +64,7 @@ None; the bundle adds no request content of its own.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Blank objective fails the load by design** — the shipped row carries `objective: ''`; a deployment that enables the bundle must supply the objective through its own patch.
+- **Blank objective or target fails the load by design** — the shipped row carries `objective: ''` and `target.repoPath: ''`; a deployment that enables the bundle must supply both through its own patch.
 - **Headless-first** — the bundle composes plugins for CLI and headless profiles; Web/desktop presentation for hard sessions is deferred.
 
 <a id="dev-note"></a>

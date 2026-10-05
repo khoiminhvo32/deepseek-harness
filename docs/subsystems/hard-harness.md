@@ -12,7 +12,7 @@ The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
 
-The coverage matrix comes from the mission's arming record: at load the mission plugin pins the configured target repository (resolving `target.commit` to its full sha) and enumerates the tracked modules with `git ls-files`, so the denominator respects `.gitignore` and reproduces byte-for-byte on the same commit. The matrix rides one additive `hard/mission/armed` event; `coverageProgress` counts verdicts over the `modules × bugClasses` cells, `uncoveredCells` lists the cells that still owe work, and `openWork` names both uncovered and suspicious cells.
+The coverage matrix comes from the mission's arming record: at load the mission plugin pins the configured target repository (resolving `target.commit` to its full sha) and enumerates the tracked modules with `git ls-files`, so the denominator respects `.gitignore` and reproduces byte-for-byte on the same commit. The matrix rides one additive `hard/mission/armed` event. Three economics keep the denominator reachable on real repositories: `CLASS_SCOPE` gives `dependencies` and `misconfig` one repository-level cell instead of one per module; modules whose every tracked file is non-executable (`inertModules`) are pre-verdicted by the harness without a model event; and `hard_clear_modules` batch-clears one class across modules behind a harness grep that unions the model's patterns with the fixed table, recording `source: model-verified` while the model's own marks stay unattributed (read as `model`). `coverageProgress` counts verdicts over the scoped total, `uncoveredCells` lists only the cells that still need the model, `coverageBySource` partitions verdicts by decider, and `openWork` sends a hash-sampled share of batch-cleared cells back for a manual re-read so the screen's false-negative rate stays measured.
 
 ## Proof-of-effect contract
 
@@ -129,15 +129,29 @@ coverageMatrix(agent: Agent): HardCoverageMatrix | undefined
 coverageProgress(agent: Agent): { verdicted: number; total: number }
 
 /**
- * Matrix cells with no verdict yet, in deterministic module-then-class order.
+ * Matrix cells that still need the model, in matrix order: sorted modules
+ * outer, the configured class order inner, then repository-scoped cells
+ * under the `.` module. Inert modules carry no module-class surface and are
+ * never listed; a repository-scoped class is listed once, not per module.
  * @param agent - the live agent whose ledger state is read.
  * @returns one entry per uncovered matrix cell, empty without a matrix.
  */
 uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
 
 /**
+ * Verdicted matrix cells partitioned by who decided them: the model's own
+ * reads, batch clears the harness grep confirmed, and the purely mechanical
+ * inert-module screen. A cell carrying no source reads as `model`, so older
+ * logs partition unchanged.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the three counts; all zero without a matrix.
+ */
+coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number }
+
+/**
  * Model-facing open work summary: pending verifications, unresolved
- * states, and coverage cells that still owe work.
+ * states, coverage cells that still owe work, and batch-cleared cells the
+ * deterministic screen spot-check sends back for a manual re-read.
  * @param agent - the live agent whose ledger state is read.
  * @returns bounded human-readable work items, empty when nothing is open.
  */
@@ -179,6 +193,25 @@ async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindi
  * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
  */
 async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
+
+/**
+ * Mechanical absence screen behind the batch clear: grep the requested
+ * modules for the union of the model's patterns and the class's fixed sink
+ * patterns, anchored at the pinned target repository. The union means the
+ * model's patterns can only ADD coverage, never subtract — a narrow
+ * pattern choice cannot sneak past the harness table. An empty grep on
+ * every module proves the absence predicate; any match fails the whole
+ * batch and returns the matching lines as evidence for a manual read.
+ * Absence-shaped classes are refused: for their protective sinks, an empty
+ * grep is suspicious, not clean.
+ * @param agent - the live agent whose ledger matrix anchors the grep.
+ * @param bugClass - the bug class to prove absent.
+ * @param modules - the target-repo-relative modules to grep.
+ * @param patterns - the model's own extended-regex absence patterns.
+ * @returns `clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.
+ * @throws when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.
+ */
+async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>
 ```
 
 Types: [Agent](core.md)

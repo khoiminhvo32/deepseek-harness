@@ -80,6 +80,7 @@ Results append after the reusable request prefix without invalidating earlier en
 
 - **Bash PoC** — 执行运行 `bash <pocPath>`；Windows PoC 运行器需要 pwsh provider 路径，已延期。
 - **效果类别细化延期** — 针对内存安全与 authz 类别的 sanitizer 信号与差分检查分类将随覆盖审计器落地；标记契约是 PR2 的唯一契约。
+- **缺席形态的类别拒绝批量筛查** — `ABSENCE_SINK_CLASSES`（`authz`、`authn-bypass`、`login-bypass`）命名的是防护性检查，因此 `screenModules` 拒绝它们：对这些类别，空 grep 意味着没有找到任何防护，是可疑而非干净。批量联合还意味着模型的 pattern 只能在固定表之上增加覆盖，永远不能减。
 - **网络策略属于部署** — PoC 运行期间的出网限制跟随已挂载的 sandbox provider；验证器不添加自己的策略。
 
 <a id="dev-note"></a>

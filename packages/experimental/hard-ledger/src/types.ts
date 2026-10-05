@@ -23,6 +23,14 @@ export type HardHypothesisStatus = 'proposed' | 'testing' | 'confirmed' | 'refut
 /** Verdict a model may declare for one coverage cell. */
 export type HardCoverageVerdict = 'cleared' | 'suspicious' | 'uncovered'
 
+/**
+ * Who decided one coverage cell's verdict. Absent means `model` — the
+ * historical behavior — so older logs read back with unchanged meaning.
+ * `model-verified` marks a batch clear the harness grep confirmed;
+ * `harness` marks a purely mechanical screen the model took no part in.
+ */
+export type HardCoverageSource = 'model' | 'model-verified' | 'harness'
+
 /** One proposed finding, appended before verification runs. */
 export interface HardFindingProposedData {
   readonly id: HardFindingId
@@ -77,6 +85,11 @@ export interface HardCoverageCellData {
   readonly verdict: HardCoverageVerdict
   /** Sink sites the model declares it inspected for this cell. */
   readonly declaredSinks: readonly string[]
+  /**
+   * Who decided this verdict. Optional so the change is additive: absent
+   * reads as `model`. Harness callers set this; model-facing tools never do.
+   */
+  readonly source?: HardCoverageSource
 }
 
 /** One completed sweep pass summary; purely informational. */
@@ -100,4 +113,10 @@ export interface HardMissionArmedData {
   readonly modules: readonly string[]
   /** Bug class names swept in the systematic pass — the coverage matrix columns. */
   readonly bugClasses: readonly string[]
+  /**
+   * Sorted subset of `modules` where every tracked file carries an inert
+   * extension: no code, so no module-class surface. Optional so the change
+   * is additive; absent reads as an empty screen.
+   */
+  readonly inertModules?: readonly string[]
 }

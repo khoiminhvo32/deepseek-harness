@@ -1,0 +1,239 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/coverage/cell",
+      "kind": "event",
+      "event": "hard/coverage/cell",
+      "surface": false,
+      "digest": "c1f5a2e424cdeeee133c7b4d2f5599d1c13ab0290e07cb92619fc5c923b55502",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 14,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClass",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "declaredSinks",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "verdict",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "model-verified"
+          },
+          {
+            "kind": "literal",
+            "value": "harness"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "union",
+            "types": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "cleared"
+          },
+          {
+            "kind": "literal",
+            "value": "suspicious"
+          },
+          {
+            "kind": "literal",
+            "value": "uncovered"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/coverage/cell"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/mission/armed",
+      "kind": "event",
+      "event": "hard/mission/armed",
+      "surface": false,
+      "digest": "4a44bc0b449762e9c5f0b13fbea08a7fb607f34d1681aee1edb5d88ee1249161",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClasses",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "commit",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "inertModules",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "modules",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "objective",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "targetRepo",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/mission/armed"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

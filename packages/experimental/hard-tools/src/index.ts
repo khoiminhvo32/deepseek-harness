@@ -11,7 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
-import { claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
 
 export const name = 'hard-tools'
@@ -38,6 +38,13 @@ const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systemati
   + 'bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; '
   + 'the harness may re-grep the module against your declared list.'
 
+const CLEAR_MODULES_DESCRIPTION = 'Batch-clear one bug class across several modules WITH harness verification. '
+  + 'Provide extended-regex patterns that prove this class\'s sinks are absent from those modules; the harness greps '
+  + 'each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, '
+  + 'never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the '
+  + 'matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) '
+  + 'are refused: there, an empty grep is suspicious, not clean.'
+
 const SWEEP_DESCRIPTION = 'Record one completed sweep pass. When the pass found nothing, empty_proof is required: '
   + 'name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.'
 
@@ -57,12 +64,12 @@ function hypothesisId(value: string): string {
   return trimmed
 }
 
-/** Shared compact JSON result renderer for the four tools. */
+/** Shared compact JSON result renderer for the hard tools. */
 function renderJson(_args: unknown, value: unknown): { type: 'text'; text: string }[] {
   return [{ type: 'text', text: JSON.stringify(value) }]
 }
 
-/** Register the four hard-harness tools. */
+/** Register the five hard-harness tools. */
 export function apply(ctx: Context, _config: Config): void {
   const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
@@ -236,6 +243,90 @@ export function apply(ctx: Context, _config: Config): void {
       })
     },
     presentCall: args => present(`Coverage ${args.module} x ${args.bug_class}: ${args.verdict}`, args.module),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'hard_clear_modules',
+    description: CLEAR_MODULES_DESCRIPTION,
+    parameters: {
+      modules: { type: 'array', required: true, description: 'Target-repo-relative module names to clear in one batch.' },
+      bug_class: { type: 'string', required: true, description: 'One module-scoped bug class absent from all listed modules.' },
+      patterns: {
+        type: 'array', required: true,
+        description: 'Extended-regex patterns proving the class\'s sinks are absent; the harness unions them with its own fixed table.',
+      },
+      rationale: { type: 'string', required: true, description: 'Why this pattern set is sufficient for this repository.' },
+    },
+    output: {
+      schema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          cleared: { type: 'number', required: true, description: 'Cells cleared; 0 when any module still matches.' },
+          clearedCells: {
+            type: 'array', required: true,
+            items: { type: 'object', additionalProperties: false, properties: { module: { type: 'string', required: true }, bugClass: { type: 'string', required: true } } },
+            description: 'The cleared module and class pairs, empty when nothing cleared.',
+          },
+          evidence: {
+            type: 'array', required: true,
+            description: 'Matching lines proving a sink exists; empty when the batch cleared.',
+          },
+        },
+      } as const,
+      render: renderJson,
+    },
+    execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_clear_modules requires a live agent')
+      const matrix = ledger.coverageMatrix(agent)
+      if (matrix === undefined) throw new Error('hard_clear_modules requires an armed coverage matrix')
+      if (ABSENCE_SINK_CLASSES.has(args.bug_class)) {
+        throw new Error(`hard_clear_modules refuses ${args.bug_class}: its sinks are protective checks, so an `
+          + 'empty grep means no guard was found, which is suspicious rather than clean; verify its cells '
+          + 'individually with hard_mark_coverage')
+      }
+      if (args.modules.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
+        throw new Error('modules entries must be non-empty strings')
+      }
+      const modules = [...new Set(args.modules.filter((entry): entry is string => typeof entry === 'string'))]
+      if (modules.length === 0) throw new Error('modules must list at least one module')
+      if (modules.length > 50) throw new Error('modules must not exceed 50 entries per batch')
+      for (const module of modules) {
+        if (!matrix.modules.includes(module)) {
+          throw new Error(`modules entry ${module} is not an armed coverage module`)
+        }
+      }
+      if (args.patterns.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
+        throw new Error('patterns entries must be non-empty strings')
+      }
+      const patterns = args.patterns.filter((entry): entry is string => typeof entry === 'string')
+      if (patterns.length === 0 || patterns.length > 10) {
+        throw new Error('patterns must list between 1 and 10 extended-regex patterns')
+      }
+      for (const pattern of patterns) {
+        if (pattern.length > 500) throw new Error('patterns entries must not exceed 500 characters')
+      }
+      if (typeof args.rationale !== 'string' || args.rationale.trim().length === 0) {
+        throw new Error('rationale must explain why this pattern set is sufficient for this repository')
+      }
+      return verifier.screenModules(agent, args.bug_class, modules, patterns).then((screen) => {
+        if (!screen.clean) {
+          return { cleared: 0, clearedCells: [], evidence: [...screen.evidence] }
+        }
+        const clearedCells = modules.map(module => ({ module, bugClass: args.bug_class }))
+        for (const cell of clearedCells) {
+          ledger.markCoverage(agent, {
+            module: cell.module,
+            bugClass: cell.bugClass,
+            verdict: 'cleared',
+            declaredSinks: [...patterns],
+            source: 'model-verified',
+          })
+        }
+        return { cleared: clearedCells.length, clearedCells, evidence: [] }
+      })
+    },
+    presentCall: args => present(`Batch clear ${args.modules.length} module(s) x ${args.bug_class}`, args.bug_class),
   }))
 
   ctx.tools.register(defineTool({

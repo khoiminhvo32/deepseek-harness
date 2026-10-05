@@ -6,15 +6,24 @@
  * @module @deepseek-ai/dsh-experimental-hard-verifier
  */
 
-import { createHash } from 'node:crypto'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { HardFindingProposedData, HardFindingVerdictData } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { cellSampledForPercent } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
 import { SINK_PATTERNS } from './sink-patterns.ts'
+
+/**
+ * Bug classes whose sink patterns name PROTECTIVE checks (authorization
+ * guards, authentication bypasses, login flows). For these, an empty grep
+ * means no protective sink was found anywhere — a suspicious absence, not
+ * a clean sweep — so batch clearing is refused and each cell needs an
+ * individual model read.
+ */
+export const ABSENCE_SINK_CLASSES: ReadonlySet<string> = new Set(['authz', 'authn-bypass', 'login-bypass'])
 import { classifyRuns } from './verdict.ts'
 import type { PoCRunRecord } from './verdict.ts'
 // Loads the declaration-merged `shell` Context key this service executes through.
@@ -146,10 +155,7 @@ export interface CoverageReopenRecord {
  * @returns true when the cross-check inspects this cell.
  */
 export function sampleCellForSpotCheck(cell: { module: string; bugClass: string }, percent: number): boolean {
-  if (percent <= 0) return false
-  if (percent >= 100) return true
-  const digest = createHash('sha256').update(`${cell.module}\u0000${cell.bugClass}`).digest()
-  return (digest[0] ?? 255) * 100 < percent * 256
+  return cellSampledForPercent(cell, percent)
 }
 
 /**
@@ -270,6 +276,71 @@ export class HardVerifier extends Service {
       .slice(0, 8)
     if (missed.length === 0) return undefined
     return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed }
+  }
+
+  /**
+   * Mechanical absence screen behind the batch clear: grep the requested
+   * modules for the union of the model's patterns and the class's fixed sink
+   * patterns, anchored at the pinned target repository. The union means the
+   * model's patterns can only ADD coverage, never subtract — a narrow
+   * pattern choice cannot sneak past the harness table. An empty grep on
+   * every module proves the absence predicate; any match fails the whole
+   * batch and returns the matching lines as evidence for a manual read.
+   * Absence-shaped classes are refused: for their protective sinks, an empty
+   * grep is suspicious, not clean.
+   * @param agent - the live agent whose ledger matrix anchors the grep.
+   * @param bugClass - the bug class to prove absent.
+   * @param modules - the target-repo-relative modules to grep.
+   * @param patterns - the model's own extended-regex absence patterns.
+   * @returns `clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.
+   * @throws when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.
+   */
+  async screenModules(
+    agent: Agent,
+    bugClass: string,
+    modules: readonly string[],
+    patterns: readonly string[],
+  ): Promise<{ clean: boolean; evidence: readonly string[] }> {
+    const classPatterns = SINK_PATTERNS[bugClass]
+    if (classPatterns === undefined || classPatterns.length === 0) {
+      throw new HarnessError(
+        `hard screen: bug class ${bugClass} has no fixed sink patterns to verify against`,
+        'HARD_VERIFIER_UNKNOWN_CLASS',
+      )
+    }
+    if (ABSENCE_SINK_CLASSES.has(bugClass)) {
+      throw new HarnessError(
+        `hard screen: bug class ${bugClass} is absence-shaped — its sinks are protective checks, `
+        + 'so an empty grep means no guard was found, which is suspicious rather than clean; '
+        + 'verify its cells individually with hard_mark_coverage',
+        'HARD_VERIFIER_ABSENCE_CLASS',
+      )
+    }
+    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
+    if (targetRepo === undefined) {
+      throw new HarnessError('hard screen: no armed coverage matrix', 'HARD_VERIFIER_NO_MATRIX')
+    }
+    const union = [...new Set([...patterns, ...classPatterns])]
+    const spec = this.ctx.shell.resolve({
+      command: `grep -rInE ${shellQuote(union.join('|'))} ${modules.map(shellQuote).join(' ')}`,
+      timeoutMs: this.resolved.timeoutSeconds * 1000,
+      stdoutMaxBytes: this.resolved.stdoutMaxBytes,
+      workdir: targetRepo,
+    })
+    const execution = await this.ctx.shell.execute(spec)
+    const result = await execution.result()
+    if (result.timedOut || result.aborted || (result.exitCode !== 0 && result.exitCode !== 1)) {
+      throw new HarnessError(
+        `hard screen: grep over ${modules.join(', ')} failed with exit ${String(result.exitCode)}: `
+        + result.stderr.text.trim().slice(-400),
+        'HARD_VERIFIER_SCREEN_FAILED',
+      )
+    }
+    const evidence = result.stdout.text.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .slice(0, 8)
+    return { clean: evidence.length === 0, evidence }
   }
 }
 

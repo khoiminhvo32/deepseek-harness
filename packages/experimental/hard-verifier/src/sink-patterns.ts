@@ -13,7 +13,7 @@ export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
   sqli: [
     '(execute|executemany|query|rawQuery)\\(',
     'createStatement|prepareStatement',
-    '(SELECT|INSERT|UPDATE|DELETE)[^\n]*(\\+|\\$\\{|%s|f")',
+    '(SELECT|INSERT|UPDATE|DELETE).*(\\+|\\$\\{|%s|f")',
   ],
   xss: [
     'innerHTML|outerHTML|document\\.write',
@@ -29,7 +29,7 @@ export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
   'path-traversal': [
     '(readFile|writeFile|open|createReadStream|createWriteStream)\\(',
     'File\\(|FileInputStream|new File\\(',
-    'path\\.(join|resolve)\\([^\n]*(req\\.|params\\.|user)',
+    'path\\.(join|resolve)\\(.*(req\\.|params\\.|user)',
   ],
   'open-redirect': [
     '(redirect|sendRedirect|Location:)',
@@ -39,14 +39,14 @@ export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
   deserialization: [
     'pickle\\.loads|yaml\\.load\\(|unserialize\\(',
     'ObjectInputStream|readObject\\(',
-    'JSON\\.parse\\([^\n]*(req|user|input)',
+    'JSON\\.parse\\(.*(req|user|input)',
   ],
   ssrf: [
     '(fetch|urlopen|requests\\.(get|post)|axios(\\.get|\\.post)?|http\\.get|HttpClient)',
-    'new URL\\([^\n]*(req|user|param)',
+    'new URL\\(.*(req|user|param)',
   ],
   authn: [
-    '(password|passwd|secret|token)\\s*==|\\.equals\\([^\n]*(password|token)',
+    '(password|passwd|secret|token)\\s*==|\\.equals\\(.*(password|token)',
     'jwt\\.(decode|verify)|verify\\(',
     'session\\[|getSession',
   ],
@@ -82,7 +82,7 @@ export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
     '(secret_key|api_key)\\s*=\\s*["\']',
   ],
   dependencies: [
-    '(require|import)\\([^\n]*(http:|git+)',
+    '(require|import)\\(.*(http:|git+)',
     '"(resolve|dependencies)"\\s*:',
   ],
   race: [

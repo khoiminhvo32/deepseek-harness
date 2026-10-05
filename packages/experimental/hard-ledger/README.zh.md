@@ -47,7 +47,9 @@ kind: "package-reference"
 - **从日志分配顺序 id。** `F-<n>` 与 `H-<n>` 计数器统计各自类型的历史事件；假设迁移会对照日志中已存在的 id 校验成员资格。
 - **增量事件，无需格式升级。** 这些事件都是纯增量 root：无表面、信封或头变化，任何既有事件形态不变，因此词汇增长无需格式升级。早于该词汇表的构建会拒绝此类日志而非误读，这正是仓库内事件要求的读取契约。
 - **有界文本。** 自由文本字段上限 2000 字符；`refuted` 与 `deferred` 假设的 reason 字段、零发现扫描的 `emptyProof` 均为必填。
-- **来自武装记录的覆盖分母。** mission 插件追加一条 `hard/mission/armed` 事件，携带已固定的目标仓库、解析后的提交 sha、已排序的模块行与 bug 类别列。折叠把它存为矩阵；`coverageProgress` 按 `modules × bugClasses` 统计已有结论的单元，`uncoveredCells` 以确定顺序列出仍欠工作的单元，`openWork` 同时点名未覆盖与可疑单元，让停止门与轮次上下文看到剩余扫描。矩阵外的单元永不计数；没有武装记录的日志保持旧有形状——空结果，不抛错。
+- **来自武装记录的覆盖分母。** mission 插件追加一条 `hard/mission/armed` 事件，携带已固定的目标仓库、解析后的提交 sha、已排序的模块行、bug 类别列与惰性模块筛查。两个协议事实决定矩阵运算：`CLASS_SCOPE` 把 `dependencies` 与 `misconfig` 标为仓库级——各贡献一个单元而非每模块一个，未知类别默认模块级（向更多工作一侧失败安全）；惰性模块不含可执行文件，其模块级单元按已判定计数且判定方为 harness，`uncoveredCells` 永不列出它们。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 列出仍需要模型的单元（仓库级单元只出现一次，挂在 `.` 模块下），`coverageBySource` 按决定方拆分已判定单元：模型自己的阅读、经 harness grep 确认的批量清除、以及机械筛查。矩阵外的单元永不计数；没有武装记录的日志保持旧有形状——空结果，不抛错。
+- **结论归因。** 每个覆盖单元可携带 `source`：`model`（模型自己读了代码；缺省时的历史默认）、`model-verified`（批量清除且经 harness grep 确认）、或 `harness`（模型完全未参与的纯机械筛查）。这个区分是诚实性要求——报告能分辨三种置信级别——且面向模型的工具绝不设置它，只有 harness 调用方设置。
+- **筛查抽查。** `screenSpotCheckPercent`（默认 5）把按单元哈希确定性抽样的一部分批量清除单元送回 `openWork`，标注 `verify the mechanical screen`，让模型重读、使筛查的假阴性率始终被测量。手工重标某单元会把它移出池子；`0` 关闭重读。
 
 ### Source map
 

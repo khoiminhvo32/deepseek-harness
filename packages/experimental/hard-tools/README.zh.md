@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-tools` 注册 hard harness 的四个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量与 PoC 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_sweep_summary` 记录完成的扫描过程，空扫描必须携带证明。
+`dsh-experimental-hard-tools` 注册 hard harness 的五个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量与 PoC 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后跨多个模块批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程，空扫描必须携带证明。
 
 ## 目录
 
@@ -63,7 +63,7 @@ kind: "package-reference"
 
 #### What the model sees
 
-The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_mark_coverage`, and `hard_sweep_summary` schemas](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded coverage cell, or the recorded sweep summary.
+The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_mark_coverage`, `hard_clear_modules`, and `hard_sweep_summary` schemas](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), or the recorded sweep summary.
 
 #### Token effect
 

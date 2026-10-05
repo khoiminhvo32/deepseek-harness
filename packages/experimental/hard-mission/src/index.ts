@@ -18,9 +18,9 @@ import type {} from '@deepseek-ai/dsh-goal'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { HARD_MATRIX_MODULE_LIMIT } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { filterExcludedPaths, modulesFromPaths } from './modules.ts'
+import { filterExcludedPaths, inertModulesFromPaths, INERT_EXTENSIONS, modulesFromPaths } from './modules.ts'
 
-export { filterExcludedPaths, modulesFromPaths } from './modules.ts'
+export { filterExcludedPaths, inertModulesFromPaths, INERT_EXTENSIONS, moduleOfPath, modulesFromPaths } from './modules.ts'
 
 export const name = 'hard-mission'
 export const inject = ['agents', 'goals', 'systemPrompt', 'shell', 'hardLedger']
@@ -65,7 +65,22 @@ export const DEFAULT_TARGET_COMMIT = 'HEAD'
 export const DEFAULT_MODULE_DEPTH = 2
 
 /** Default root-anchored globs kept out of the module enumeration. */
-export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = ['node_modules/**', 'vendor/**', 'dist/**', 'build/**']
+export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = [
+  'node_modules/**',
+  'vendor/**',
+  'dist/**',
+  'build/**',
+  '.git/**',
+  'docs/**',
+  'doc/**',
+  'locales/**',
+  'i18n/**',
+  'assets/**',
+  'fixtures/**',
+  'testdata/**',
+  '__snapshots__/**',
+  '**/*.min.js',
+]
 
 /** Wall-clock budget for one arming git command. */
 const ARM_GIT_TIMEOUT_MS = 60_000
@@ -285,7 +300,8 @@ async function armTargetMatrix(ctx: Context, resolved: ResolvedConfig): Promise<
   const target = resolved.target
   const commit = await pinnedCommit(ctx, target)
   const tracked = await trackedFiles(ctx, target)
-  const modules = modulesFromPaths(filterExcludedPaths(tracked, target.excludeGlobs), target.moduleDepth)
+  const kept = filterExcludedPaths(tracked, target.excludeGlobs)
+  const modules = modulesFromPaths(kept, target.moduleDepth)
   if (modules.length === 0) {
     throw new Error(`hard mission: no tracked modules survived the exclusion globs in ${target.repoPath}`)
   }
@@ -295,11 +311,16 @@ async function armTargetMatrix(ctx: Context, resolved: ResolvedConfig): Promise<
       + `lower target.moduleDepth from ${target.moduleDepth} or exclude more trees`,
     )
   }
+  const inertModules = inertModulesFromPaths(kept, target.moduleDepth, INERT_EXTENSIONS)
+  if (inertModules.length === modules.length) {
+    throw new Error(`hard mission: target has no code modules — every module in ${target.repoPath} holds only inert files`)
+  }
   return {
     targetRepo: target.repoPath,
     commit,
     modules,
     bugClasses: [...resolved.bugClasses],
+    inertModules,
   }
 }
 

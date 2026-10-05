@@ -1312,13 +1312,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]',
-        description: 'Matrix cells with no verdict yet, in deterministic module-then-class order.',
+        description: 'Matrix cells that still need the model, in matrix order: sorted modules outer, the configured class order inner, then repository-scoped cells under the `.` module. Inert modules carry no module-class surface and are never listed; a repository-scoped class is listed once, not per module.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'one entry per uncovered matrix cell, empty without a matrix.',
       },
       {
+        signature: 'coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number }',
+        description: 'Verdicted matrix cells partitioned by who decided them: the model\'s own reads, batch clears the harness grep confirmed, and the purely mechanical inert-module screen. A cell carrying no source reads as `model`, so older logs partition unchanged.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the three counts; all zero without a matrix.',
+      },
+      {
         signature: 'openWork(agent: Agent): string[]',
-        description: 'Model-facing open work summary: pending verifications, unresolved states, and coverage cells that still owe work.',
+        description: 'Model-facing open work summary: pending verifications, unresolved states, coverage cells that still owe work, and batch-cleared cells the deterministic screen spot-check sends back for a manual re-read.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'bounded human-readable work items, empty when nothing is open.',
       },
@@ -1340,6 +1346,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. The grep runs from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, a missing matrix, or a grep without misses returns `undefined` and changes nothing.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
         returns: 'the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.',
+      },
+      {
+        signature: 'async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>',
+        description: 'Mechanical absence screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed sink patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD coverage, never subtract — a narrow pattern choice cannot sneak past the harness table. An empty grep on every module proves the absence predicate; any match fails the whole batch and returns the matching lines as evidence for a manual read. Absence-shaped classes are refused: for their protective sinks, an empty grep is suspicious, not clean.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'bugClass', description: 'the bug class to prove absent.' }, { name: 'modules', description: 'the target-repo-relative modules to grep.' }, { name: 'patterns', description: 'the model\'s own extended-regex absence patterns.' }],
+        returns: '`clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.',
+        throws: ['when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.'],
       },
     ],
   },
@@ -5488,11 +5501,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardCoverageCellData',
-    declaration: 'export interface HardCoverageCellData {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: HardCoverageVerdict;\n    readonly declaredSinks: readonly string[];\n}',
+    declaration: 'export interface HardCoverageCellData {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: HardCoverageVerdict;\n    readonly declaredSinks: readonly string[];\n    readonly source?: HardCoverageSource;\n}',
   },
   {
     name: 'HardCoverageMatrix',
     declaration: 'export type HardCoverageMatrix = NonNullable<HardLedgerProjectionState[\'matrix\']>;',
+  },
+  {
+    name: 'HardCoverageSource',
+    declaration: 'export type HardCoverageSource = \'model\' | \'model-verified\' | \'harness\';',
   },
   {
     name: 'HardCoverageVerdict',
@@ -5532,7 +5549,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardMissionArmedData',
-    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n}',
+    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n}',
   },
   {
     name: 'HardSweepSummaryData',

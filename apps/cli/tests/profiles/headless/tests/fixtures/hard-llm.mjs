@@ -129,7 +129,14 @@ function script(messages) {
   if (!seen.includes('"phase":"A"')) {
     return toolChunks([{ name: 'hard_sweep_summary', args: { phase: 'A', cells_touched: 1, new_findings: 1 } }])
   }
-  // 6. Complete the goal only after the ledger holds the confirmed finding.
+  // 6. Batch clear a class the harness grep can prove absent: the planted
+  // repository builds shell commands only, so the sqli union (the model's
+  // patterns plus the fixed table) matches nothing and every cell clears as
+  // model-verified.
+  if (!seen.includes('"cleared":1')) {
+    return toolChunks([{ name: 'hard_clear_modules', args: { modules: ['src'], bug_class: 'sqli', patterns: ["SELECT[^\\n]*\\+"], rationale: 'The repository builds shell commands only; no SQL statement exists to concatenate.' } }])
+  }
+  // 7. Complete the goal only after the ledger holds the confirmed finding.
   // Gap 1.2 note: completion acceptance is unconditional here until the
   // completion gate lands; that gate will tighten this step and this fixture.
   if (!names.includes('get_goal')) return toolChunks([{ name: 'get_goal', args: {} }])

@@ -51,12 +51,12 @@ function stubAgent(rawId: string): StubAgent {
   return { agent, session, inbox, setStatus(value) { status = value } }
 }
 
-async function harness() {
+async function harness(config: { screenSpotCheckPercent?: number } = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
-  const fiber = await ctx.plugin(HardLedger, {})
+  const fiber = await ctx.plugin(HardLedger, config)
   const root = stubAgent(`hard-ledger-root-${Math.random()}`)
   await ctx.agents.register(root.agent)
   return { ctx, fiber, root }
@@ -361,6 +361,108 @@ describe('hard ledger coverage matrix', () => {
       .toThrow('bugClasses[] must be a non-empty string')
     ctx.hardLedger.recordMissionArmed(root.agent, armed)
     expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 0, total: 1 })
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, inertModules: ['b', 'a'],
+    }) }).toThrow('inertModules must be a sorted deduplicated subset of modules')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, inertModules: ['nope'],
+    }) }).toThrow('inertModules must be a sorted deduplicated subset of modules')
+    ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, inertModules: ['src'] })
+    expect(ctx.hardLedger.coverageBySource(root.agent)).toEqual({ model: 0, modelVerified: 0, harness: 1 })
+  })
+
+  it('computes cells over class scope and the inert screen: 3 modules, 17 classes, one inert docs module', async () => {
+    const { ctx, root } = await harness()
+    // DEFAULT_BUG_CLASSES shape: 15 module-scoped classes plus repo-scoped
+    // dependencies and misconfig, so 3 modules arm 3*15+2 = 47 cells.
+    const bugClasses = ['sqli', 'xss', 'cmdi', 'path-traversal', 'open-redirect', 'deserialization', 'ssrf',
+      'authn', 'authn-bypass', 'login-bypass', 'oauth-bypass', 'session', 'authz', 'crypto-misuse', 'race',
+      'dependencies', 'misconfig']
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['.', 'docs', 'src'],
+      bugClasses,
+      inertModules: ['docs'],
+    })
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 15, total: 47 })
+    expect(ctx.hardLedger.coverageBySource(root.agent)).toEqual({ model: 0, modelVerified: 0, harness: 15 })
+    const uncovered = ctx.hardLedger.uncoveredCells(root.agent)
+    expect(uncovered).toHaveLength(32)
+    // Matrix order: sorted modules outer, configured class order inner; the
+    // inert docs module never appears; repo cells come last under '.'.
+    expect(uncovered[0]).toEqual({ module: '.', bugClass: 'sqli' })
+    expect(uncovered[14]).toEqual({ module: '.', bugClass: 'race' })
+    expect(uncovered[15]).toEqual({ module: 'src', bugClass: 'sqli' })
+    expect(uncovered).not.toContain(expect.objectContaining({ module: 'docs' }))
+    expect(uncovered[30]).toEqual({ module: '.', bugClass: 'dependencies' })
+    expect(uncovered[31]).toEqual({ module: '.', bugClass: 'misconfig' })
+
+    // Marking repo cells: one event covers the whole repository, on any module.
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'src', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['package-lock.json'],
+    })
+    expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 16, total: 47 })
+    expect(ctx.hardLedger.uncoveredCells(root.agent).at(-1)).toEqual({ module: '.', bugClass: 'misconfig' })
+  })
+
+  it('partitions verdicted cells by source and re-reads batch clears per the screen spot-check', async () => {
+    const plain = await harness()
+    plain.ctx.hardLedger.recordMissionArmed(plain.root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['src'],
+      bugClasses: ['cmdi'],
+    })
+    // An event without the optional source reads as model: legacy logs
+    // partition unchanged.
+    plain.ctx.hardLedger.markCoverage(plain.root.agent, {
+      module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'],
+    })
+    expect(plain.ctx.hardLedger.coverageBySource(plain.root.agent)).toEqual({ model: 1, modelVerified: 0, harness: 0 })
+
+    const { ctx, root } = await harness({ screenSpotCheckPercent: 100 })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['src'],
+      bugClasses: ['cmdi', 'sqli'],
+      inertModules: [],
+    })
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['execSync'], source: 'model-verified',
+    })
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'src', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['rawQuery'], source: 'model-verified',
+    })
+    expect(ctx.hardLedger.coverageBySource(root.agent)).toEqual({ model: 0, modelVerified: 2, harness: 0 })
+    const work = ctx.hardLedger.openWork(root.agent)
+    expect(work).toContain('cell src × cmdi was batch-cleared; verify the mechanical screen')
+    expect(work).toContain('cell src × sqli was batch-cleared; verify the mechanical screen')
+
+    // Re-marking one cell by hand (no source: a model read) leaves the pool.
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['execSync'],
+    })
+    expect(ctx.hardLedger.coverageBySource(root.agent)).toEqual({ model: 1, modelVerified: 1, harness: 0 })
+    expect(ctx.hardLedger.openWork(root.agent)).not.toContain('cell src × cmdi was batch-cleared; verify the mechanical screen')
+
+    // percent 0 disables the re-read entirely.
+    const off = await harness({ screenSpotCheckPercent: 0 })
+    off.ctx.hardLedger.recordMissionArmed(off.root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['src'],
+      bugClasses: ['cmdi'],
+    })
+    off.ctx.hardLedger.markCoverage(off.root.agent, {
+      module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['execSync'], source: 'model-verified',
+    })
+    expect(off.ctx.hardLedger.openWork(off.root.agent)).not.toContain('verify the mechanical screen')
   })
 })
 

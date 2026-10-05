@@ -9,7 +9,7 @@ import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
-import HardVerifier, { claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import HardVerifier, { SINK_PATTERNS, claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { Config as VerifierConfig } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { HardFindingId } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -308,6 +308,17 @@ function armMatrix(ctx: Context, targetRepo: string): Agent {
 }
 
 describe('hard verifier coverage cross-check', () => {
+  it('keeps every sink pattern single-line so a shell-quoted grep parses', () => {
+    for (const [bugClass, patterns] of Object.entries(SINK_PATTERNS)) {
+      for (const pattern of patterns) {
+        // A real control character inside the quoted grep pattern makes BSD
+        // grep reject the whole expression ("brackets not balanced", exit 2).
+        expect(pattern, `${bugClass}: ${pattern}`).not.toMatch(/[\u0000-\u001f]/u)
+      }
+    }
+  })
+
+
   it('samples deterministically by cell and respects the bounds', () => {
     expect(sampleCellForSpotCheck(clearedCell, 0)).toBe(false)
     expect(sampleCellForSpotCheck(clearedCell, 100)).toBe(true)

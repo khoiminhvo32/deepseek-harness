@@ -176,6 +176,37 @@
       }
     },
     {
+      "name": "hard_clear_modules",
+      "description": "Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) are refused: there, an empty grep is suspicious, not clean.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "array",
+            "description": "Target-repo-relative module names to clear in one batch."
+          },
+          "bug_class": {
+            "type": "string",
+            "description": "One module-scoped bug class absent from all listed modules."
+          },
+          "patterns": {
+            "type": "array",
+            "description": "Extended-regex patterns proving the class's sinks are absent; the harness unions them with its own fixed table."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this pattern set is sufficient for this repository."
+          }
+        },
+        "required": [
+          "modules",
+          "bug_class",
+          "patterns",
+          "rationale"
+        ]
+      }
+    },
+    {
       "name": "hard_mark_coverage",
       "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list.",
       "parameters": {

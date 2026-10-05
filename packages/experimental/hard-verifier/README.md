@@ -80,6 +80,7 @@ Results append after the reusable request prefix without invalidating earlier en
 
 - **Bash PoCs** — execution runs `bash <pocPath>`; Windows PoC runners need the pwsh provider path, deferred.
 - **Effect-class refinement deferred** — sanitizer-signal and differential-check classification for memory-safety and authz classes land with the coverage auditor; the marker contract is the single PR2 contract.
+- **Absence-shaped classes refuse batch screens** — `ABSENCE_SINK_CLASSES` (`authz`, `authn-bypass`, `login-bypass`) name protective checks, so `screenModules` refuses them: there, an empty grep means no guard was found, which is suspicious rather than clean. The batch union also means a model's patterns can only add coverage over the fixed table, never subtract.
 - **Network policy is the deployment's** — egress restriction during PoC runs follows the mounted sandbox provider; the verifier does not add its own policy.
 
 <a id="dev-note"></a>

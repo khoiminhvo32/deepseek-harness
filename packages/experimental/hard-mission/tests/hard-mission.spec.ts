@@ -238,8 +238,26 @@ describe('hard mission target pinning', () => {
       bugClasses: [...hardMission.DEFAULT_BUG_CLASSES],
       targetRepo,
       commit: targetSha,
+      // The root module holds only README.md, so the inert screen screens it.
+      inertModules: ['.'],
     })
     expect(ctx.goals.get(root.agent)?.revision).toBe(1)
+  })
+
+  it('fails loud when every module is inert — the target has no code modules', async () => {
+    const docs = await mkdtemp(join(tmpdir(), 'hard-mission-docs-'))
+    try {
+      const repo = join(docs, 'repo')
+      await mkdir(join(repo, 'guide'), { recursive: true })
+      await writeFile(join(repo, 'README.md'), '# target\n')
+      await writeFile(join(repo, 'guide', 'intro.md'), 'hello\n')
+      seedGitRepo(repo)
+      const ctx = await baseHarness()
+      await expect(ctx.plugin(hardMission, missionConfig({ target: { repoPath: repo } })))
+        .rejects.toThrow(/target has no code modules/)
+    } finally {
+      await rm(docs, { recursive: true, force: true })
+    }
   })
 
   it('honors an explicit commit ref and module depth', async () => {
@@ -429,5 +447,17 @@ describe('coverage module enumeration', () => {
     expect(hardMission.filterExcludedPaths(['src/a.b.ts'], ['src/*.b.ts'])).toEqual([])
     expect(hardMission.filterExcludedPaths(['src/deep/a.b.ts'], ['src/*.b.ts'])).toEqual(['src/deep/a.b.ts'])
     expect(hardMission.filterExcludedPaths(['src/a.ts'], ['src/?.ts'])).toEqual([])
+  })
+
+  it('screens modules whose every file carries an inert extension', () => {
+    const inert = hardMission.INERT_EXTENSIONS
+    expect(hardMission.inertModulesFromPaths(['notes/a.md', 'notes/b.png', 'README.md'], 1, inert)).toEqual(['.', 'notes'])
+    expect(hardMission.inertModulesFromPaths(['src/a.md', 'src/logo.svg'], 1, inert)).toEqual([])
+    expect(hardMission.inertModulesFromPaths(['src/a.md', 'src/lib.rs'], 1, inert)).toEqual([])
+    expect(hardMission.inertModulesFromPaths([], 2, inert)).toEqual([])
+    // An extensionless file (Dockerfile, Makefile) is code.
+    expect(hardMission.inertModulesFromPaths(['deploy/Dockerfile', 'deploy/README.md'], 1, inert)).toEqual([])
+    // A dotfile is its own extension, not an inert one.
+    expect(hardMission.inertModulesFromPaths(['.gitignore'], 2, inert)).toEqual([])
   })
 })

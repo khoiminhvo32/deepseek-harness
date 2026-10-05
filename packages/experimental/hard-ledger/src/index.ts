@@ -14,6 +14,7 @@ import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type {
   HardCoverageCellData,
+  HardCoverageSource,
   HardCoverageVerdict,
   HardFindingId,
   HardFindingProposedData,
@@ -26,10 +27,12 @@ import type {
 } from './types.ts'
 import type { HardCoverageMatrix, HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
 import { hardLedgerProjectionDefinition } from './projection.ts'
+import { cellSampledForPercent, classScope } from './scope.ts'
 import './domain.ts'
 
 export type {
   HardCoverageCellData,
+  HardCoverageSource,
   HardCoverageVerdict,
   HardFindingId,
   HardFindingProposedData,
@@ -43,6 +46,7 @@ export type {
 } from './types.ts'
 export { applyHardLedgerProjection, emptyHardLedgerState, hardLedgerProjectionDefinition } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
+export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
 declare module '@deepseek-ai/cordis' {
   /** The log-derived hard-harness ledger service. */
@@ -51,11 +55,39 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Ledger service config; reserved for future thresholds. */
-export interface Config {}
+/** Ledger service config. */
+export interface Config {
+  /**
+   * Share of `model-verified` (batch-cleared) coverage cells openWork sends
+   * back for a manual model re-read, in percent. Sampling is deterministic
+   * per cell hash, so the same cell is always re-read or never; `0` disables
+   * the re-read. This is the only measurement of the mechanical screen's
+   * false-negative rate.
+   */
+  screenSpotCheckPercent?: number
+}
+
+/** Default share of screened cells the openWork re-read sends back. */
+export const DEFAULT_SCREEN_SPOT_CHECK_PERCENT = 5
 
 /** Schemastery config for the ledger service. */
-export const Config: z<Config> = z.object({})
+export const Config: z<Config> = z.object({
+  screenSpotCheckPercent: z.number().step(1).min(0).max(100).default(DEFAULT_SCREEN_SPOT_CHECK_PERCENT),
+})
+
+/** Fully materialized ledger settings. */
+interface ResolvedConfig {
+  readonly screenSpotCheckPercent: number
+}
+
+/** Validate config even when apply is called directly outside Loader normalization. */
+function resolveConfig(config: Config): ResolvedConfig {
+  const screenSpotCheckPercent = config.screenSpotCheckPercent ?? DEFAULT_SCREEN_SPOT_CHECK_PERCENT
+  if (!Number.isSafeInteger(screenSpotCheckPercent) || screenSpotCheckPercent < 0 || screenSpotCheckPercent > 100) {
+    throw new TypeError('screenSpotCheckPercent must be a safe integer from 0 through 100')
+  }
+  return { screenSpotCheckPercent }
+}
 
 /** Maximum characters retained for bounded reason and statement text. */
 export const HARD_TEXT_LIMIT = 2000
@@ -73,10 +105,12 @@ export class HardLedger extends Service {
 
   static Config: z<Config> = Config
 
+  private readonly resolved: ResolvedConfig
+
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'hardLedger')
+    this.resolved = resolveConfig(config)
     ctx.sessionProjections.register(hardLedgerProjectionDefinition)
-    void config
   }
 
   /**
@@ -107,6 +141,20 @@ export class HardLedger extends Service {
       || new Set(modules).size !== modules.length) {
       throw new HarnessError('modules must be sorted and deduplicated', 'HARD_LEDGER_UNSORTED_MATRIX')
     }
+    let inertModules: readonly string[] = []
+    if (data.inertModules !== undefined) {
+      const suppliedInert: readonly string[] = data.inertModules
+      if (suppliedInert.some(module => typeof module !== 'string' || module.trim().length === 0)) {
+        throw new HarnessError('inertModules must be an array of non-empty module names', 'HARD_LEDGER_INVALID_TEXT')
+      }
+      const inertSorted = [...suppliedInert].sort()
+      if (inertSorted.some((module, index) => module !== suppliedInert[index])
+        || new Set(suppliedInert).size !== suppliedInert.length
+        || suppliedInert.some(module => !modules.includes(module))) {
+        throw new HarnessError('inertModules must be a sorted deduplicated subset of modules', 'HARD_LEDGER_UNSORTED_MATRIX')
+      }
+      inertModules = [...suppliedInert]
+    }
     for (const bugClass of data.bugClasses) this.assertText('bugClasses[]', bugClass)
     agent.session.append('hard/mission/armed', {
       objective: data.objective,
@@ -114,6 +162,7 @@ export class HardLedger extends Service {
       commit: data.commit,
       modules,
       bugClasses: [...data.bugClasses],
+      ...(data.inertModules === undefined ? {} : { inertModules }),
     })
   }
 
@@ -209,13 +258,23 @@ export class HardLedger extends Service {
         `verdict must be one of ${verdicts.join(', ')}`, 'HARD_LEDGER_INVALID_COVERAGE_VERDICT',
       )
     }
+    const sources: readonly HardCoverageSource[] = ['model', 'model-verified', 'harness']
+    if (request.source !== undefined && !sources.includes(request.source)) {
+      throw new HarnessError(
+        `source must be one of ${sources.join(', ')}`, 'HARD_LEDGER_INVALID_COVERAGE_SOURCE',
+      )
+    }
     if (request.verdict === 'cleared' && request.declaredSinks.length === 0) {
       throw new HarnessError(
         'cleared requires the declared sinks inspected for this cell', 'HARD_LEDGER_SINKS_REQUIRED',
       )
     }
     for (const sink of request.declaredSinks) this.assertText('declaredSinks[]', sink)
-    agent.session.append('hard/coverage/cell', { ...request, declaredSinks: [...request.declaredSinks] })
+    agent.session.append('hard/coverage/cell', {
+      ...request,
+      declaredSinks: [...request.declaredSinks],
+      ...(request.source === undefined ? {} : { source: request.source }),
+    })
   }
 
   /**
@@ -288,7 +347,10 @@ export class HardLedger extends Service {
    * @returns one record per module and bug-class cell.
    */
   coverage(agent: Agent): readonly HardCoverageCellData[] {
-    return this.state(agent.session).coverage
+    return this.state(agent.session).coverage.map(({ source, ...cell }) => ({
+      ...cell,
+      ...(source === undefined ? {} : { source }),
+    }))
   }
 
   /**
@@ -318,39 +380,96 @@ export class HardLedger extends Service {
    * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
    */
   coverageProgress(agent: Agent): { verdicted: number; total: number } {
-    const matrix = this.state(agent.session).matrix
+    const state = this.state(agent.session)
+    const matrix = state.matrix
     if (matrix === undefined) return { verdicted: 0, total: 0 }
-    const rows = new Set(matrix.modules)
-    const columns = new Set(matrix.bugClasses)
-    const verdicted = new Set(this.state(agent.session).coverage
-      .filter(cell => rows.has(cell.module) && columns.has(cell.bugClass))
-      .map(cell => `${cell.module}\u0000${cell.bugClass}`))
-    return { verdicted: verdicted.size, total: rows.size * columns.size }
+    const inert = new Set(matrix.inertModules ?? [])
+    const moduleClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'module')
+    const repoClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'repo')
+    const verdictedModuleCells = new Set(this.coverage(agent).map(cell => `${cell.module}\u0000${cell.bugClass}`))
+    let verdicted = 0
+    for (const module of matrix.modules) {
+      for (const bugClass of moduleClasses) {
+        if (inert.has(module) || verdictedModuleCells.has(`${module}\u0000${bugClass}`)) verdicted += 1
+      }
+    }
+    for (const bugClass of repoClasses) {
+      if (this.coverage(agent).some(cell => cell.bugClass === bugClass)) verdicted += 1
+    }
+    return { verdicted, total: matrix.modules.length * moduleClasses.length + repoClasses.length }
   }
 
   /**
-   * Matrix cells with no verdict yet, in matrix order: sorted modules outer,
-   * the configured class order inner.
+   * Matrix cells that still need the model, in matrix order: sorted modules
+   * outer, the configured class order inner, then repository-scoped cells
+   * under the `.` module. Inert modules carry no module-class surface and are
+   * never listed; a repository-scoped class is listed once, not per module.
    * @param agent - the live agent whose ledger state is read.
    * @returns one entry per uncovered matrix cell, empty without a matrix.
    */
   uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[] {
-    const matrix = this.state(agent.session).matrix
+    const state = this.state(agent.session)
+    const matrix = state.matrix
     if (matrix === undefined) return []
-    const verdicted = new Set(this.state(agent.session).coverage
-      .map(cell => `${cell.module}\u0000${cell.bugClass}`))
+    const inert = new Set(matrix.inertModules ?? [])
+    const verdicted = new Set(this.coverage(agent).map(cell => `${cell.module}\u0000${cell.bugClass}`))
     const uncovered: { module: string; bugClass: string }[] = []
     for (const module of matrix.modules) {
+      if (inert.has(module)) continue
       for (const bugClass of matrix.bugClasses) {
-        if (!verdicted.has(`${module}\u0000${bugClass}`)) uncovered.push({ module, bugClass })
+        if (classScope(bugClass) === 'module' && !verdicted.has(`${module}\u0000${bugClass}`)) {
+          uncovered.push({ module, bugClass })
+        }
+      }
+    }
+    for (const bugClass of matrix.bugClasses) {
+      if (classScope(bugClass) === 'repo' && !this.coverage(agent).some(cell => cell.bugClass === bugClass)) {
+        uncovered.push({ module: '.', bugClass })
       }
     }
     return uncovered
   }
 
   /**
+   * Verdicted matrix cells partitioned by who decided them: the model's own
+   * reads, batch clears the harness grep confirmed, and the purely mechanical
+   * inert-module screen. A cell carrying no source reads as `model`, so older
+   * logs partition unchanged.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the three counts; all zero without a matrix.
+   */
+  coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number } {
+    const state = this.state(agent.session)
+    const matrix = state.matrix
+    if (matrix === undefined) return { model: 0, modelVerified: 0, harness: 0 }
+    const inert = new Set(matrix.inertModules ?? [])
+    const latest = new Map<string, HardCoverageCellData>()
+    for (const cell of this.coverage(agent)) latest.set(`${cell.module}\u0000${cell.bugClass}`, cell)
+    const moduleClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'module')
+    const repoClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'repo')
+    const counts = { model: 0, modelVerified: 0, harness: 0 }
+    const tally = (source: HardCoverageSource | undefined): void => {
+      if (source === 'model-verified') counts.modelVerified += 1
+      else counts.model += 1
+    }
+    for (const module of matrix.modules) {
+      for (const bugClass of moduleClasses) {
+        const cell = latest.get(`${module}\u0000${bugClass}`)
+        if (cell !== undefined) tally(cell.source)
+        else if (inert.has(module)) counts.harness += 1
+      }
+    }
+    for (const bugClass of repoClasses) {
+      const cell = [...this.coverage(agent)].reverse().find(entry => entry.bugClass === bugClass)
+      if (cell !== undefined) tally(cell.source)
+    }
+    return counts
+  }
+
+  /**
    * Model-facing open work summary: pending verifications, unresolved
-   * states, and coverage cells that still owe work.
+   * states, coverage cells that still owe work, and batch-cleared cells the
+   * deterministic screen spot-check sends back for a manual re-read.
    * @param agent - the live agent whose ledger state is read.
    * @returns bounded human-readable work items, empty when nothing is open.
    */
@@ -374,9 +493,12 @@ export class HardLedger extends Service {
         work.push(`cell ${cell.module} × ${cell.bugClass} has no verdict`)
       }
     }
-    for (const cell of this.state(agent.session).coverage) {
+    for (const cell of this.coverage(agent)) {
       if (cell.verdict === 'suspicious') {
         work.push(`cell ${cell.module} × ${cell.bugClass} is suspicious: re-verify the declared sinks`)
+      }
+      if (cell.source === 'model-verified' && cellSampledForPercent(cell, this.resolved.screenSpotCheckPercent)) {
+        work.push(`cell ${cell.module} × ${cell.bugClass} was batch-cleared; verify the mechanical screen`)
       }
     }
     return work

@@ -32,7 +32,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`, `grep` | `ctx.tools`, `ctx.subprocess`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments. |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_mark_coverage`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1381,6 +1381,42 @@ create, edit, pause, and resume require direct-human root authority; complete an
 <a id="deepseek-aidsh-experimental-hard-tools"></a>
 
 ## `@deepseek-ai/dsh-experimental-hard-tools`
+
+### `hard_clear_modules`
+
+Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) are refused: there, an empty grep is suspicious, not clean.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "modules": {
+      "type": "array",
+      "description": "Target-repo-relative module names to clear in one batch."
+    },
+    "bug_class": {
+      "type": "string",
+      "description": "One module-scoped bug class absent from all listed modules."
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Extended-regex patterns proving the class's sinks are absent; the harness unions them with its own fixed table."
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Why this pattern set is sufficient for this repository."
+    }
+  },
+  "required": [
+    "modules",
+    "bug_class",
+    "patterns",
+    "rationale"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_mark_coverage`
 

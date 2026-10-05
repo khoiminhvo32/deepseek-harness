@@ -145,12 +145,15 @@ describe('dsh --profile hard fabrication traps', () => {
         commit: string
         modules: string[]
         bugClasses: string[]
+        inertModules?: string[]
       } | undefined
       expect(armed).toBeDefined()
       expect(armed?.targetRepo).toBe(cwd)
       expect(armed?.commit).toBe(commit)
       expect(armed?.modules).toEqual(['src'])
       expect(armed?.bugClasses.length).toBeGreaterThan(0)
+      // Every src file is JavaScript: nothing screens inert.
+      expect(armed?.inertModules).toEqual([])
       // The stop gate steered the premature clean claim back to work.
       const steerings = sessionFiles.filter(event => event.type === 'user/message')
         .filter((event) => {
@@ -168,14 +171,17 @@ describe('dsh --profile hard fabrication traps', () => {
       expect(verdicts.filter(v => v.verdict === 'confirmed')).toHaveLength(1)
 
       // The coverage cross-check reopened the under-declared cell, then the
-      // corrected clearance stood.
+      // corrected clearance stood; the batch clear landed as model-verified
+      // while the model's own marks carry no source (they read as model).
       const coverage = sessionFiles.filter(event => event.type === 'hard/coverage/cell')
-        .map(event => event.data as { verdict: string })
+        .map(event => event.data as { verdict: string; source?: string })
       expect(coverage).toEqual([
         expect.objectContaining({ verdict: 'cleared' }),
         expect.objectContaining({ verdict: 'suspicious' }),
         expect.objectContaining({ verdict: 'cleared' }),
+        expect.objectContaining({ verdict: 'cleared', source: 'model-verified' }),
       ])
+      expect(coverage.slice(0, 3).every(cell => cell.source === undefined)).toBe(true)
 
       // A completed goal from an honest completion claim.
       // Gap 1.2 note: until the completion gate lands, update_goal action

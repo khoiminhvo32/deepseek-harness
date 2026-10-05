@@ -1034,11 +1034,20 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:55`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:59`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
-/** Ledger service config; reserved for future thresholds. */
-export interface Config {}
+/** Ledger service config. */
+export interface Config {
+  /**
+   * Share of `model-verified` (batch-cleared) coverage cells openWork sends
+   * back for a manual model re-read, in percent. Sampling is deterministic
+   * per cell hash, so the same cell is always re-read or never; `0` disables
+   * the re-read. This is the only measurement of the mechanical screen's
+   * false-negative rate.
+   */
+  screenSpotCheckPercent?: number
+}
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
 
@@ -1048,7 +1057,7 @@ export interface Config {}
 ## `@deepseek-ai/dsh-experimental-hard-mission`
 
 - `inject`: `agents` · `goals` · `systemPrompt` · `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-mission/src/index.ts:92`](../packages/experimental/hard-mission/src/index.ts)
+- `source`: [`packages/experimental/hard-mission/src/index.ts:107`](../packages/experimental/hard-mission/src/index.ts)
 
 ```ts config-catalog
 /** Mission plugin config. */
@@ -1186,7 +1195,7 @@ export interface Config {}
 ## `@deepseek-ai/dsh-experimental-hard-verifier`
 
 - `inject`: `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-verifier/src/index.ts:36`](../packages/experimental/hard-verifier/src/index.ts)
+- `source`: [`packages/experimental/hard-verifier/src/index.ts:45`](../packages/experimental/hard-verifier/src/index.ts)
 
 ```ts config-catalog
 /** Verifier plugin config. */

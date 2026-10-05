@@ -1,4 +1,4 @@
-/** The four hard tools register, execute through the ledger and verifier, and dispose cleanly. */
+/** The hard tools register, execute through the ledger and verifier, and dispose cleanly. */
 
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
@@ -132,10 +132,10 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('hard tools registration', () => {
-  it('registers the four tools and disposes them with the fiber', async () => {
+  it('registers the five tools and disposes them with the fiber', async () => {
     const { ctx, fiber } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
-    expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_mark_coverage', 'hard_sweep_summary']
-      .map(name => ctx.tools.get(name)?.name)).toHaveLength(4)
+    expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules']
+      .map(name => ctx.tools.get(name)?.name)).toHaveLength(5)
     await fiber.dispose()
     expect(ctx.tools.get('hard_submit_finding')).toBeUndefined()
     expect(ctx.tools.get('hard_sweep_summary')).toBeUndefined()
@@ -313,6 +313,74 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([
       expect.objectContaining({ verdict: 'suspicious', declaredSinks: ['src/db/exec.ts:9: exec(userCmd)'] }),
     ])
+  })
+
+  it('batch-clears modules the harness grep proves clean, as model-verified', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/auth', 'src/db'],
+      bugClasses: ['cmdi', 'sqli'],
+    })
+    const cleared = resultJson(await execute(ctx, 'hard_clear_modules', {
+      modules: ['src/auth', 'src/db'],
+      bug_class: 'sqli',
+      patterns: ['SELECT[^\\n]*\\+'],
+      rationale: 'No SQL statement is built in this repository.',
+    }, root.agent))
+    expect(cleared.cleared).toBe(2)
+    expect(cleared.clearedCells).toEqual([
+      { module: 'src/auth', bugClass: 'sqli' },
+      { module: 'src/db', bugClass: 'sqli' },
+    ])
+    expect(ctx.hardLedger.coverageBySource(root.agent)).toEqual({ model: 0, modelVerified: 2, harness: 0 })
+    const cell = ctx.hardLedger.coverage(root.agent)[0]
+    expect(cell).toMatchObject({ verdict: 'cleared', source: 'model-verified' })
+  })
+
+  it('clears nothing and returns evidence when a module still matches', async () => {
+    const { ctx, root } = await harness({ exitCode: 0, stdoutText: 'src/db/query.ts:42: rawQuery("s" + user)\n' })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/auth', 'src/db'],
+      bugClasses: ['sqli'],
+    })
+    const cleared = resultJson(await execute(ctx, 'hard_clear_modules', {
+      modules: ['src/auth', 'src/db'],
+      bug_class: 'sqli',
+      patterns: ['SELECT[^\\n]*\\+'],
+      rationale: 'No SQL statement is built in this repository.',
+    }, root.agent))
+    expect(cleared.cleared).toBe(0)
+    expect(cleared.evidence).toEqual(['src/db/query.ts:42: rawQuery("s" + user)'])
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+  })
+
+  it('refuses absence-shaped classes and unknown modules with clear reasons', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src'],
+      bugClasses: ['authz', 'sqli'],
+    })
+    const refused = await execute(ctx, 'hard_clear_modules', {
+      modules: ['src'], bug_class: 'authz', patterns: ['checkPermission'], rationale: 'r',
+    }, root.agent)
+    expect(refused.isError).toBe(true)
+    expect(refused.content[0]).toMatchObject({ type: 'text' })
+    const text = (refused.content[0] as { type: string; text: string }).text
+    expect(text).toContain('protective checks')
+    const unknown = await execute(ctx, 'hard_clear_modules', {
+      modules: ['nope'], bug_class: 'sqli', patterns: ['SELECT'], rationale: 'r',
+    }, root.agent)
+    expect(unknown.isError).toBe(true)
+    expect((unknown.content[0] as { type: string; text: string }).text).toContain('not an armed coverage module')
   })
 
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {

@@ -56,6 +56,7 @@ const coverageSchema = zod.object({
   bugClass: zod.string().min(1),
   verdict: zod.enum(['cleared', 'suspicious', 'uncovered']),
   declaredSinks: zod.array(zod.string().min(1)).readonly(),
+  source: zod.enum(['model', 'model-verified', 'harness']).optional(),
 })
 
 /** Validates one folded mission arming record: the pinned target and the matrix axes. */
@@ -64,6 +65,7 @@ const matrixSchema = zod.object({
   bugClasses: zod.array(zod.string()).readonly(),
   targetRepo: zod.string().min(1),
   commit: zod.string().regex(/^[0-9a-f]{40}$|^[0-9a-f]{64}$/u),
+  inertModules: zod.array(zod.string().min(1)).optional(),
 })
 
 /** Validates persisted projection state before it seeds a fold. */
@@ -120,6 +122,7 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
           bugClasses: [...event.data.bugClasses],
           targetRepo: event.data.targetRepo,
           commit: event.data.commit,
+          ...(event.data.inertModules === undefined ? {} : { inertModules: [...event.data.inertModules] }),
         },
       }
     default:
@@ -158,9 +161,9 @@ export const hardLedgerProjectionDefinition = {
     failure: null,
   }),
   apply: applyHardLedgerProjection,
-  // Version 2 adds the optional coverage matrix; the bump forces a full log
-  // rebuild so matrices recorded before the upgrade are recovered on resume.
-  stateVersion: 2,
+  // Version 3 adds the optional coverage source and the armed inert-modules
+  // screen; the bump forces a full log rebuild so both recover on resume.
+  stateVersion: 3,
 } satisfies ProjectionDefinition<'hardLedger', HardLedgerProjectionState>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

@@ -678,7 +678,25 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
-<div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-05. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
+<section id="pr7-live">
+  <h2><span class="h2-index">13</span>PR7 live: coverage economics — completion gate khả thi</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR7 (2026-10-06). Nguyên tắc: verdict rẻ thì giả được, verdict đắt thì không scale — chi phí verdict khớp rủi ro cell, HARNESS quyết định cell nào rẻ dựa trên bằng chứng cơ học; model đề xuất, harness xác minh; SINK_PATTERNS không bao giờ là oracle.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>CLASS_SCOPE + inert screening</td><td><span class="chip pass">xong</span></td><td><code>hard-ledger/src/scope.ts</code>: CLASS_SCOPE (dependencies + misconfig = repo, mặc định module fail-safe) + <code>cellSampledForPercent</code> (verifier delegate). Mission: INERT_EXTENSIONS (18 ext, JSDoc liệt kê lý do KHÔNG inert: .svg vector XSS, cấu hình/template, .csv formula injection, .lock bề mặt dependencies, không-đuôi là mã) + <code>inertModulesFromPaths</code> (module rỗng never inert) + armed event mang <code>inertModules</code>; mọi module inert → "target has no code modules". 3 module × 17 class → 47 cell (không phải 51)</td></tr>
+      <tr><td>source trên coverage cell</td><td><span class="chip pass">xong</span></td><td><code>source?: 'model' | 'model-verified' | 'harness'</code> OPTIONAL — log cũ đọc là model, same-version. markCoverage validate 3 giá trị; tool面向 model KHÔNG bao giờ set (chỉ harness callers). <code>coverageBySource</code> chia 3 mức — yêu cầu TRUNG THỰC của báo cáo</td></tr>
+      <tr><td>hard_clear_modules</td><td><span class="chip pass">xong</span></td><td>Tool mới (KHÔNG mở rộng mark_coverage — clear đơn cần declaredSinks, batch cần patterns-predicate). Harness grep UNION (model ∪ SINK_PATTERNS) — model chỉ THÊM được coverage; 0 match → mọi cell cleared source model-verified; có match → 0 cell + evidence trả về. CẤM 3 lớp vắng-mặt (authz, authn-bypass, login-bypass): 0 match = không tìm thấy guard = ĐÁNG NGỜ. Verifier owner <code>screenModules</code>; tool chỉ orchestrate ledger writes (≤50 module, ≤10 pattern, rationale bắt buộc)</td></tr>
+      <tr><td>Ledger scope math + screen recheck</td><td><span class="chip pass">xong</span></td><td>coverageProgress/uncoveredCells tôn trọng scope + inert (repo class 1 cell, cell repo trả về dưới module '.'); inert cell = verdicted nguồn harness, không bao giờ nằm trong uncovered. Config <code>screenSpotCheckPercent</code> mặc định 5 trên LEDGER (deviation có chủ đích: verifier→ledger là dependency cycle — task ghi verifier nhưng openWork thuộc ledger) — sample hash-deterministic gửi model-verified cells quay lại openWork "verify the mechanical screen"; model re-mark tay → ra khỏi pool; 0 tắt</td></tr>
+      <tr><td>excludeGlobs mặc định + MUST tune</td><td><span class="chip pass">xong</span></td><td>Thêm .git docs doc locales i18n assets fixtures testdata __snapshots__ **/*.min.js; README mission (en/zh) nói THẲNG: người dùng BẮT BUỘC chỉnh excludeGlobs — mẫu số sai làm cả coverage lẫn completion gate sai theo</td></tr>
+      <tr><td>Bug có sẵn bị lộ: SINK_PATTERNS newline</td><td><span class="chip pass">fix</span></td><td>6 pattern viết <code>[^\n]</code> trong TS string → runtime chứa NEWLINE THẬT trong bracket → BSD grep "brackets not balanced" exit 2 (chỉ lộ khi batch grep sqli thật; audit cmdi trước giờ không chạm). Sửa thành <code>.*</code> (grep đọc theo dòng — predicate tương đương) + unit guard: mọi pattern không chứa control char</td></tr>
+      <tr><td>Snapshot authored + batch flow</td><td><span class="chip pass">xong</span></td><td>Replay chỉ phát lại script cũ nên authored JSONL được chèn tay entry batch (assistant + tool/call + cell model-verified + tool/result + step boundary) sau sweep, shift steps; replay.override patch at 11→12. Refresh → replay phát batch THẬT end-to-end (grep thật chạy, cell source model-verified thật). E2e fixture thêm step batch + assert source</td></tr>
+      <tr><td>Gates cuối PR7</td><td><span class="chip pass">xong</span></td><td>137/137 hard suites (11 files) + e2e 1/1 (2.2s) + test:snapshot trừ stagehand env + doc-sync 42/42 + lint 0/0 + typecheck 0 + duplication 0 + persistence 72 roots/14 records + pairing 877</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>
 

@@ -12,7 +12,7 @@ The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
 
-覆盖矩阵来自 mission 的武装记录：加载时 mission 插件固定已配置的目标仓库（把 `target.commit` 解析为完整 sha），并用 `git ls-files` 枚举已跟踪模块，因此分母天然尊重 `.gitignore`，同一提交上逐字节复现。矩阵承载于一条增量 `hard/mission/armed` 事件；`coverageProgress` 按 `modules × bugClasses` 统计已有结论的单元，`uncoveredCells` 列出仍欠工作的单元，`openWork` 同时点名未覆盖与可疑单元。
+覆盖矩阵来自 mission 的武装记录：加载时 mission 插件固定已配置的目标仓库（把 `target.commit` 解析为完整 sha），并用 `git ls-files` 枚举已跟踪模块，因此分母天然尊重 `.gitignore`，同一提交上逐字节复现。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量清除一个类别，记录 `source: model-verified`，而模型自己的标记不带归因（读作 `model`）。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
 
 ## Proof-of-effect contract
 
@@ -129,15 +129,29 @@ coverageMatrix(agent: Agent): HardCoverageMatrix | undefined
 coverageProgress(agent: Agent): { verdicted: number; total: number }
 
 /**
- * Matrix cells with no verdict yet, in deterministic module-then-class order.
+ * Matrix cells that still need the model, in matrix order: sorted modules
+ * outer, the configured class order inner, then repository-scoped cells
+ * under the `.` module. Inert modules carry no module-class surface and are
+ * never listed; a repository-scoped class is listed once, not per module.
  * @param agent - the live agent whose ledger state is read.
  * @returns one entry per uncovered matrix cell, empty without a matrix.
  */
 uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
 
 /**
+ * Verdicted matrix cells partitioned by who decided them: the model's own
+ * reads, batch clears the harness grep confirmed, and the purely mechanical
+ * inert-module screen. A cell carrying no source reads as `model`, so older
+ * logs partition unchanged.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the three counts; all zero without a matrix.
+ */
+coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number }
+
+/**
  * Model-facing open work summary: pending verifications, unresolved
- * states, and coverage cells that still owe work.
+ * states, coverage cells that still owe work, and batch-cleared cells the
+ * deterministic screen spot-check sends back for a manual re-read.
  * @param agent - the live agent whose ledger state is read.
  * @returns bounded human-readable work items, empty when nothing is open.
  */
@@ -179,6 +193,25 @@ async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindi
  * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
  */
 async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
+
+/**
+ * Mechanical absence screen behind the batch clear: grep the requested
+ * modules for the union of the model's patterns and the class's fixed sink
+ * patterns, anchored at the pinned target repository. The union means the
+ * model's patterns can only ADD coverage, never subtract — a narrow
+ * pattern choice cannot sneak past the harness table. An empty grep on
+ * every module proves the absence predicate; any match fails the whole
+ * batch and returns the matching lines as evidence for a manual read.
+ * Absence-shaped classes are refused: for their protective sinks, an empty
+ * grep is suspicious, not clean.
+ * @param agent - the live agent whose ledger matrix anchors the grep.
+ * @param bugClass - the bug class to prove absent.
+ * @param modules - the target-repo-relative modules to grep.
+ * @param patterns - the model's own extended-regex absence patterns.
+ * @returns `clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.
+ * @throws when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.
+ */
+async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>
 ```
 
 Types: [Agent](core.zh.md)

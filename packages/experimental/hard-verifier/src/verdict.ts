@@ -22,10 +22,24 @@ export interface PoCRunRecord {
  * Whether one run satisfied the proof-of-effect contract.
  * @param run - the executed run's reduced facts.
  * @param claimHash - the expected `HARD-PASS` marker hash.
- * @returns true only for a zero-exit run that printed the marker.
+ * @returns true only for a zero-exit run that printed the marker AND produced
+ * observable output beyond the marker itself: a stdout that is nothing but the
+ * `HARD-PASS` line proves the echo, not the vulnerability, so it never
+ * satisfies the contract (the echo trap).
  */
 export function runSatisfied(run: PoCRunRecord, claimHash: string): boolean {
-  return run.exitCode === 0 && !run.timedOut && !run.aborted && run.stdoutText.includes(`HARD-PASS ${claimHash}`)
+  if (run.exitCode !== 0 || run.timedOut || run.aborted) return false
+  const marker = `HARD-PASS ${claimHash}`
+  if (!run.stdoutText.includes(marker)) return false
+  return run.stdoutText.replaceAll(marker, '').trim().length > 0
+}
+
+/** Whether a run printed the claim marker but nothing else (the echo trap). */
+function isEchoOnly(run: PoCRunRecord, claimHash: string): boolean {
+  const marker = `HARD-PASS ${claimHash}`
+  return run.exitCode === 0 && !run.timedOut && !run.aborted
+    && run.stdoutText.includes(marker)
+    && run.stdoutText.replaceAll(marker, '').trim().length === 0
 }
 
 /**
@@ -68,6 +82,8 @@ export function classifyRuns(request: {
     /* v8 ignore next -- defensive: guarded above, a non-empty run list always has a first run */
     if (first === undefined) {
       reason = 'no runs were executed'
+    } else if (isEchoOnly(first, claimHash)) {
+      reason = 'the PoC printed only the claim marker without observable effect (echo trap)'
     } else if (first.timedOut) {
       reason = 'the PoC hit the verifier timeout without printing the claim marker'
     } else if (first.aborted) {

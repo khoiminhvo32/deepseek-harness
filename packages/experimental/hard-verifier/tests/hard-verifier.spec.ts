@@ -157,8 +157,8 @@ describe('hard verifier execution', () => {
     const claim = 'The username parameter reaches concatenation in the login query.'
     const { ctx, root, shell } = await harness([
       { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}\n` },
-      { exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` },
-      { exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` },
+      { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
+      { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
     ], { runs: 3, timeoutSeconds: 30 })
     const request = findingRequest(claim)
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
@@ -193,7 +193,7 @@ describe('hard verifier execution', () => {
   it('refutes a timed-out run and flags a split verdict flaky', async () => {
     const claim = 'A flaky claim.'
     const { ctx, root } = await harness([
-      { exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` },
+      { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
       { exitCode: null, stdoutText: '', timedOut: true },
     ], { runs: 2 })
     const request = findingRequest(claim)
@@ -213,7 +213,7 @@ describe('hard verifier execution', () => {
 
   it('flags a claimed score that does not match the recomputation', async () => {
     const claim = 'An overclaimed score.'
-    const { ctx, root } = await harness([{ exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` }])
+    const { ctx, root } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
     const request = { ...findingRequest(claim), cvssClaimed: 10 }
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
@@ -223,7 +223,7 @@ describe('hard verifier execution', () => {
 
   it('passes the configured workdir through to the shell request', async () => {
     const claim = 'The workdir claim.'
-    const { ctx, shell } = await harness([{ exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` }], {
+    const { ctx, shell } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }], {
       runs: 1, timeoutSeconds: 30, pocWorkdir: '/tmp/hard-target',
     })
     const request = findingRequest(claim)
@@ -234,7 +234,7 @@ describe('hard verifier execution', () => {
 
   it('rejects a duplicate proposal of a confirmed root cause without executing anything', async () => {
     const claim = 'The duplicate claim.'
-    const { ctx, root, shell } = await harness([{ exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` }])
+    const { ctx, root, shell } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
     const request = findingRequest(claim)
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     await ctx.hardVerifier.verify(root.agent, { ...request, id })
@@ -267,6 +267,13 @@ describe('hard verifier verdict units', () => {
     })
     expect(empty.verdict).toBe('refuted')
     expect(empty.reason).toBe('no runs were executed')
+    const echo = classifyRuns({
+      id: brandString<HardFindingId>('F-1'),
+      runs: [{ exitCode: 0, timedOut: false, aborted: false, stdoutText: `HARD-PASS ${hash}\n`, stderrTail: '' }],
+      claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
+    })
+    expect(echo.verdict).toBe('refuted')
+    expect(echo.reason).toContain('echo trap')
     const aborted = classifyRuns({
       id: brandString<HardFindingId>('F-1'),
       runs: [{ exitCode: null, timedOut: false, aborted: true, stdoutText: '', stderrTail: '' }],

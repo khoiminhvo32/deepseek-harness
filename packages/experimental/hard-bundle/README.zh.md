@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-启用这个可选组合包会以单一层挂载 hard-agent 九插件：`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。
+启用这个可选组合包会以单一层挂载全部九个 hard 插件：`hard-ledger` 拥有持久的 findings、假设与覆盖记录，`hard-verifier` 执行 findings 的效果证明并重算其 CVSS 4.0 分数，`hard-tools` 是面向模型的外表，`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要，`hard-rounds` 以 A/B 轮换记录轮次账目，`hard-deepread` 拥有深读契约。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。
 
 ## 目录
 
@@ -43,7 +43,7 @@ kind: "package-bundle"
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) 插入携带空白目标的 `hard-mission` 行——在部署设置真实目标之前这是一次刻意的响亮失败——以及默认配置的停止门、待机、交接、轮次与深读行。每个插件拥有自己的行为与生命周期；参见 [hard-mission](../hard-mission/README.zh.md)、[hard-stopgate](../hard-stopgate/README.zh.md)、[hard-standby](../hard-standby/README.zh.md)、[hard-handoff](../hard-handoff/README.zh.md)、[hard-rounds](../hard-rounds/README.zh.md) 与 [hard-deepread](../hard-deepread/README.zh.md)。
+[`cordis.patch.yml`](cordis.patch.yml) 插入携带空白目标的 `hard-mission` 行——在部署设置真实目标之前这是一次刻意的响亮失败——以及默认配置的 ledger、verifier、tools、停止门、待机、交接、轮次与深读行。每个插件拥有自己的行为与生命周期；参见 [hard-mission](../hard-mission/README.zh.md)、[hard-stopgate](../hard-stopgate/README.zh.md)、[hard-standby](../hard-standby/README.zh.md)、[hard-handoff](../hard-handoff/README.zh.md)、[hard-rounds](../hard-rounds/README.zh.md) 与 [hard-deepread](../hard-deepread/README.zh.md)。
 
 </details>
 

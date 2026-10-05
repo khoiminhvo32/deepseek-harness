@@ -1,4 +1,5 @@
-/** Keyless end-to-end hard-profile run: stop-gate steering, refuted fabrication, verified finding. */
+/** Keyless end-to-end hard-profile run: stop-gate steering, refuted fabrications
+ * including the echo trap, a model-written proof, and the coverage cross-check. */
 
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -42,37 +43,22 @@ function sessionValid(session) {
 module.exports = { sessionValid }
 `
 
-/** The fabrication trap: a PoC that fails, so the fake finding must be refuted. */
-const FAILING_POC = '#!/bin/sh\nexit 1\n'
-
-/** The real PoC: the injection payload escapes the interpolated command and lands the file. */
-const PROOF_POC = `#!/bin/sh
-set -e
-cd "$(dirname "$0")/../.."
-node -e "const {buildReport}=require('./src/reports.js'); buildReport('x; touch pwned.txt')"
-test -f pwned.txt
-echo "HARD-PASS \${HASH}"
-`
-
 const MISSION = 'Hunt vulnerabilities in this repository; only verified findings count.'
 
 function records(content: string) {
   return content.split('\n').filter(Boolean).map((line: string) => JSON.parse(line) as Record<string, unknown>)
 }
 
-describe('dsh --profile hard fabrication trap', () => {
-  it('steers an early clean claim, refutes a fabricated PoC, and confirms the planted command injection', async () => {
+describe('dsh --profile hard fabrication traps', () => {
+  it('steers a clean claim, refutes a dead PoC and an echo-only PoC, confirms the model-written proof, and cross-checks coverage', async () => {
     const { createHash } = await import('node:crypto')
     const claimHash = createHash('sha256').update(fixtureModule.CONFIRMED_CLAIM).digest('hex')
+    void claimHash
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-hard-fabrication-'))
     try {
       await mkdir(join(cwd, 'src'), { recursive: true })
-      await mkdir(join(cwd, 'poc', 'F-1'), { recursive: true })
-      await mkdir(join(cwd, 'poc', 'F-2'), { recursive: true })
       await writeFile(join(cwd, 'src', 'reports.js'), REPORTS_SOURCE)
       await writeFile(join(cwd, 'src', 'session.js'), SESSION_SOURCE)
-      await writeFile(join(cwd, 'poc', 'F-1', 'poc.sh'), FAILING_POC, { mode: 0o755 })
-      await writeFile(join(cwd, 'poc', 'F-2', 'poc.sh'), PROOF_POC.replaceAll('${HASH}', claimHash), { mode: 0o755 })
 
       const home = join(cwd, '.dsh')
       const sessions = join(home, 'sessions')
@@ -94,10 +80,15 @@ describe('dsh --profile hard fabrication trap', () => {
           },
         },
       }, undefined, 2) + '\n')
+      // coverageSpotCheckPercent: 100 makes the deterministic cross-check run
+      // for every cleared cell instead of its default 20 percent sample.
       await writeFile(join(profileDir, 'cordis.patch.yml'), [
         '- id: hard-mission',
         '  config:',
         `    objective: '${MISSION}'`,
+        '- id: hard-verifier',
+        '  config:',
+        '    coverageSpotCheckPercent: 100',
         '- id: llm-deepseek',
         '  disabled: true',
         '- id: session-persistence-jsonl',
@@ -127,6 +118,10 @@ describe('dsh --profile hard fabrication trap', () => {
       })
 
       expect(execution.exitCode, execution.stderr.slice(-2000)).toBe(0)
+      // Regression tripwire for the composition itself: every mounted plugin
+      // must have activated, so a removed bundle row fails here loudly.
+      expect(execution.stderr).not.toContain('did not activate')
+
       const sessionFiles = records(await readSessionLog(sessions))
       // The stop gate steered the premature clean claim back to work.
       const steerings = sessionFiles.filter(event => event.type === 'user/message')
@@ -136,13 +131,27 @@ describe('dsh --profile hard fabrication trap', () => {
         })
       expect(steerings.length).toBeGreaterThanOrEqual(1)
 
-      // The fabricated PoC was refuted; the planted bug was confirmed.
+      // The dead PoC and the echo-only PoC were both refuted; the
+      // model-written proof of the planted bug was confirmed.
       const verdicts = sessionFiles.filter(event => event.type === 'hard/finding/verdict')
-        .map(event => (event.data as { verdict: string }).verdict)
-      expect(verdicts).toContain('refuted')
-      expect(verdicts).toContain('confirmed')
+        .map(event => event.data as { verdict: string; reason: string })
+      expect(verdicts.filter(v => v.verdict === 'refuted')).toHaveLength(2)
+      expect(verdicts.find(v => v.reason.includes('echo trap'))).toBeDefined()
+      expect(verdicts.filter(v => v.verdict === 'confirmed')).toHaveLength(1)
+
+      // The coverage cross-check reopened the under-declared cell, then the
+      // corrected clearance stood.
+      const coverage = sessionFiles.filter(event => event.type === 'hard/coverage/cell')
+        .map(event => event.data as { verdict: string })
+      expect(coverage).toEqual([
+        expect.objectContaining({ verdict: 'cleared' }),
+        expect.objectContaining({ verdict: 'suspicious' }),
+        expect.objectContaining({ verdict: 'cleared' }),
+      ])
 
       // A completed goal from an honest completion claim.
+      // Gap 1.2 note: until the completion gate lands, update_goal action
+      // complete is accepted unconditionally; that gate will tighten this.
       const goalStates = sessionFiles.filter(event => event.type === 'goal/change')
         .map(event => event.data as { operation: string })
       expect(goalStates.at(-1)).toMatchObject({ operation: 'complete' })

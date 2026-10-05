@@ -43,7 +43,7 @@ The goal tools and the goal service come from `dsh-base`; this bundle adds only 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the `hard-mission` row with a blank objective — a deliberate loud failure until the deployment sets a real one — and the stop-gate, standby, handoff, rounds, and deep-read rows with default config. Each plugin owns its behavior and lifetime; see [hard-mission](../hard-mission/README.md), [hard-stopgate](../hard-stopgate/README.md), [hard-standby](../hard-standby/README.md), [hard-handoff](../hard-handoff/README.md), [hard-rounds](../hard-rounds/README.md), and [hard-deepread](../hard-deepread/README.md).
+[`cordis.patch.yml`](cordis.patch.yml) inserts the `hard-mission` row with a blank objective — a deliberate loud failure until the deployment sets a real one — and the ledger, verifier, tools, stop-gate, standby, handoff, rounds, and deep-read rows with default config. Each plugin owns its behavior and lifetime; see [hard-mission](../hard-mission/README.md), [hard-stopgate](../hard-stopgate/README.md), [hard-standby](../hard-standby/README.md), [hard-handoff](../hard-handoff/README.md), [hard-rounds](../hard-rounds/README.md), and [hard-deepread](../hard-deepread/README.md).
 
 </details>
 

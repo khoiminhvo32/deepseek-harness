@@ -480,7 +480,9 @@ const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
     // Isolate from the developer's global gitconfig: core.autocrlf or a global
     // attributes file would normalize line endings differently per machine,
     // changing the tree hash, the commit sha, and therefore the armed matrix
-    // the committed fixture pins.
+    // the committed fixture pins. The trailing `...env` lets the caller win by
+    // design; a new caller must not pass GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM
+    // there unless it intends to break the isolation.
     const run = (args: string[], env?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync> => spawnSync('git', ['-C', cwd, ...args], {
       encoding: 'utf8',
       env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null', ...env },

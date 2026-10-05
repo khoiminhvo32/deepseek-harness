@@ -144,6 +144,8 @@
   <a href="#pr3-live">PR3 live</a>
   <div class="toc-divider">PR4</div>
   <a href="#pr4-live">PR4 live</a>
+  <div class="toc-divider">PR5</div>
+  <a href="#pr5-live">PR5 live</a>
 </nav>
 
 <main>
@@ -628,6 +630,23 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
       <tr><td>Bug B32: domain merge không tự nạp</td><td><span class="chip pass">fix</span></td><td>rounds index quên <code>import type {} from './domain.ts'</code> → SessionEventMap thiếu hard/round/* trong chương trình typecheck (test runtime vẫn pass vì merge phụ thuộc thứ tự import); probe test dùng structural cast thay so sánh enum</td></tr>
       <tr><td>Persistence + bundle + docs</td><td><span class="chip pass">xong</span></td><td>Record <code>2026-10-05-hard-round-events</code> (2 roots, same-version) → 71 roots / 12 records; bundle 6 plugin (deps + patch + test); README en/zh ×2 + i18n records; experimental README +2 hàng; subsystem page +rounds/deepread/cross-check; TYPE_LINK_EXEMPTIONS +2 (CoverageAuditCell/ReopenRecord → hard-verifier README); families.spec +2; generators regen</td></tr>
       <tr><td>Gates cuối PR4</td><td><span class="chip pass">xong</span></td><td>147/147 tests (13 file); doc-sync <strong>42/42</strong>; persistence 71/12; typecheck 0; lint 0/0; duplication 0; coverage 100% các file hard mới; unknown-casts pass</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="pr5-live">
+  <h2><span class="h2-index">11</span>PR5 live: profile hard, fixture trap, keyless e2e</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR5 (2026-10-05).</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Wire profile <code>hard</code></td><td><span class="chip pass">xong</span></td><td><code>PROFILE_TEMPLATES.hard</code> = base + headless + hard-bundle (app-boot); spec pin assertion +1</td></tr>
+      <tr><td>Bug B33: bundle thiếu 3 plugin lõi</td><td><span class="chip pass">fix (e2e bắt được)</span></td><td>hard-bundle chỉ mount 6 plugin, thiếu hard-ledger/hard-verifier/hard-tools — các test đơn lẻ tự mount tay nên gates vẫn xanh; e2e thật đầu tiên phơi bày: hard-handoff + hard-rounds pending chờ hardLedger, model không gọi được tool. Bundle giờ mount đủ 9 plugin (deps + patch + test + README en/zh)</td></tr>
+      <tr><td>Bug B34: fixture đọc source sai tầng</td><td><span class="chip pass">fix</span></td><td>Message source nằm trên <code>message.source.kind</code> (như team-llm), không phải trên content block — fixture ban đầu không nhận ra steering của stopgate nên lặp mòn câu "không có bug"; hơn nữa tool schema là <code>cvss_score</code> (tool TỰ tính claimHash + fingerprint từ claim, model không truyền 2 trường đó — đúng hợp đồng anti-hallucination)</td></tr>
+      <tr><td>Fixture repo + bẫy</td><td><span class="chip pass">xong</span></td><td>2 bug trồng sẵn (cmdi: interpolation vào execSync; logic: session không expiry) + bẫy anti-hallucination: (1) model tuyên bố sạch không tool-call → stopgate phải steer; (2) submit finding giả PoC exit 1 → verifier REFUTED; (3) PoC thật pre-stage in HARD-PASS sha256(claim) → CONFIRMED 3/3 runs; update_goal complete chỉ sau confirm</td></tr>
+      <tr><td>Keyless e2e</td><td><span class="chip pass">xong</span></td><td><code>apps/cli/tests/hard-fabrication.e2e.ts</code> chạy <code>dsh --profile hard</code> qua fixture LLM adapter (pattern team-llm) — không cần DEEPSEEK_API_KEY; assert: ≥1 hard-stopgate steering, verdicts chứa refuted + confirmed, goal cuối operation complete</td></tr>
+      <tr><td>Ghi nhận: recorded snapshot hoãn</td><td><span class="chip pass">đối chứng</span></td><td>Snapshot record cần API key (máy không có); keyless fixture-e2e phủ đúng kịch bản anti-hallucination mà design §12 yêu cầu cho fixture e2e. Khi có key: <code>DSH_SNAPSHOT=record</code> bổ sung snapshot lane sau</td></tr>
+      <tr><td>Gates cuối PR5</td><td><span class="chip pass">xong</span></td><td>115/115 hard unit + profile spec 35/35 + e2e fabrication 1/1; doc-sync 42/42; typecheck 0; lint 0/0</td></tr>
     </tbody>
   </table>
 </section>

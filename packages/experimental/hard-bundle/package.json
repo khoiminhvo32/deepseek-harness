@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-experimental-hard-bundle",
-  "description": "The hard harness bundle: mission, stop gate, quota standby, compaction handoff, round driver, and deep-read template for persistent vulnerability research",
+  "description": "The hard harness bundle: ledger, verifier, tools, mission, stop gate, standby, handoff, rounds, and deep-read for persistent vulnerability research",
   "version": "0.2.1-alpha.1",
   "publishConfig": {
     "access": "public"
@@ -36,10 +36,13 @@
   "dependencies": {
     "@deepseek-ai/dsh-experimental-hard-deepread": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-handoff": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hard-ledger": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-mission": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-rounds": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-stopgate": "workspace:*",
-    "@deepseek-ai/dsh-experimental-hard-standby": "workspace:*"
+    "@deepseek-ai/dsh-experimental-hard-standby": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hard-tools": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hard-verifier": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"

@@ -1,4 +1,10 @@
 - insert:
+    - id: hard-ledger
+      name: '@deepseek-ai/dsh-experimental-hard-ledger'
+    - id: hard-verifier
+      name: '@deepseek-ai/dsh-experimental-hard-verifier'
+    - id: hard-tools
+      name: '@deepseek-ai/dsh-experimental-hard-tools'
     - id: hard-mission
       name: '@deepseek-ai/dsh-experimental-hard-mission'
       config:

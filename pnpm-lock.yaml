@@ -8042,6 +8042,9 @@ importers:
       '@deepseek-ai/dsh-experimental-hard-handoff':
         specifier: workspace:*
         version: link:../hard-handoff
+      '@deepseek-ai/dsh-experimental-hard-ledger':
+        specifier: workspace:*
+        version: link:../hard-ledger
       '@deepseek-ai/dsh-experimental-hard-mission':
         specifier: workspace:*
         version: link:../hard-mission
@@ -8054,6 +8057,12 @@ importers:
       '@deepseek-ai/dsh-experimental-hard-stopgate':
         specifier: workspace:*
         version: link:../hard-stopgate
+      '@deepseek-ai/dsh-experimental-hard-tools':
+        specifier: workspace:*
+        version: link:../hard-tools
+      '@deepseek-ai/dsh-experimental-hard-verifier':
+        specifier: workspace:*
+        version: link:../hard-verifier
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~

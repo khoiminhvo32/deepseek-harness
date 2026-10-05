@@ -1,0 +1,47 @@
+{
+  "patches": [
+    {
+      "at": 11,
+      "entry": {
+        "kind": "chunks",
+        "chunks": [
+          {
+            "type": "block-start",
+            "index": 0,
+            "blockType": "tool-call"
+          },
+          {
+            "type": "tool-call-delta",
+            "index": 0,
+            "id": "hard-fixture-11",
+            "name": "update_goal",
+            "argumentsDelta": "{\"goal_id\":\"{{fromRequest:\\\"id\\\":\\\"(goal-[0-9a-f-]{36})\\\"}}\",\"revision\":1,\"action\":\"complete\"}"
+          },
+          {
+            "type": "block-end",
+            "index": 0,
+            "block": {
+              "type": "tool-call",
+              "id": "hard-fixture-11",
+              "name": "update_goal",
+              "arguments": "{\"goal_id\":\"{{fromRequest:\\\"id\\\":\\\"(goal-[0-9a-f-]{36})\\\"}}\",\"revision\":1,\"action\":\"complete\"}"
+            }
+          },
+          {
+            "type": "usage",
+            "usage": {
+              "inputTokens": 10,
+              "outputTokens": 5
+            }
+          },
+          {
+            "type": "finish",
+            "reason": {
+              "kind": "tool-calls"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

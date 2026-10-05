@@ -110,8 +110,8 @@ function missionContract(resolved: ResolvedConfig): string {
   const sweep = resolved.bugClasses.length > 0
     ? `Systematic passes sweep these bug classes: ${resolved.bugClasses.join(', ')}. `
     : ''
-  return `Mission: ${resolved.objective}
-This session carries one durable goal and keeps working toward it across turns. `
+  return `Mission: ${resolved.objective} `
+    + 'This session carries one durable goal and keeps working toward it across turns. '
     + 'Do not stop to announce progress while concrete work remains; take the next action instead. '
     + sweep
     + `Every ${resolved.deepReadEveryN} systematic passes, run a deep-reading pass that models dataflow, `

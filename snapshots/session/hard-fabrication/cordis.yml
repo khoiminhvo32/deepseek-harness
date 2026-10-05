@@ -1,0 +1,28 @@
+# Composition owner for the hard-fabrication authored scenario: the full
+# hard bundle over dsh-headless, with the objective set and the coverage
+# cross-check pinned to a 100 percent spot-check so the recorded grep is
+# deterministic.
+
+- insert:
+    - id: hard-ledger
+      name: '@deepseek-ai/dsh-experimental-hard-ledger'
+    - id: hard-verifier
+      name: '@deepseek-ai/dsh-experimental-hard-verifier'
+      config:
+        coverageSpotCheckPercent: 100
+    - id: hard-tools
+      name: '@deepseek-ai/dsh-experimental-hard-tools'
+    - id: hard-mission
+      name: '@deepseek-ai/dsh-experimental-hard-mission'
+      config:
+        objective: 'Hunt vulnerabilities in this repository; only verified findings count.'
+    - id: hard-stopgate
+      name: '@deepseek-ai/dsh-experimental-hard-stopgate'
+    - id: hard-standby
+      name: '@deepseek-ai/dsh-experimental-hard-standby'
+    - id: hard-handoff
+      name: '@deepseek-ai/dsh-experimental-hard-handoff'
+    - id: hard-rounds
+      name: '@deepseek-ai/dsh-experimental-hard-rounds'
+    - id: hard-deepread
+      name: '@deepseek-ai/dsh-experimental-hard-deepread'

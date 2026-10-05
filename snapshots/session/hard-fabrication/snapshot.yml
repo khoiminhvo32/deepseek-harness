@@ -1,0 +1,12 @@
+version: 1
+scenario: hard-fabrication
+profile: headless
+composition: hard-fabrication
+recording: authored
+header:
+  class: hard-fabrication
+  pin: true
+workspace:
+  final: true
+replay:
+  override: true

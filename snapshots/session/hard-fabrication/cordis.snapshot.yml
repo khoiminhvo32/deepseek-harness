@@ -1,0 +1,56 @@
+# Replay delta for the hard-fabrication composition: the model script comes
+# from the scenario's committed session JSONL.
+
+- id: plugin-package-inventory-deepseek
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+  disabled: true
+
+- id: session-persistence-jsonl
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js dshHomePath('sessions')
+    compression: none
+
+- insert:
+    - id: hard-ledger
+      name: '@deepseek-ai/dsh-experimental-hard-ledger'
+    - id: hard-verifier
+      name: '@deepseek-ai/dsh-experimental-hard-verifier'
+      config:
+        coverageSpotCheckPercent: 100
+    - id: hard-tools
+      name: '@deepseek-ai/dsh-experimental-hard-tools'
+    - id: hard-mission
+      name: '@deepseek-ai/dsh-experimental-hard-mission'
+      config:
+        objective: 'Hunt vulnerabilities in this repository; only verified findings count.'
+    - id: hard-stopgate
+      name: '@deepseek-ai/dsh-experimental-hard-stopgate'
+    - id: hard-standby
+      name: '@deepseek-ai/dsh-experimental-hard-standby'
+    - id: hard-handoff
+      name: '@deepseek-ai/dsh-experimental-hard-handoff'
+    - id: hard-rounds
+      name: '@deepseek-ai/dsh-experimental-hard-rounds'
+    - id: hard-deepread
+      name: '@deepseek-ai/dsh-experimental-hard-deepread'
+    - id: llm-replay
+      name: '@deepseek-ai/dsh-llm-replay'
+      config:
+        providers:
+          - id: deepseek-official
+            name: DeepSeek
+            models:
+              # The live route's published facts, so replay reconstructs the
+              # recorded request header.
+              - id: deepseek-flash
+                contextWindow: 128000
+                defaultMaxTokens: 8192
+                reasoningEfforts: [off, low, high, max]
+                defaultReasoningEffort: max

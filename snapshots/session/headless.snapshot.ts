@@ -477,9 +477,13 @@ async function seedWorkspace(scenario: HeadlessScenario, cwd: string): Promise<v
 const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
   /** Turn the seeded workspace into the deterministic git repo the target pinning enumerates. */
   async 'git-repo'(cwd) {
+    // Isolate from the developer's global gitconfig: core.autocrlf or a global
+    // attributes file would normalize line endings differently per machine,
+    // changing the tree hash, the commit sha, and therefore the armed matrix
+    // the committed fixture pins.
     const run = (args: string[], env?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync> => spawnSync('git', ['-C', cwd, ...args], {
       encoding: 'utf8',
-      ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null', ...env },
     })
     expect(run(['init', '--quiet']).status).toBe(0)
     expect(run(['add', '-A']).status).toBe(0)

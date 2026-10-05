@@ -329,7 +329,8 @@ export class HardLedger extends Service {
   }
 
   /**
-   * Matrix cells with no verdict yet, in deterministic module-then-class order.
+   * Matrix cells with no verdict yet, in matrix order: sorted modules outer,
+   * the configured class order inner.
    * @param agent - the live agent whose ledger state is read.
    * @returns one entry per uncovered matrix cell, empty without a matrix.
    */
@@ -344,8 +345,7 @@ export class HardLedger extends Service {
         if (!verdicted.has(`${module}\u0000${bugClass}`)) uncovered.push({ module, bugClass })
       }
     }
-    return uncovered.sort((left, right) =>
-      (left.module + '\u0000' + left.bugClass) < (right.module + '\u0000' + right.bugClass) ? -1 : 1)
+    return uncovered
   }
 
   /**

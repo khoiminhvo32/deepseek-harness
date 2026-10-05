@@ -18,6 +18,20 @@ import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import * as hardMission from '@deepseek-ai/dsh-experimental-hard-mission'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
+/** Run git detached from the developer's global and system gitconfig. */
+const GIT_CONFIG_ISOLATION = { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+
+/** Seed one deterministic git repository: init, add everything, commit. */
+function seedGitRepo(repo: string): void {
+  const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...GIT_CONFIG_ISOLATION },
+  })
+  git('init', '--quiet')
+  git('add', '-A')
+  git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+}
+
 interface StubAgent {
   readonly agent: Agent
   readonly session: Session
@@ -128,7 +142,10 @@ const targetSha: string = await (async () => {
   await writeFile(join(targetRepo, 'src', 'parser', 'lexer.ts'), 'export {}\n')
   await writeFile(join(targetRepo, 'src', 'parser', 'token.ts'), 'export {}\n')
   await writeFile(join(targetRepo, 'vendor', 'lib', 'vendored.js'), 'export {}\n')
-  const git = (...args: string[]) => execFileSync('git', ['-C', targetRepo, ...args], { encoding: 'utf8' })
+  const git = (...args: string[]) => execFileSync('git', ['-C', targetRepo, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...GIT_CONFIG_ISOLATION },
+  })
   git('init', '--quiet')
   git('add', '-A')
   git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
@@ -254,10 +271,7 @@ describe('hard mission target pinning', () => {
       const repo = join(excluded, 'repo')
       await mkdir(repo, { recursive: true })
       await writeFile(join(repo, 'keep.txt'), 'x\n')
-      const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' })
-      git('init', '--quiet')
-      git('add', '-A')
-      git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+      seedGitRepo(repo)
       const ctx = await baseHarness()
       await expect(ctx.plugin(hardMission, missionConfig({
         target: { repoPath: repo, excludeGlobs: ['**'] },
@@ -277,10 +291,7 @@ describe('hard mission target pinning', () => {
         await mkdir(directory, { recursive: true })
         await writeFile(join(directory, 'f.ts'), 'export {}\n')
       }
-      const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' })
-      git('init', '--quiet')
-      git('add', '-A')
-      git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+      seedGitRepo(repo)
       const ctx = await baseHarness()
       await expect(ctx.plugin(hardMission, missionConfig({
         target: { repoPath: repo, moduleDepth: 1 },

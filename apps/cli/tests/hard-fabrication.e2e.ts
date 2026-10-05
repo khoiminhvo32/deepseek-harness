@@ -62,8 +62,12 @@ describe('dsh --profile hard fabrication traps', () => {
       await writeFile(join(cwd, 'src', 'reports.js'), REPORTS_SOURCE)
       await writeFile(join(cwd, 'src', 'session.js'), SESSION_SOURCE)
       // The target is a real git repository so the mission pins the commit and
-      // enumerates the tracked modules at load time.
-      const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+      // enumerates the tracked modules at load time. Config isolation keeps a
+      // developer's global gitconfig (autocrlf, gpgsign) out of the run.
+      const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], {
+        encoding: 'utf8',
+        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      })
       git('init', '--quiet')
       git('add', '-A')
       git('-c', 'user.name=hard-e2e', '-c', 'user.email=hard@e2e', 'commit', '--quiet', '-m', 'seed')

@@ -310,6 +310,8 @@ describe('hard ledger coverage matrix', () => {
     ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
     ctx.hardLedger.markCoverage(root.agent, { module: 'outside', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
     expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 1, total: 6 })
+    // Matrix order: sorted modules outer, the configured class order inner —
+    // the loop's own order, no re-sort.
     expect(ctx.hardLedger.uncoveredCells(root.agent)).toEqual([
       { module: '.', bugClass: 'cmdi' },
       { module: '.', bugClass: 'sqli' },

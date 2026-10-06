@@ -762,6 +762,20 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="p1-measured-live">
+  <h2><span class="h2-index">18</span>PR10 live: step cap thật, verdict đo lường được, pilot</h2>
+  <p class="intro">Smoke test 2026-10-06 với model DeepSeek thật xác nhận giao thức đứng vững (model tìm đúng bug, PoC qua \$1, qua specificity check, verdict confirmed) nhưng log phơi ba lỗ hổng đo lường. Phần 1: lượt đầu không có round nên stepsPerRound vô hiệu, và turn-stopping chỉ bó steering — model gọi tool liên tục không bao giờ chạm tới. Phần 2: reason string tự do không phân biệt được "target sạch" với "model hỏng giao thức". Phần 3: pilot ngoài repo để chạy nhiều vòng.</p>
+  <table>
+    <thead><tr><th>Phần việc</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>P1 — maxStepsPerTurn ở biên step</td><td><span class="chip pass">xong</span></td><td>Cap theo lượt kiểm ở agent/pre-step, áp cho mọi turn kể cả lượt không thuộc round; payload pre-step mang sẵn position {turn, step} 1-based từ vòng lặp nên tin position thay vì đếm riêng (không thể drift); chạm trần → reject + event hard/step-cap/reached (root mới, additive; steps = step − 1; round có mặt khi round đang giữ turn). stepsPerRound giữ vai trò steering budget, JSDoc + README nêu rõ khác biệt để người sau không xoá nhầm. 4 test: roundless quá trần, round mang round, dưới trần không can thiệp, hai agent không lẫn</td></tr>
+      <tr><td>P2 — cause + evidence + refutationBreakdown</td><td><span class="chip pass">xong</span></td><td>Mỗi nhánh refuted gán đúng một cause (benign-arm-passed, no-marker, nonzero-exit, timeout, aborted, no-runs); evidence: 'proven' dành cho differential runner, không nhánh nào được gán, vắng mặt đọc là demonstrated; refutationBreakdown gộp protocol/genuine/infra, verdict trước thời cause đọc là unattributed. Fix ngầm: schema runs min(1)→min(0) — verdict benign-refute có runs 0 hợp lệ, sẽ nổ khi restore qua stateSchema.parse. Các test assert bằng chuỗi con đổi sang assert cause; tool result giữ nguyên mặt model, cause thuộc bản ghi ledger</td></tr>
+      <tr><td>P3 — pilot ngoài repo</td><td><span class="chip pass">xong</span></td><td>pilot/ cạnh hard-smoke/: target 15 file, 6 module (docs + data/manuals inert), 3 bug trồng (cmdi renderPage nối chuỗi vào execSync wc; sqli findUser nối chuỗi vào node:sqlite lộ api_token admin; path-traversal readDoc đọc ngoài manuals), 2 near-miss sạch (execFileSync mảng đối số, truy vấn tham số hoá), tự kiểm từng bug trước khi seed git; planted.json đặt NGOÀI target; report.mjs đã kiểm chứng trên log smoke thật (38 steps, 46k/17.5k tok khớp con số task). Ước tính: input ~0.5–1M tok, output ~150–300k tok cho lần chạy đầy đủ — output tăng nhanh nhất</td></tr>
+      <tr><td>Gates cuối PR10</td><td><span class="chip pass">xong</span></td><td>161/161 tests cả 10 package hard-* + e2e 1/1 (assert cause) + snapshot refresh + exact replay + doc-sync 42/42 + typecheck toàn repo 0 + pairing 880. Commit theo subject: feat(experimental): step cap thật cho mọi lượt + feat(experimental): cause và evidence cho verdict + docs(plans): worklog §18</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

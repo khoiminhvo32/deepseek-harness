@@ -824,6 +824,22 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr13-attribution-and-matrix-guard">
+  <h2><span class="h2-index">22</span>PR13: hai sửa nhỏ lộ ra từ pilot — reopen khai thẩm quyền + chặn cell ngoài ma trận</h2>
+  <p class="intro">Pilot chạy thật xong (4/4 recall, 0 protocol failure) nhưng report.mjs nói sai số liệu: 14/32 "gaming" thực ra gộp 6 harness reopen với 8 lần model TỰ đánh suspicious — hành vi đúng bị đếm như gian lận, vì đường reopen duy nhất harness tự quyết không gắn <code>source: 'harness'</code>. Kèm đó model quét <code>poc/</code> — thư mục PoC do chính nó tạo, không phải hàng ma trận — mà <code>markCoverage</code> nhận mọi chuỗi.</p>
+  <table>
+    <thead><tr><th>Điểm</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Reopen gán source: 'harness' tường minh</td><td><span class="chip pass">xong</span></td><td>CoverageReopenRecord thêm literal <code>source: 'harness'</code> — cùng khuôn với <code>evidence: 'demonstrated'</code> ở nhánh confirmed: gán tường minh, không dựa mặc định. Cả hai nhánh audit (presence + guarded-surface) và đường fail-closed AUDIT_FAILED trong hard_mark_coverage (khối .catch) đều gán — cell do harness quyết thì khai thẩm quyền trong dữ liệu, không phải sniff chuỗi phía report. Log cũ không source ⇒ đọc là model (behavior có sẵn, không đổi); enum HardCoverageSource đã có 'harness' từ trước nên KHÔNG có persistence type change (chạy persistence-changes xác nhận).</td></tr>
+      <tr><td>markCoverage chặn module ngoài ma trận</td><td><span class="chip pass">xong</span></td><td>Method mới <code>assertModulesInMatrix(agent, modules)</code> trên HardLedger (dùng chung ledger + tool, không trùng lặp): module không nằm trong <code>matrix.modules</code> ⇒ throw HARD_LEDGER_MODULE_NOT_IN_MATRIX với thông điệp dạy được liệt kê hàng hợp lệ tại commit pin — "module \"poc\" is not in the armed coverage matrix; the matrix rows at commit &lt;sha&gt; are: ., data/manuals, …" — bound 12 hàng rồi "…and N more" (HARD_MATRIX_ROWS_LIST_LIMIT, khuôn HARD_BLOCKER_LIMIT). Chưa arm ma trận (mission không mount / log cũ) ⇒ nhận như cũ — merge-extensible fall through, không throw. markCoverage gọi với [module]; hard_clear_modules gọi với cả lô TRƯỚC khi grep nên một module ngoài ⇒ từ chối cả lô, không cell nào kịp mark; thay thế được check cũ "not an armed coverage module" vốn không liệt kê rows.</td></tr>
+      <tr><td>report.mjs tách theo source</td><td><span class="chip pass">xong</span></td><td>Hàng Gaming đọc <code>c.source === 'harness'</code> (harness reopen = gaming thật, mẫu số là lệnh cleared) và <code>c.source === undefined</code> (model tự đánh suspicious = hành vi đúng) — hai dòng riêng trong một ô, không gộp. Ví dụ pilot cũ sẽ đọc: "6/32 cell cleared bị harness reopen; 8 cell model tự đánh suspicious (hành vi đúng)".</td></tr>
+      <tr><td>Gates nổ và đã tắt</td><td><span class="chip pass">xong</span></td><td>gen-tool-catalog stale (COVERAGE_DESCRIPTION thêm ràng buộc ma trận) — regen + zh mirror cập nhật tay cùng câu; gen-cordis-catalog tự sinh assertModulesInMatrix vào subsystems en/zh + api-catalog; pairing re-record 4 file (tool-catalog + 3 README); READMEs hard-ledger/hard-verifier/hard-tools en+zh: attribution bullet mở nghĩa 'harness' (màn hình cơ học, reopen, fail-closed), markCoverage chặn ngoài ma trận, báo cáo không đọc suspicious của model là gaming.</td></tr>
+      <tr><td>Snapshot + e2e</td><td><span class="chip pass">xong</span></td><td>hard-fabrication: DSH_SNAPSHOT=refresh trên fixture đã commit — chỉ đúng 2 dòng thay đổi (event suspicious thêm "source":"harness", tool-schemas.expected.json theo description mới); e2e assert coverage[1] mang source 'harness' còn mark của model vẫn vắng source. Fixture an toàn sẵn: script mark 'src', ma trận arm rows ["notes","src"].</td></tr>
+      <tr><td>Gates cuối</td><td><span class="chip pass">xong</span></td><td>10 package hard-* 176/176 (+3 test mới); hard-fabrication + hard-web-boot e2e xanh; test:snapshot 181 passed — fail duy nhất browser-use-stagehand-native (thiếu browser, fail sẵn); typecheck 0; lint 0 (bài học: arrow shorthand trả void call — assertModulesInMatrix — bị no-confusing-void-expression bắt, bọc braces); doc-sync 42/42 gồm persistence type history.</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

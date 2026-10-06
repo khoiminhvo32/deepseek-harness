@@ -1267,7 +1267,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'markCoverage(agent: Agent, request: HardCoverageCellData): void',
         description: 'Append one coverage cell verdict, replacing any prior verdict for the cell.',
-        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the cell coordinates, verdict, and declared sink sites.' }],
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the cell coordinates, verdict, and declared sink sites; the module must be an armed matrix row when a matrix exists.' }],
+      },
+      {
+        signature: 'assertModulesInMatrix(agent: Agent, modules: readonly string[]): void',
+        description: 'Reject modules outside the armed coverage matrix, naming the valid rows so the caller can correct its target list instead of guessing. A module the model invented — an untracked directory such as its own `poc/` scratch folder — is not a matrix row, so sweeping it is wasted steps and noise in the cell list. Without an armed matrix (the mission plugin is not mounted, or the log predates arming) every module passes — the merge-extensible default.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the check.' }, { name: 'modules', description: 'the module names to validate.' }],
+        throws: ['`HARD_LEDGER_MODULE_NOT_IN_MATRIX` listing the offending modules and the bounded valid rows.'],
       },
       {
         signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
@@ -5172,7 +5178,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CoverageReopenRecord',
-    declaration: 'export interface CoverageReopenRecord {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: \'suspicious\';\n    readonly declaredSinks: readonly string[];\n}',
+    declaration: 'export interface CoverageReopenRecord {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: \'suspicious\';\n    readonly declaredSinks: readonly string[];\n    readonly source: \'harness\';\n}',
   },
   {
     name: 'CreateAgentOptions',

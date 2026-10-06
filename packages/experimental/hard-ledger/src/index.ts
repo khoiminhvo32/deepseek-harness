@@ -122,6 +122,9 @@ export const HARD_TEXT_LIMIT = 2000
 /** Maximum coverage matrix rows one arming record may carry. */
 export const HARD_MATRIX_MODULE_LIMIT = 500
 
+/** Maximum matrix rows one rejection message lists before it summarizes the rest. */
+export const HARD_MATRIX_ROWS_LIST_LIMIT = 12
+
 /** Maximum blocking items one completion assessment lists before it summarizes the rest. */
 export const HARD_BLOCKER_LIMIT = 8
 
@@ -280,11 +283,12 @@ export class HardLedger extends Service {
   /**
    * Append one coverage cell verdict, replacing any prior verdict for the cell.
    * @param agent - the live agent whose session receives the record.
-   * @param request - the cell coordinates, verdict, and declared sink sites.
+   * @param request - the cell coordinates, verdict, and declared sink sites; the module must be an armed matrix row when a matrix exists.
    */
   markCoverage(agent: Agent, request: HardCoverageCellData): void {
     this.assertText('module', request.module)
     this.assertText('bugClass', request.bugClass)
+    this.assertModulesInMatrix(agent, [request.module])
     const verdicts: readonly HardCoverageVerdict[] = ['cleared', 'suspicious', 'uncovered']
     if (!verdicts.includes(request.verdict)) {
       throw new HarnessError(
@@ -308,6 +312,35 @@ export class HardLedger extends Service {
       declaredSinks: [...request.declaredSinks],
       ...(request.source === undefined ? {} : { source: request.source }),
     })
+  }
+
+  /**
+   * Reject modules outside the armed coverage matrix, naming the valid rows
+   * so the caller can correct its target list instead of guessing. A module
+   * the model invented — an untracked directory such as its own `poc/`
+   * scratch folder — is not a matrix row, so sweeping it is wasted steps and
+   * noise in the cell list. Without an armed matrix (the mission plugin is
+   * not mounted, or the log predates arming) every module passes — the
+   * merge-extensible default.
+   * @param agent - the live agent whose ledger matrix anchors the check.
+   * @param modules - the module names to validate.
+   * @throws `HARD_LEDGER_MODULE_NOT_IN_MATRIX` listing the offending modules and the bounded valid rows.
+   */
+  assertModulesInMatrix(agent: Agent, modules: readonly string[]): void {
+    const matrix = this.coverageMatrix(agent)
+    if (matrix === undefined) return
+    const unknown = [...new Set(modules)].filter(module => !matrix.modules.includes(module))
+    if (unknown.length === 0) return
+    const subject = unknown.length === 1
+      ? `module "${unknown[0]}" is`
+      : `modules ${unknown.map(entry => `"${entry}"`).join(', ')} are`
+    const listed = matrix.modules.length > HARD_MATRIX_ROWS_LIST_LIMIT
+      ? [...matrix.modules.slice(0, HARD_MATRIX_ROWS_LIST_LIMIT), `…and ${matrix.modules.length - HARD_MATRIX_ROWS_LIST_LIMIT} more`]
+      : [...matrix.modules]
+    throw new HarnessError(
+      `${subject} not in the armed coverage matrix; the matrix rows at commit ${matrix.commit} are: ${listed.join(', ')}`,
+      'HARD_LEDGER_MODULE_NOT_IN_MATRIX',
+    )
   }
 
   /**

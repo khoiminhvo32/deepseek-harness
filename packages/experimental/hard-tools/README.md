@@ -44,7 +44,7 @@ All six tools require a live agent and return compact JSON. Submit results carry
 ### Design
 
 - **Verification at submission.** `hard_submit_finding` hashes the claim (the marker the PoC must print) and the root cause (the dedup key), proposes through the ledger, then awaits `hardVerifier.verify` before answering; the model sees the executed outcome, not an assumption. The tool description teaches the specificity contract: read the payload from `$1`, never hardcode it, because the harness re-runs the PoC with a benign payload and requires it to fail.
-- **Lifecycle in the ledger.** Hypothesis transitions, coverage cells, and sweeps are ledger appends with fail-loud validation; the tools add only the hypothesis-membership check for `hypothesis_id`.
+- **Lifecycle in the ledger.** Hypothesis transitions, coverage cells, and sweeps are ledger appends with fail-loud validation; the tools add only the hypothesis-membership check for `hypothesis_id`. `hard_mark_coverage` refuses a module that is not a row of the armed matrix, naming the valid rows, and a harness reopen or fail-closed audit attributes its cell with `source: 'harness'`, so reports never read the model's own `suspicious` call as gaming.
 
 ### Source map
 

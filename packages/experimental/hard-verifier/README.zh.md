@@ -81,7 +81,7 @@ Results append after the reusable request prefix without invalidating earlier en
 - **Bash PoC** — 执行运行 `bash <pocPath>`；Windows PoC 运行器需要 pwsh provider 路径，已延期。
 - **flow 引用解析** — `checkFlowCitations(agent, citations)` 通过 `git ls-tree` 与 `git show` 将每条 `path:line` 引用对照钉住的提交解析，从不读工作树：路径必须在提交中被跟踪、行必须存在、片段必须出现在该内容中。git 调用未干净结束即 fail closed，并以原因返回被拒引用，`hard_record_flow` 因此能点名每条失败引用拒绝整份文档。
 - **效果类别细化延期** — 针对内存安全与 authz 类别的 sanitizer 信号与差分检查分类将随覆盖审计器落地；标记契约是 PR2 的唯一契约。
-- **受保护面类别反转读法** — 对 `authz` 与 `authn-bypass`，缺陷是防护的缺席，因此 `GUARDED_SURFACE_PATTERNS` 命名的是导出的操作而非防护本身：交叉检查会重开一个已清除的单元格，点名模型声明中未提及的每个导出操作；`screenModules` 把零匹配读作模块没有暴露任何需要保护的操作。`ABSENCE_SINK_CLASSES` 只保留 `login-bypass`——它的 sink 是防护性检查，批量筛查会被拒绝：对它，空 grep 是可疑而非干净。批量联合仍然意味着模型的 pattern 只能在固定表之上增加覆盖，永远不能减。
+- **受保护面类别反转读法** — 对 `authz` 与 `authn-bypass`，缺陷是防护的缺席，因此 `GUARDED_SURFACE_PATTERNS` 命名的是导出的操作而非防护本身：交叉检查会重开一个已清除的单元格，点名模型声明中未提及的每个导出操作；`screenModules` 把零匹配读作模块没有暴露任何需要保护的操作。`ABSENCE_SINK_CLASSES` 只保留 `login-bypass`——它的 sink 是防护性检查，批量筛查会被拒绝：对它，空 grep 是可疑而非干净。批量联合仍然意味着模型的 pattern 只能在固定表之上增加覆盖，永远不能减。每条重开记录都携带 `source: 'harness'`，因此报告能区分 harness 的重开与模型自己给出的 `suspicious` 判定——发现了东西是正确行为，不是投机。
 - **网络策略属于部署** — PoC 运行期间的出网限制跟随已挂载的 sandbox provider；验证器不添加自己的策略。
 
 <a id="dev-note"></a>

@@ -429,6 +429,7 @@ describe('hard verifier coverage cross-check', () => {
       bugClass: 'cmdi',
       verdict: 'suspicious',
       declaredSinks: ['src/auth/exec.ts:5: exec(userCmd)'],
+      source: 'harness',
     })
     expect(shell.runs[0]?.command).toContain('grep -rInE')
     expect(shell.runs[0]?.command).toContain('src/auth')
@@ -484,7 +485,7 @@ describe('hard verifier coverage cross-check', () => {
       declaredSinks: ['renderPage → requireRole(\'editor\')'],
     })
     expect(reopened).toEqual({
-      module: 'src/auth', bugClass: 'authz', verdict: 'suspicious', declaredSinks: ['handleDashboardQuery'],
+      module: 'src/auth', bugClass: 'authz', verdict: 'suspicious', declaredSinks: ['handleDashboardQuery'], source: 'harness',
     })
     expect(shell.runs[0]?.command).toContain('module\\.exports')
     // Declaring every exported operation keeps the cell standing.

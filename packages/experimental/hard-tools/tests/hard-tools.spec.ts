@@ -344,7 +344,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(reopened.coverage).toMatchObject({ module: 'src/db', verdict: 'suspicious' })
     expect(reopened.reopenedSinks).toEqual(['src/db/exec.ts:9: exec(userCmd)'])
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([
-      expect.objectContaining({ verdict: 'suspicious', declaredSinks: ['src/db/exec.ts:9: exec(userCmd)'] }),
+      expect.objectContaining({ verdict: 'suspicious', declaredSinks: ['src/db/exec.ts:9: exec(userCmd)'], source: 'harness' }),
     ])
   })
 
@@ -366,9 +366,10 @@ describe('hard_update_hypothesis and methodology tools', () => {
     }, root.agent)
     expect(failed.isError).toBe(true)
     expect(failed.error?.info?.code).toBe('HARD_VERIFIER_AUDIT_FAILED')
-    // The just-marked clearance did not stand: the durable cell reads suspicious.
+    // The just-marked clearance did not stand: the durable cell reads
+    // suspicious, attributed to the harness that decided it.
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([
-      expect.objectContaining({ verdict: 'suspicious', declaredSinks: [] }),
+      expect.objectContaining({ verdict: 'suspicious', declaredSinks: [], source: 'harness' }),
     ])
   })
 
@@ -440,10 +441,37 @@ describe('hard_update_hypothesis and methodology tools', () => {
     const text = (refused.content[0] as { type: string; text: string }).text
     expect(text).toContain('protective checks')
     const unknown = await execute(ctx, 'hard_clear_modules', {
-      modules: ['nope'], bug_class: 'sqli', patterns: ['SELECT'], rationale: 'r',
+      modules: ['src', 'nope'], bug_class: 'sqli', patterns: ['SELECT'], rationale: 'r',
     }, root.agent)
     expect(unknown.isError).toBe(true)
-    expect((unknown.content[0] as { type: string; text: string }).text).toContain('not an armed coverage module')
+    expect((unknown.content[0] as { type: string; text: string }).text)
+      .toContain('module "nope" is not in the armed coverage matrix; the matrix rows at commit')
+    // The whole batch was refused before any cell was cleared.
+    expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(1)
+  })
+
+  it('refuses a coverage cell outside the armed matrix, naming the valid rows', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/db'],
+      bugClasses: ['cmdi'],
+    })
+    const refused = await execute(ctx, 'hard_mark_coverage', {
+      module: 'poc', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['execSync'],
+    }, root.agent)
+    expect(refused.isError).toBe(true)
+    expect((refused.content[0] as { type: string; text: string }).text)
+      .toContain('module "poc" is not in the armed coverage matrix; the matrix rows at commit')
+    expect((refused.content[0] as { type: string; text: string }).text).toContain('are: src/db')
+    // Without an armed matrix every module passes — the merge-extensible default.
+    const bare = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    const unArmed = resultJson(await execute(bare.ctx, 'hard_mark_coverage', {
+      module: 'poc', bug_class: 'cmdi', verdict: 'suspicious', declared_sinks: [],
+    }, bare.root.agent))
+    expect(unArmed.coverage).toMatchObject({ module: 'poc', verdict: 'suspicious' })
   })
 
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {

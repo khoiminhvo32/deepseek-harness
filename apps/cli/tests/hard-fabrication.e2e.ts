@@ -197,18 +197,20 @@ describe('dsh --profile hard fabrication traps', () => {
       // Confirms carry their evidence strength explicitly.
       expect(verdicts.find(v => v.verdict === 'confirmed')?.evidence).toBe('demonstrated')
 
-      // The coverage cross-check reopened the under-declared cell, then the
-      // corrected clearance stood; the batch clear landed as model-verified
-      // while the model's own marks carry no source (they read as model).
+      // The coverage cross-check reopened the under-declared cell — attributed
+      // to the harness that decided it — then the corrected clearance stood;
+      // the batch clear landed as model-verified while the model's own marks
+      // carry no source (they read as model).
       const coverage = sessionFiles.filter(event => event.type === 'hard/coverage/cell')
         .map(event => event.data as { verdict: string; source?: string })
       expect(coverage).toEqual([
         expect.objectContaining({ verdict: 'cleared' }),
-        expect.objectContaining({ verdict: 'suspicious' }),
+        expect.objectContaining({ verdict: 'suspicious', source: 'harness' }),
         expect.objectContaining({ verdict: 'cleared' }),
         expect.objectContaining({ verdict: 'cleared', source: 'model-verified' }),
       ])
-      expect(coverage.slice(0, 3).every(cell => cell.source === undefined)).toBe(true)
+      expect(coverage[0]?.source).toBeUndefined()
+      expect(coverage[2]?.source).toBeUndefined()
 
       // The Phase B record: the fabricated citation was rejected naming the
       // cite, and the resolvable one landed as hard/flow/doc with its count.

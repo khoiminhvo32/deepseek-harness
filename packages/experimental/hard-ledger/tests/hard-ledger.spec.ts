@@ -607,7 +607,9 @@ describe('hard ledger coverage matrix', () => {
     })
     expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 0, total: 6 })
     ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
-    ctx.hardLedger.markCoverage(root.agent, { module: 'outside', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] })
+    // A module outside the armed rows is refused; the invalid cell never lands.
+    expect(() => { ctx.hardLedger.markCoverage(root.agent, { module: 'outside', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] }) })
+      .toThrow('module "outside" is not in the armed coverage matrix; the matrix rows at commit')
     expect(ctx.hardLedger.coverageProgress(root.agent)).toEqual({ verdicted: 1, total: 6 })
     // Matrix order: sorted modules outer, the configured class order inner —
     // the loop's own order, no re-sort.
@@ -634,6 +636,35 @@ describe('hard ledger coverage matrix', () => {
     const after = ctx.hardLedger.openWork(root.agent)
     expect(after).toContain('cell src × sqli is suspicious: re-verify the declared sinks')
     expect(after).not.toContain('cell src × cmdi has no verdict')
+  })
+
+  it('names the valid matrix rows when refusing outside modules, and passes everything without a matrix', async () => {
+    const { ctx, root } = await harness()
+    // No armed matrix (mission not mounted, or a legacy log): every module passes.
+    ctx.hardLedger.markCoverage(root.agent, { module: 'anywhere', bugClass: 'cmdi', verdict: 'uncovered', declaredSinks: [] })
+    expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(1)
+
+    armMatrix(ctx, root)
+    expect(() => { ctx.hardLedger.assertModulesInMatrix(root.agent, ['src', 'poc']) })
+      .toThrow(`module "poc" is not in the armed coverage matrix; the matrix rows at commit ${'c'.repeat(40)} are: ., src, src/parser`)
+    expect(() => { ctx.hardLedger.assertModulesInMatrix(root.agent, ['poc', 'tmp']) })
+      .toThrow('modules "poc", "tmp" are not in the armed coverage matrix')
+    // Rows of the matrix, including the repository root, pass unchanged.
+    ctx.hardLedger.assertModulesInMatrix(root.agent, ['.', 'src', 'src/parser'])
+    ctx.hardLedger.markCoverage(root.agent, { module: '.', bugClass: 'sqli', verdict: 'uncovered', declaredSinks: [] })
+  })
+
+  it('bounds the valid-rows list in the rejection message', async () => {
+    const { ctx, root } = await harness()
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'd'.repeat(40),
+      modules: Array.from({ length: 14 }, (_, index) => `m${String(index).padStart(2, '0')}`),
+      bugClasses: ['cmdi'],
+    })
+    expect(() => { ctx.hardLedger.assertModulesInMatrix(root.agent, ['poc']) })
+      .toThrow(`the matrix rows at commit ${'d'.repeat(40)} are: m00, m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, …and 2 more`)
   })
 
   it('rejects invalid arming records with stable codes', async () => {

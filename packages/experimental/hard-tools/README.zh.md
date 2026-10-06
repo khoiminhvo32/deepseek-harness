@@ -44,7 +44,7 @@ kind: "package-reference"
 ### Design
 
 - **提交时验证。** `hard_submit_finding` 对 claim（PoC 必须打印的标记）与根因（去重键）做哈希，通过台账提出，然后等待 `hardVerifier.verify` 再作答；模型看到的是执行后的结论，而不是假设。工具描述传授 specificity 契约：从 `$1` 读取 payload、绝不硬编码，因为 harness 会用良性载荷重跑 PoC 并要求其失败。
-- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。
+- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。`hard_mark_coverage` 拒绝非武装矩阵行的模块并点名有效行；harness 重开或 fail-closed 审计给其单元显式标注 `source: 'harness'`，报告因此不会把模型自己给出的 `suspicious` 判定读作投机。
 
 ### Source map
 

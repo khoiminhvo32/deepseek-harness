@@ -208,7 +208,7 @@
     },
     {
       "name": "hard_mark_coverage",
-      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.",
+      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.",
       "parameters": {
         "type": "object",
         "properties": {

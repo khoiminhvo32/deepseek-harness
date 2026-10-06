@@ -76,9 +76,23 @@ writeHypothesis( agent: Agent, request: { id?: string; statement: string; status
 /**
  * Append one coverage cell verdict, replacing any prior verdict for the cell.
  * @param agent - the live agent whose session receives the record.
- * @param request - the cell coordinates, verdict, and declared sink sites.
+ * @param request - the cell coordinates, verdict, and declared sink sites; the module must be an armed matrix row when a matrix exists.
  */
 markCoverage(agent: Agent, request: HardCoverageCellData): void
+
+/**
+ * Reject modules outside the armed coverage matrix, naming the valid rows
+ * so the caller can correct its target list instead of guessing. A module
+ * the model invented — an untracked directory such as its own `poc/`
+ * scratch folder — is not a matrix row, so sweeping it is wasted steps and
+ * noise in the cell list. Without an armed matrix (the mission plugin is
+ * not mounted, or the log predates arming) every module passes — the
+ * merge-extensible default.
+ * @param agent - the live agent whose ledger matrix anchors the check.
+ * @param modules - the module names to validate.
+ * @throws `HARD_LEDGER_MODULE_NOT_IN_MATRIX` listing the offending modules and the bounded valid rows.
+ */
+assertModulesInMatrix(agent: Agent, modules: readonly string[]): void
 
 /**
  * Append one completed sweep summary. An empty sweep must cite verifiable

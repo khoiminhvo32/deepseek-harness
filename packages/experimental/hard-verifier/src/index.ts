@@ -182,12 +182,20 @@ export interface FlowCitationReject {
   readonly reason: string
 }
 
-/** Structural reopening record the cross-check produces for a failed audit. */
+/**
+ * Structural reopening record the cross-check produces for a failed audit.
+ * `source: 'harness'` is set explicitly, same as the confirmed branch's
+ * `evidence: 'demonstrated'`: the reopen is the one coverage decision the
+ * harness makes on its own, and attribution in the data is what lets
+ * consumers separate harness reopens from the model's own `suspicious`
+ * verdicts — a well-behaved model that found something is not gaming.
+ */
 export interface CoverageReopenRecord {
   readonly module: string
   readonly bugClass: string
   readonly verdict: 'suspicious'
   readonly declaredSinks: readonly string[]
+  readonly source: 'harness'
 }
 
 /**
@@ -366,7 +374,7 @@ export class HardVerifier extends Service {
       .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => line.includes(sink)))
       .slice(0, 8)
     if (missed.length === 0) return undefined
-    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed }
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
   }
 
   /**
@@ -405,7 +413,7 @@ export class HardVerifier extends Service {
       .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)))
       .slice(0, 8)
     if (missed.length === 0) return undefined
-    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed }
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
   }
 
   /**

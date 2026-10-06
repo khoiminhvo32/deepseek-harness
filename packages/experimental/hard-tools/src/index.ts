@@ -40,8 +40,10 @@ const HYPOTHESIS_DESCRIPTION = 'Propose a new hypothesis, or move an existing on
   + 'an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.'
 
 const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systematic pass: a module swept for one '
-  + 'bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol '
-  + 'references; the harness may re-grep the module against your declared list. '
+  + 'bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you '
+  + 'created yourself (such as a poc/ scratch folder) is refused. Most classes: cleared requires the concrete '
+  + 'sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against '
+  + 'your declared list. '
   + 'For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it '
   + 'exports, so cleared requires one declaration per exported operation — name the guard that protects it, '
   + 'or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any '
@@ -336,9 +338,12 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
         }
       }).catch((error: unknown) => {
         // Fail closed: a cross-check that could not run must not leave the
-        // cell standing cleared in the durable ledger.
+        // cell standing cleared in the durable ledger. The cell is
+        // harness-decided here, so it is attributed like a reopen.
         if (!(error instanceof HarnessError) || error.code !== 'HARD_VERIFIER_AUDIT_FAILED') throw error
-        ledger.markCoverage(agent, { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: [] })
+        ledger.markCoverage(agent, {
+          module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: [], source: 'harness',
+        })
         throw error
       })
     },
@@ -447,8 +452,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
     execute(args, exec) {
       const agent = exec.agent
       if (agent === undefined) throw new Error('hard_clear_modules requires a live agent')
-      const matrix = ledger.coverageMatrix(agent)
-      if (matrix === undefined) throw new Error('hard_clear_modules requires an armed coverage matrix')
+      if (ledger.coverageMatrix(agent) === undefined) throw new Error('hard_clear_modules requires an armed coverage matrix')
       if (ABSENCE_SINK_CLASSES.has(args.bug_class)) {
         throw new Error(`hard_clear_modules refuses ${args.bug_class}: its sinks are protective checks, so an `
           + 'empty grep means no guard was found, which is suspicious rather than clean; verify its cells '
@@ -460,11 +464,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       const modules = [...new Set(args.modules.filter((entry): entry is string => typeof entry === 'string'))]
       if (modules.length === 0) throw new Error('modules must list at least one module')
       if (modules.length > 50) throw new Error('modules must not exceed 50 entries per batch')
-      for (const module of modules) {
-        if (!matrix.modules.includes(module)) {
-          throw new Error(`modules entry ${module} is not an armed coverage module`)
-        }
-      }
+      ledger.assertModulesInMatrix(agent, modules)
       if (args.patterns.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
         throw new Error('patterns entries must be non-empty strings')
       }

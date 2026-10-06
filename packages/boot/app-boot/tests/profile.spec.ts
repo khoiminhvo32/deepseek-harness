@@ -406,7 +406,7 @@ describe('loadProfile', () => {
     })
   })
 
-  it.each(['missing package', 'invalid manifest', 'not a bundle', 'missing patch', 'invalid patch'])(
+  it.each(['invalid manifest', 'not a bundle', 'missing patch', 'invalid patch'])(
     'skips a bundle with %s, retains selections, and retries it on reread', async (failure) => {
       const anchor = stageInstallation({
         before: { patch: '- insert: [{ id: a, name: pkg-a }]\n' },
@@ -420,7 +420,6 @@ describe('loadProfile', () => {
       const manifestPath = join(bundleDir, 'package.json')
       const patchPath = join(bundleDir, 'cordis.patch.yml')
       const original = readFileSync(manifestPath, 'utf8')
-      if (failure === 'missing package') rmSync(bundleDir, { recursive: true })
       if (failure === 'invalid manifest') writeFileSync(manifestPath, '{')
       if (failure === 'not a bundle') writeFileSync(manifestPath, '{}')
       if (failure === 'missing patch') rmSync(patchPath)
@@ -440,7 +439,7 @@ describe('loadProfile', () => {
       expect(warn.mock.calls).toEqual([[`t: skipping profile bundle "broken": ${profile.skippedBundles[0]?.reason}\n`]])
       expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(saved)
       const resolution = await createRuntimeResolution({ installAnchor: anchor, profile, home })
-      const unavailable = failure === 'missing package' || failure === 'invalid manifest'
+      const unavailable = failure === 'invalid manifest'
       expect(resolution.entries.map(entry => entry.name))
         .toEqual(['dsh-app', 'before', ...unavailable ? [] : ['broken'], 'after'])
       mkdirSync(bundleDir, { recursive: true })
@@ -450,6 +449,20 @@ describe('loadProfile', () => {
         .toEqual(['before', 'broken', 'after'])
     },
   )
+
+  it('fails loud when a bundle resolves from neither the installation nor the profile directory', () => {
+    const anchor = stageInstallation({
+      before: { patch: '- insert: [{ id: a, name: pkg-a }]\n' },
+      after: { patch: '- id: a\n  config: { value: after }\n' },
+    })
+    const home = tmp()
+    const dir = resolveProfileDir('demo', home)
+    initProfile(dir, ['before', 'absent-bundle', 'after'])
+    // Skipping used to boot a paid session with the profile's plugins silently
+    // absent; a missing referent must stop the load instead.
+    expect(() => loadProfile('t', 'demo', anchor, home))
+      .toThrow('cannot resolve profile bundle "absent-bundle"')
+  })
 
   it('skips a bundle whose own dsh peers are incompatible until the profile exempts that exact pair', () => {
     const anchor = stageInstallation({

@@ -106,7 +106,7 @@ export interface Profile {
 export interface SkippedBundle {
   /** The bundle's package name from `dsh.profile.bundles`. */
   packageName: string
-  /** The resolution, manifest, compatibility, or patch-loading failure. */
+  /** The manifest, compatibility, or patch-loading failure; resolution failure throws instead. */
   reason: string
 }
 
@@ -724,8 +724,11 @@ export function resolveBundleDir(
  * the shared Harness home. This is used by application-owned profiles whose
  * package project and lifecycle belong to that application.
  * Retired bundles are removed from the stored bundle list first, rewriting the
- * manifest when it listed one. Unreadable bundles, and bundles whose own dsh peers the profile does not exempt, are skipped
- * without changing the manifest and listed in `skippedBundles`; nothing is printed.
+ * manifest when it listed one. A bundle the installation and the profile
+ * directory both fail to resolve throws: a missing referent cannot degrade
+ * into a silently plugin-less session. Unreadable bundle content, and bundles
+ * whose own dsh peers the profile does not exempt, are skipped without
+ * changing the manifest and listed in `skippedBundles`; nothing is printed.
  * @param binName - the diagnostic prefix on thrown errors.
  * @param dir - absolute profile package directory.
  * @param installAnchor - absolute path of the owning dsh app's package.json.
@@ -744,8 +747,12 @@ export function loadProfileDirectory(
   const skippedBundles: SkippedBundle[] = []
   const exemptions = bundles.length === 0 ? {} : readProfileVersionExemptions(dir)
   for (const packageName of bundles) {
+    // A bundle neither anchor can resolve is a missing referent, not a
+    // degraded bundle: continuing would run the session with the profile's
+    // plugins silently absent. Content failures below stay skippable — they
+    // cannot remove the profile's other layers.
+    const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
     try {
-      const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
       const bundleManifest = readProfileManifest(binName, packageDir)
       const bundle = bundleManifest.dsh?.bundle
       if (bundle === undefined) {
@@ -770,8 +777,9 @@ export function loadProfileDirectory(
 
 /**
  * Load a profile: resolve every `dsh.profile.bundles` entry to its patch
- * layer and parse the profile's own patch file. Unreadable or incompatible bundles
- * are skipped and listed in `skippedBundles`; profile manifest and user patch errors still throw.
+ * layer and parse the profile's own patch file. A bundle neither anchor
+ * resolves throws; unreadable or incompatible bundle content is skipped and
+ * listed in `skippedBundles`; profile manifest and user patch errors still throw.
  * @param binName - the diagnostic prefix on thrown errors.
  * @param name - the profile name.
  * @param installAnchor - absolute path of the dsh app's package.json (first resolution anchor).

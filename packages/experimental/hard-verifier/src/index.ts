@@ -115,6 +115,31 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`
 }
 
+/** The settled foreground fields the fail-closed grep guard reads. */
+interface GrepOutcome {
+  readonly timedOut: boolean
+  readonly aborted: boolean
+  readonly exitCode: number | null
+  readonly stderr: { readonly text: string }
+}
+
+/**
+ * Fail closed when a grep did not settle cleanly: an infrastructure error, a
+ * timeout, or an abort throws instead of reading as an evaluated result.
+ * @param result - the settled shell result of the grep run.
+ * @param what - the grepped subject, worded for the error message.
+ * @param code - the fail-closed error code to throw.
+ */
+function assertGrepSettled(result: GrepOutcome, what: string, code: string): void {
+  if (result.timedOut || result.aborted || (result.exitCode !== 0 && result.exitCode !== 1)) {
+    throw new HarnessError(
+      `hard ${what} failed with exit ${String(result.exitCode)}: `
+      + result.stderr.text.trim().slice(-400),
+      code,
+    )
+  }
+}
+
 /** Deterministically recompute the score and compare with the model's claim. */
 function recomputeCvss(proposed: HardFindingProposedData): { computed: number; match: boolean } {
   let computed: number
@@ -248,10 +273,14 @@ export class HardVerifier extends Service {
    * module path is always target-repo relative. Sampling follows the
    * configured spot-check percent by cell hash; an unsampled cell, a
    * non-cleared cell, a class without patterns, a missing matrix, or a grep
-   * without misses returns `undefined` and changes nothing.
+   * with no undeclared matches returns `undefined` and changes nothing. The
+   * check fails closed: a grep that errors, times out, or is aborted never
+   * reads as a clean cell.
    * @param agent - the live agent whose ledger matrix anchors the grep.
    * @param cell - the coverage cell the model just marked `cleared`.
    * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
+   * @throws `HARD_VERIFIER_AUDIT_FAILED` when the cross-check grep errors, times
+   *   out, or is aborted — an unevaluated grep is not evidence of absence.
    */
   async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined> {
     if (cell.verdict !== 'cleared') return undefined
@@ -262,14 +291,14 @@ export class HardVerifier extends Service {
     if (targetRepo === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
-      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)} 2>/dev/null || true`,
+      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)}`,
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
       workdir: targetRepo,
     })
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
-    if (result.timedOut || result.aborted || result.exitCode !== 0) return undefined
+    assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
     const missed = result.stdout.text.split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => line.includes(sink)))
@@ -329,13 +358,7 @@ export class HardVerifier extends Service {
     })
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
-    if (result.timedOut || result.aborted || (result.exitCode !== 0 && result.exitCode !== 1)) {
-      throw new HarnessError(
-        `hard screen: grep over ${modules.join(', ')} failed with exit ${String(result.exitCode)}: `
-        + result.stderr.text.trim().slice(-400),
-        'HARD_VERIFIER_SCREEN_FAILED',
-      )
-    }
+    assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
     const evidence = result.stdout.text.split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)

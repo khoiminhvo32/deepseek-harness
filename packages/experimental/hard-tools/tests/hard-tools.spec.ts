@@ -315,6 +315,30 @@ describe('hard_update_hypothesis and methodology tools', () => {
     ])
   })
 
+  it('marks the cell suspicious and fails the tool call when the cross-check grep errors', async () => {
+    const { ctx, root } = await harness(
+      { exitCode: 2, stdoutText: '' },
+      { runs: 1, coverageSpotCheckPercent: 100 },
+    )
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/db'],
+      bugClasses: ['cmdi'],
+    })
+    const failed = await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'cmdi', verdict: 'cleared',
+      declared_sinks: ['src/db/query.ts:42 rawQuery()'],
+    }, root.agent)
+    expect(failed.isError).toBe(true)
+    expect(failed.error?.info?.code).toBe('HARD_VERIFIER_AUDIT_FAILED')
+    // The just-marked clearance did not stand: the durable cell reads suspicious.
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([
+      expect.objectContaining({ verdict: 'suspicious', declaredSinks: [] }),
+    ])
+  })
+
   it('batch-clears modules the harness grep proves clean, as model-verified', async () => {
     const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
     ctx.hardLedger.recordMissionArmed(root.agent, {

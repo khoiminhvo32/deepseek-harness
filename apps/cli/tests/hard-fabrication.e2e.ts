@@ -61,6 +61,12 @@ describe('dsh --profile hard fabrication traps', () => {
       await mkdir(join(cwd, 'src'), { recursive: true })
       await writeFile(join(cwd, 'src', 'reports.js'), REPORTS_SOURCE)
       await writeFile(join(cwd, 'src', 'session.js'), SESSION_SOURCE)
+      // One notes-only module so the full inert chain runs for real: arming
+      // enumerates it, the ledger pre-verdicts its cells, and openWork never
+      // lists them. Not named docs — the default exclude globs drop that
+      // directory from the matrix before inert screening ever sees it.
+      await mkdir(join(cwd, 'notes'), { recursive: true })
+      await writeFile(join(cwd, 'notes', 'NOTES.md'), '# Hard target\n\nNotes only; this module screens inert in the coverage matrix.\n')
       // The target is a real git repository so the mission pins the commit and
       // enumerates the tracked modules at load time. Config isolation keeps a
       // developer's global gitconfig (autocrlf, gpgsign) out of the run.
@@ -139,7 +145,8 @@ describe('dsh --profile hard fabrication traps', () => {
 
       const sessionFiles = records(await readSessionLog(sessions))
       // The mission pinned the target and armed the coverage matrix from the
-      // tracked tree: both planted sources group into the single src module.
+      // tracked tree: both planted sources group into the src module while
+      // the notes module screens inert.
       const armed = sessionFiles.find(event => event.type === 'hard/mission/armed')?.data as {
         targetRepo: string
         commit: string
@@ -150,10 +157,11 @@ describe('dsh --profile hard fabrication traps', () => {
       expect(armed).toBeDefined()
       expect(armed?.targetRepo).toBe(cwd)
       expect(armed?.commit).toBe(commit)
-      expect(armed?.modules).toEqual(['src'])
+      expect(armed?.modules).toEqual(['notes', 'src'])
       expect(armed?.bugClasses.length).toBeGreaterThan(0)
-      // Every src file is JavaScript: nothing screens inert.
-      expect(armed?.inertModules).toEqual([])
+      // The notes module holds only Markdown, so it screens inert; the src
+      // files are all JavaScript and stay in the work surface.
+      expect(armed?.inertModules).toEqual(['notes'])
       // The stop gate steered the premature clean claim back to work.
       const steerings = sessionFiles.filter(event => event.type === 'user/message')
         .filter((event) => {

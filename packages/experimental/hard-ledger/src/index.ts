@@ -375,7 +375,9 @@ export class HardLedger extends Service {
 
   /**
    * Coverage progress over the matrix: matrix cells holding a verdict,
-   * of the whole matrix. Cells outside the matrix never count.
+   * of the whole matrix. Cells outside the matrix never count. A
+   * repository-scoped class is verdicted once for the whole repository, so
+   * its verdict lookup deliberately ignores the recorded cell's module.
    * @param agent - the live agent whose ledger state is read.
    * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
    */

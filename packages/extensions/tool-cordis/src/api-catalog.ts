@@ -1306,7 +1306,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'coverageProgress(agent: Agent): { verdicted: number; total: number }',
-        description: 'Coverage progress over the matrix: matrix cells holding a verdict, of the whole matrix. Cells outside the matrix never count.',
+        description: 'Coverage progress over the matrix: matrix cells holding a verdict, of the whole matrix. Cells outside the matrix never count. A repository-scoped class is verdicted once for the whole repository, so its verdict lookup deliberately ignores the recorded cell\'s module.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the verdicted count and the matrix cell total, `0/0` without a matrix.',
       },
@@ -1343,9 +1343,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>',
-        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. The grep runs from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, a missing matrix, or a grep without misses returns `undefined` and changes nothing.',
+        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. The grep runs from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, a missing matrix, or a grep with no undeclared matches returns `undefined` and changes nothing. The check fails closed: a grep that errors, times out, or is aborted never reads as a clean cell.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
         returns: 'the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.',
+        throws: ['`HARD_VERIFIER_AUDIT_FAILED` when the cross-check grep errors, times out, or is aborted — an unevaluated grep is not evidence of absence.'],
       },
       {
         signature: 'async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>',

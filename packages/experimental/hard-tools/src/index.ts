@@ -13,6 +13,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 export const name = 'hard-tools'
 export const inject = ['tools', 'hardLedger', 'hardVerifier']
@@ -240,6 +241,12 @@ export function apply(ctx: Context, _config: Config): void {
           coverage,
           reopenedSinks: reopened === undefined ? [] : [...reopened.declaredSinks],
         }
+      }).catch((error: unknown) => {
+        // Fail closed: a cross-check that could not run must not leave the
+        // cell standing cleared in the durable ledger.
+        if (!(error instanceof HarnessError) || error.code !== 'HARD_VERIFIER_AUDIT_FAILED') throw error
+        ledger.markCoverage(agent, { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: [] })
+        throw error
       })
     },
     presentCall: args => present(`Coverage ${args.module} x ${args.bug_class}: ${args.verdict}`, args.module),

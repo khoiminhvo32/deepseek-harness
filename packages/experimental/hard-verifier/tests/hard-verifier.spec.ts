@@ -357,7 +357,7 @@ describe('hard verifier coverage cross-check', () => {
     expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
   })
 
-  it('leaves the cell alone when every match was declared or the run failed', async () => {
+  it('leaves the cell alone when every match was declared or the grep found nothing', async () => {
     const declared = await harness(
       [{ exitCode: 0, stdoutText: 'src/auth/login.ts:10 system(cmd)\n' }],
       { coverageSpotCheckPercent: 100 },
@@ -365,9 +365,29 @@ describe('hard verifier coverage cross-check', () => {
     const declaredRoot = armMatrix(declared.ctx, '/tmp/hard-target')
     expect(await declared.ctx.hardVerifier.auditCoverage(declaredRoot, clearedCell)).toBeUndefined()
 
-    const failed = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
-    const failedRoot = armMatrix(failed.ctx, '/tmp/hard-target')
-    expect(await failed.ctx.hardVerifier.auditCoverage(failedRoot, clearedCell)).toBeUndefined()
+    const clean = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
+    const cleanRoot = armMatrix(clean.ctx, '/tmp/hard-target')
+    expect(await clean.ctx.hardVerifier.auditCoverage(cleanRoot, clearedCell)).toBeUndefined()
+  })
+
+  it('fails closed when the cross-check grep errors or times out', async () => {
+    const { ctx, shell } = await harness(
+      [
+        { exitCode: 2, stderrText: 'grep: brackets ([ ]) not balanced', stdoutText: '' },
+        { exitCode: null, timedOut: true, stdoutText: '' },
+      ],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const failed = await ctx.hardVerifier.auditCoverage(root, clearedCell).catch((error: unknown) => error)
+    expect((failed as { code?: string }).code).toBe('HARD_VERIFIER_AUDIT_FAILED')
+    expect((failed as Error).message).toContain('hard audit: grep over src/auth failed with exit 2')
+    const timedOut = await ctx.hardVerifier.auditCoverage(root, clearedCell).catch((error: unknown) => error)
+    expect((timedOut as { code?: string }).code).toBe('HARD_VERIFIER_AUDIT_FAILED')
+    // A masked grep reported exit 0 with empty output — the silent pass this
+    // check must never produce.
+    expect(shell.runs[0]?.command).not.toContain('|| true')
+    expect(shell.runs).toHaveLength(2)
   })
 
   it('validates the spot-check percent fail-loud', () => {

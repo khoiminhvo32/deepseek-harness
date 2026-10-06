@@ -1181,7 +1181,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-tools`
 
 - `inject`: `tools` · `hardLedger` · `hardVerifier`
-- `source`: [`packages/experimental/hard-tools/src/index.ts:21`](../packages/experimental/hard-tools/src/index.ts)
+- `source`: [`packages/experimental/hard-tools/src/index.ts:22`](../packages/experimental/hard-tools/src/index.ts)
 
 ```ts config-catalog
 /** Tool policy config; reserved for future thresholds. */

@@ -6,7 +6,7 @@ Experimental hard-harness services keep one long-running objective alive in a se
 
 ## Running the profile
 
-The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. Supply the objective and the target repository through a profile patch overriding the `hard-mission` row's `objective` and `target.repoPath` (the bundle ships blanks and fails the load until real values are set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`.
+The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. Supply the objective and the target repository through a profile patch overriding the `hard-mission` row's `objective` and `target.repoPath` (the bundle ships blanks and fails the load until real values are set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`; a cross-check grep that errors marks the cell `suspicious` and fails the tool call instead of passing it.
 
 ## Ledger state
 
@@ -122,7 +122,9 @@ coverageMatrix(agent: Agent): HardCoverageMatrix | undefined
 
 /**
  * Coverage progress over the matrix: matrix cells holding a verdict,
- * of the whole matrix. Cells outside the matrix never count.
+ * of the whole matrix. Cells outside the matrix never count. A
+ * repository-scoped class is verdicted once for the whole repository, so
+ * its verdict lookup deliberately ignores the recorded cell's module.
  * @param agent - the live agent whose ledger state is read.
  * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
  */
@@ -187,10 +189,14 @@ async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindi
  * module path is always target-repo relative. Sampling follows the
  * configured spot-check percent by cell hash; an unsampled cell, a
  * non-cleared cell, a class without patterns, a missing matrix, or a grep
- * without misses returns `undefined` and changes nothing.
+ * with no undeclared matches returns `undefined` and changes nothing. The
+ * check fails closed: a grep that errors, times out, or is aborted never
+ * reads as a clean cell.
  * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param cell - the coverage cell the model just marked `cleared`.
  * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
+ * @throws `HARD_VERIFIER_AUDIT_FAILED` when the cross-check grep errors, times
+ *   out, or is aborted — an unevaluated grep is not evidence of absence.
  */
 async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
 

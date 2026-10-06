@@ -65,7 +65,7 @@ None; the bundle adds no request content of its own.
 <a id="known-limitations-and-deferred-work"></a>
 
 - **Blank objective or target fails the load by design** — the shipped row carries `objective: ''` and `target.repoPath: ''`; a deployment that enables the bundle must supply both through its own patch.
-- **Headless-first** — the bundle composes plugins for CLI and headless profiles; Web/desktop presentation for hard sessions is deferred.
+- **Headless-first** — the bundle composes plugins for the CLI, headless, and `hard-web` profiles; Web presentation beyond generic tool cards for hard sessions is deferred.
 
 <a id="dev-note"></a>
 ### Dev Note

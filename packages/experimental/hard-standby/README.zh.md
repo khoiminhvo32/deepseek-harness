@@ -24,7 +24,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## Use this package
 
-在 headless hard 组合中与目标服务和 hard mission 一同挂载；stop gate 读取其 `hardStandby` 投影，在等待挂起期间让 turn 干净收场。
+在 hard 组合中与目标服务和 hard mission 一同挂载；stop gate 读取其 `hardStandby` 投影，在等待挂起期间让 turn 干净收场。
 
 ```yaml
 - id: hard-standby

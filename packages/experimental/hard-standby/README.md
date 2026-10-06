@@ -24,7 +24,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the plugin beside the goal service and the hard mission in headless hard-harness compositions; the stop gate reads its `hardStandby` projection to let turns close cleanly while a wait is pending.
+Mount the plugin beside the goal service and the hard mission in hard-harness compositions; the stop gate reads its `hardStandby` projection to let turns close cleanly while a wait is pending.
 
 ```yaml
 - id: hard-standby

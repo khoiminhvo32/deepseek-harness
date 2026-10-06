@@ -65,7 +65,7 @@ None; the bundle adds no request content of its own.
 <a id="known-limitations-and-deferred-work"></a>
 
 - **空白目标或目标仓库刻意导致加载失败** — 随附行携带 `objective: ''` 与 `target.repoPath: ''`；启用该组合包的部署必须通过自己的补丁提供两者。
-- **Headless 优先** — 该组合包面向 CLI 与 headless profile 组合插件；hard 会话的 Web/桌面呈现将推迟。
+- **Headless 优先** — 该组合包面向 CLI、headless 与 `hard-web` profile 组合插件；hard 会话除通用工具卡以外的 Web 呈现将推迟。
 
 <a id="dev-note"></a>
 ### 开发备注

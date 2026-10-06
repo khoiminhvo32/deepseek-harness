@@ -354,6 +354,9 @@ describe('loadProfile', () => {
     expect(PROFILE_TEMPLATES.hard).toEqual({
       bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-experimental-hard-bundle'],
     })
+    expect(PROFILE_TEMPLATES['hard-web']).toEqual({
+      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-experimental-hard-bundle'],
+    })
     loadProfile('t', 'web', anchor, home)
     expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
       .toEqual([...PROFILE_TEMPLATES.web?.bundles ?? []])

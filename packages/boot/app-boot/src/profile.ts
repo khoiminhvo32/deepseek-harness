@@ -189,6 +189,9 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
   hard: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-experimental-hard-bundle'],
   },
+  'hard-web': {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-experimental-hard-bundle'],
+  },
   sdk: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'],
   },

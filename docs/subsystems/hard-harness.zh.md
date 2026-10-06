@@ -6,7 +6,7 @@ Experimental hard-harness services keep one long-running objective alive in a se
 
 ## Running the profile
 
-The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. Supply the objective and the target repository through a profile patch overriding the `hard-mission` row's `objective` and `target.repoPath` (the bundle ships blanks and fails the load until real values are set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`; a cross-check grep that errors marks the cell `suspicious` and fails the tool call instead of passing it.
+The shipped `hard` profile stacks `dsh-base`, `dsh-headless`, and this bundle: `dsh --profile hard "<objective>"` arms the objective as the mission and keeps the session working until the goal completes. The `hard-web` profile stacks `dsh-base`, `dsh-web-app`, and this bundle instead, running the same hard stack inside the Web GUI composition. Supply the objective and the target repository through a profile patch overriding the `hard-mission` row's `objective` and `target.repoPath` (the bundle ships blanks and fails the load until real values are set). The verifier's coverage cross-check samples `cleared` cells per `coverageSpotCheckPercent` and reopens under-declared cells as `suspicious`; a cross-check grep that errors marks the cell `suspicious` and fails the tool call instead of passing it.
 
 ## Ledger state
 

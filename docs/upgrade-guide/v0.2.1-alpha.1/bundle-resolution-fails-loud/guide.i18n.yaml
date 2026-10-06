@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/bundle-resolution-fails-loud/guide.md
+/:
+  en: 9219f84819334447
+  zh: 25fcdedd841e4be9
+/unresolvable-profile-bundles-fail-the-load:
+  en: ee8f0392f393fa97
+  zh: 1910b6bf25338ce5
+/unresolvable-profile-bundles-fail-the-load/change:
+  en: 96c7760b2c722683
+  zh: 2d954f2e82f1dd17
+/unresolvable-profile-bundles-fail-the-load/migration:
+  en: 3f3e9018b1189593
+  zh: e3c4d462d2ef81e5

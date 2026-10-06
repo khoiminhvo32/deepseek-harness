@@ -711,6 +711,25 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr8-live">
+  <h2><span class="h2-index">15</span>PR8 live: completion gate — harness giữ quyền kết luận</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR8 (2026-10-06). Nguyên tắc §3.1: harness owns completion — model chỉ được đề xuất; quyền kết luận thuộc ledger assessment + stopgate veto. Không thêm điều kiện đếm finding (§3.2 thắng §8.6); một repo sạch PHẢI hoàn thành được.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>emptyProof → tham chiếu kiểm được</td><td><span class="chip pass">xong</span></td><td>hard_sweep_summary đổi từ chuỗi tự do sang <code>empty_proof_kind/id/module/bug_class</code>; ledger <code>assertEmptySweepProof</code> kiểm referent lúc ghi: hypothesis phải <code>refuted</code>; cell phải <code>cleared</code> + declaredSinks + source ≠ harness (máy sàng không chứng minh sweep đã làm việc). Persistence-safe: <code>emptyProofRef</code> là optional property ADDED — classifier xếp same-version — còn <code>emptyProof</code> string cũ giữ nguyên trong vocabulary cho log cũ (đổi kiểu trực tiếp sẽ đòi bump SESSION_FORMAT_VERSION toàn repo, v4→v5)</td></tr>
+      <tr><td>completionAssessment (ledger)</td><td><span class="chip pass">xong</span></td><td>3 điều kiện thuần ledger: openWork rỗng; trailing <code>emptySweepRun ≥ emptySweepsToFinish</code> (projection thêm <code>recentSweeps</code> window 16, stateVersion 3→4); sàn ≥1 cell model/model-verified HOẶC ≥1 hypothesis resolved (chặn repo 100% do máy sàng — "chưa audit gì", không phải "xong"). Blockers bounded 8 mục + "…more". <code>armedGoalId</code> từ armed record mới (<code>goalId</code> optional added, same-version)</td></tr>
+      <tr><td>Veto tools/pre-execute (stopgate)</td><td><span class="chip pass">xong</span></td><td>Waterfall listener: chỉ chặn <code>update_goal</code> + <code>action complete</code> + goal khớp <code>armedGoalId</code>; deny materialize blockers thành một mệnh lệnh "The mission is not complete. …; Resolve these, then mark the goal complete." — đóng luôn gap 1.3. Không steer trong hook (stopgate steer riêng ở turn-stopping). Config <code>emptySweepsToFinish</code> mặc định 2, 0–16. Test dùng tool registry + tool-goal THẬT qua open turn boundary — đổi tên tool ở dsh-base sẽ đỏ</td></tr>
+      <tr><td>hard/gate/decision (event)</td><td><span class="chip pass">xong</span></td><td>Append ở CẢ HAI nhánh (deny + allow): decision, openWorkCount, coverage {verdicted/total/bySource}, hypotheses {resolved/open}, findings {confirmed/refuted/flaky/pending}, emptySweeps, blockers. REPORT.md sau này chỉ là lớp render của event này. Persistence: record 2026-10-06-hard-completion-gate (73 roots / 15 records, cả 3 same-version)</td></tr>
+      <tr><td>Steering dùng openWork thật</td><td><span class="chip pass">xong</span></td><td>continuationOrder liệt kê open work từ ledger (bounded 8); khi openWork rỗng thì KHÔNG steer — completion là việc của gate, hướng thêm chỉ đốt round</td></tr>
+      <tr><td>Contract texts nói đúng sự thật</td><td><span class="chip pass">xong</span></td><td>missionContract: "Propose completion … the harness, not you, certifies it — an early attempt is denied with the exact remaining work"; stopgate continuationOrder + standby wakeOrder cùng tinh thần; armed record mang goalId để gate chỉ bắn cho goal của hard</td></tr>
+      <tr><td>Fixture + authored snapshot: deny → làm nốt → allow</td><td><span class="chip pass">xong</span></td><td>E2e + snapshot sang matrix <code>[cmdi, sqli]</code>, stopgate <code>emptySweepsToFinish: 1</code>, ledger <code>screenSpotCheckPercent: 0</code>; fixture gọi complete sớm (bị deny, marker "The mission is not complete.") → batch sqli → sweep emptyProofRef → get_goal lần 2 → complete (allow) → text kết. Authored re-author qua pipeline harvest-from-e2e (giữ temp dir bằng DSH_HARD_E2E_KEEP) + 2 override patches at 10/14 (fromRequest goal id)</td></tr>
+      <tr><td>Bug lộ ra: .gitignore thành module "."</td><td><span class="chip fix">fix</span></td><td>Snapshot runner seed .gitignore rồi <code>git add -A</code> → file infrastructure vào tracked set → armed matrix có module "." (2 cell thừa) → replay không khớp raw e2e (không .gitignore) → script exhausted call #17 vòng lặp. Fix: <code>git rm --cached .gitignore</code> trong git-repo setup — file hạ tầng không bao giờ là hàng ma trận. Debug nhờ script replay standalone giữ temp cwd</td></tr>
+      <tr><td>Gates cuối PR8</td><td><span class="chip pass">xong</span></td><td>148/148 hard specs (8 files) + e2e 1/1 + test:snapshot trừ stagehand (env) + doc-sync 42/42 + persistence 73 roots/15 records + pairing 878 + typecheck/lint/duplication 0. Commit theo subject: feat(experimental): completion gate — the harness keeps the final word</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

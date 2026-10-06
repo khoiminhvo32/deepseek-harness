@@ -1103,7 +1103,7 @@ export interface TargetConfig {
 ## `@deepseek-ai/dsh-experimental-hard-rounds`
 
 - `inject`: `agents` · `goals` · `hardLedger` · `sessionProjections`
-- `source`: [`packages/experimental/hard-rounds/src/index.ts:49`](../packages/experimental/hard-rounds/src/index.ts)
+- `source`: [`packages/experimental/hard-rounds/src/index.ts:53`](../packages/experimental/hard-rounds/src/index.ts)
 
 ```ts config-catalog
 /** Rounds module config. */
@@ -1120,6 +1120,14 @@ export interface Config {
    * config, but divergent values produce divergent cadence.
    */
   deepReadEveryN?: number
+  /**
+   * Trailing empty-verified sweeps the completion gate requires, used only to
+   * render the gate's remaining blockers in the round context. Keep it equal
+   * to the stopgate's `emptySweepsToFinish`; the two values are separate on
+   * purpose so the context can render without reading plugin config, but
+   * divergent values name divergent remaining work.
+   */
+  emptySweepsToFinish?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-rounds -->

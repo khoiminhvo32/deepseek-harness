@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-rounds` adds the hard-mission layer on top of the shipped goal-round driver. The driver owns reservation, revision fencing, and the goal-round cap; this plugin observes each admitted goal round and records a durable `hard/round/start` with the A/B rotation phase and the ledger's open-work count, injects a `<hard_round n/max>` context naming the phase instruction and the open work, cancels a turn at the `stepsPerRound` budget, and records `hard/round/end` when the round's turn closes.
+`dsh-experimental-hard-rounds` adds the hard-mission layer on top of the shipped goal-round driver. The driver owns reservation, revision fencing, and the goal-round cap; this plugin observes each admitted goal round and records a durable `hard/round/start` with the A/B rotation phase and the ledger's open-work count, injects a `<hard_round n/max>` context naming the phase instruction, the open work, and — once no open work stands — the completion gate's remaining blockers, cancels a turn at the `stepsPerRound` budget, and records `hard/round/end` when the round's turn closes.
 
 ## Table of Contents
 
@@ -35,9 +35,10 @@ Mount the plugin beside the goal service, the hard ledger, and `@deepseek-ai/dsh
   config:
     stepsPerRound: 200
     deepReadEveryN: 3
+    emptySweepsToFinish: 2
 ```
 
-`deepReadEveryN` rotates the methodology pass: one Phase B deep-reading round after every `deepReadEveryN` Phase A rounds. Keep it equal to the mission's `deepReadEveryN`; the two values are separate so the driver can rotate without reading another plugin's config, but divergent values produce divergent cadence. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-rounds) is the exhaustive source for every accepted field.
+`deepReadEveryN` rotates the methodology pass: one Phase B deep-reading round after every `deepReadEveryN` Phase A rounds. Keep it equal to the mission's `deepReadEveryN`; the two values are separate so the driver can rotate without reading another plugin's config, but divergent values produce divergent cadence. `emptySweepsToFinish` renders the completion gate's remaining blockers once no open work stands; keep it equal to the stopgate's `emptySweepsToFinish` for the same reason. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-rounds) is the exhaustive source for every accepted field.
 
 -----
 

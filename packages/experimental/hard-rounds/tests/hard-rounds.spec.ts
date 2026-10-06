@@ -149,6 +149,46 @@ describe('hard rounds accounting', () => {
     expect(root.injected[0]).toContain('2 coverage cell(s) have no verdict yet')
   })
 
+  it('names the gate blockers once no open work stands, instead of ordering work that no longer exists', async () => {
+    const { ctx, root } = await harness({ emptySweepsToFinish: 2 })
+    const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
+    // The inert screen pre-verdicts the only cell, so openWork is empty while
+    // the gate still owes the trailing sweeps and the model-audit floor.
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'find bugs',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['notes'],
+      bugClasses: ['cmdi'],
+      inertModules: ['notes'],
+    })
+
+    admitRound(root.agent, goal, 1)
+    await drain()
+    expect(root.injected[0]).toContain('Remaining before the harness can certify completion:')
+    expect(root.injected[0]).toContain('0 of 2 final sweeps are empty-verified')
+    expect(root.injected[0]).toContain('no model-audited coverage cell or resolved hypothesis exists yet')
+    expect(root.injected[0]).not.toContain('start the next coverage cell')
+
+    const id = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'the parser is pure', status: 'proposed' })
+    ctx.hardLedger.writeHypothesis(root.agent, {
+      id, statement: 'the parser is pure', status: 'refuted', reason: 'it coerces input',
+    })
+    for (const phase of ['A', 'B'] as const) {
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase, cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: id },
+      })
+    }
+    root.session.append('step/start', { turn: 1, step: 0 })
+    root.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await drain()
+
+    admitRound(root.agent, goal, 2)
+    await drain()
+    expect(root.injected[1]).toContain('The ledger reports no open work and the harness can certify completion')
+    expect(root.injected[1]).not.toContain('Remaining before the harness')
+  })
+
   it('rotates to the deep-reading phase after every N systematic rounds', async () => {
     expect(phaseFor(1, 3)).toBe('A')
     expect(phaseFor(3, 3)).toBe('A')

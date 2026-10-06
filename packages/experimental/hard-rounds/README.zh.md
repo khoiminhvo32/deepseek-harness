@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-rounds` 在随附的 goal-round driver 之上叠加 hard 任务层。driver 拥有预约、修订围栏与轮次上限；本插件观察每个被接纳的 goal 轮次，记录携带 A/B 轮换阶段与台账未完成工作计数的持久 `hard/round/start`，注入命名阶段指令与未完成工作的 `<hard_round n/max>` 上下文，在 `stepsPerRound` 预算处取消 turn，并在轮次的 turn 收尾时记录 `hard/round/end`。
+`dsh-experimental-hard-rounds` 在随附的 goal-round driver 之上叠加 hard 任务层。driver 拥有预约、修订围栏与轮次上限；本插件观察每个被接纳的 goal 轮次，记录携带 A/B 轮换阶段与台账未完成工作计数的持久 `hard/round/start`，注入命名阶段指令、未完成工作——以及在没有未完成工作时——完成门剩余阻塞项的 `<hard_round n/max>` 上下文，在 `stepsPerRound` 预算处取消 turn，并在轮次的 turn 收尾时记录 `hard/round/end`。
 
 ## 目录
 
@@ -35,9 +35,10 @@ kind: "package-reference"
   config:
     stepsPerRound: 200
     deepReadEveryN: 3
+    emptySweepsToFinish: 2
 ```
 
-`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
+`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。`emptySweepsToFinish` 在没有未完成工作时渲染完成门的剩余阻塞项；出于同样原因，保持它与 stopgate 的 `emptySweepsToFinish` 相等。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
 
 -----
 

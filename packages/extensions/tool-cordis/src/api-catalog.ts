@@ -1276,6 +1276,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['`HARD_LEDGER_MODULE_NOT_IN_MATRIX` listing the offending modules and the bounded valid rows.'],
       },
       {
+        signature: 'assertClearableModules(agent: Agent, modules: readonly string[]): void',
+        description: 'Reject `cleared` verdicts on inert modules. The harness already screened an inert module as carrying no code, so its cells stand as harness verdicts — a model `cleared` there is redundant work, not diligence. A `suspicious` verdict still passes: if the model really saw something in a module this size, that signal must not be blocked.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the inert screen.' }, { name: 'modules', description: 'the module names a `cleared` verdict is about to record.' }],
+        throws: ['`HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.'],
+      },
+      {
         signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
         description: 'Append one completed sweep summary. An empty sweep must cite verifiable evidence the ledger can check — a refuted hypothesis, a model-cleared cell with declared sinks, or a recorded flow document with resolvable citations; a harness-screened cell cannot prove a sweep did work. A sweep with findings carries no proof. The legacy free-text `emptyProof` is only read from older logs; new records carry `emptyProofRef` or `emptyProofFlowDoc`.',
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the sweep phase, counters, and conditional empty proof.' }],
@@ -1298,8 +1304,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one record per proposal in id order.',
       },
       {
-        signature: 'refutationBreakdown(agent: Agent): { readonly byCause: Readonly<Record<string, number>> /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */ readonly protocolFailures: number /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */ readonly genuineRefutations: number /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */ readonly infrastructure: number }',
-        description: 'Decompose the refuted verdicts by cause code, so one run can say whether it failed at the protocol layer or the target layer.',
+        signature: 'refutationBreakdown(agent: Agent): RefutationBreakdown',
+        description: 'Decompose the refuted verdicts by cause code, so one run can say whether it failed at the protocol layer or the target layer. The math lives in `refutationBreakdownFromState` — the same function the pilot report reads after folding the log.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger holds the findings.' }],
         returns: 'refuted-verdict counts per cause plus the reading groups; a refuted verdict predating the cause codes counts under `unattributed` in `byCause` and in no group.',
       },
@@ -1323,7 +1329,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'emptySweepRun(agent: Agent): number',
-        description: 'Consecutive empty-verified sweep summaries ending at the latest one. Proof validity is a record-time invariant, so `newFindings === 0` is the whole predicate here.',
+        description: 'Consecutive empty-verified sweep summaries ending at the latest one. Proof validity is a record-time invariant, so `newFindings === 0` is the whole predicate here. The math lives in `emptySweepRunFromState`.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the trailing run length, bounded by the projection\'s sweep window.',
       },
@@ -1334,8 +1340,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the armed goal id, or `undefined` without an attributed arming record.',
       },
       {
-        signature: 'completionAssessment(agent: Agent): { complete: boolean blockers: readonly string[] }',
-        description: 'Whether the harness certifies the mission complete. Every condition reads ledger state; none counts findings (a finding quota would pressure fabrication — a clean repository must complete). The conditions: no open work, the trailing sweep window all empty-verified (the threshold is this service\'s `emptySweepsToFinish` config, so every consumer reads one answer), and at least one model-audited coverage cell or resolved hypothesis so a fully harness-screened repository reads as "nothing audited yet", not "done".',
+        signature: 'completionAssessment(agent: Agent): CompletionAssessment',
+        description: 'Whether the harness certifies the mission complete. Every condition reads ledger state; none counts findings (a finding quota would pressure fabrication — a clean repository must complete). The conditions: no open work, the trailing sweep window all empty-verified (the threshold is this service\'s `emptySweepsToFinish` config, so every consumer reads one answer), and at least one model-audited coverage cell or resolved hypothesis so a fully harness-screened repository reads as "nothing audited yet", not "done". The math lives in `completionAssessmentFromState`, shared with the projection\'s wire view.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the verdict plus the bounded blockers, phrased to serve directly as the denial reason.',
       },
@@ -1346,26 +1352,26 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the matrix axes and pinned target, or `undefined` when no arming record exists (legacy log, or the mission plugin is not mounted).',
       },
       {
-        signature: 'coverageProgress(agent: Agent): { verdicted: number; total: number }',
-        description: 'Coverage progress over the matrix: matrix cells holding a verdict, of the whole matrix. Cells outside the matrix never count. A repository-scoped class is verdicted once for the whole repository, so its verdict lookup deliberately ignores the recorded cell\'s module.',
+        signature: 'coverageProgress(agent: Agent): CoverageProgress',
+        description: 'Coverage progress over the matrix: matrix cells holding a verdict, of the whole matrix. Cells outside the matrix never count. A repository-scoped class is verdicted once for the whole repository, so its verdict lookup deliberately ignores the recorded cell\'s module. The math lives in `coverageProgressFromState` — the same function the pilot report reads after folding the log.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the verdicted count and the matrix cell total, `0/0` without a matrix.',
       },
       {
         signature: 'uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]',
-        description: 'Matrix cells that still need the model, in matrix order: sorted modules outer, the configured class order inner, then repository-scoped cells under the `.` module. Inert modules carry no module-class surface and are never listed; a repository-scoped class is listed once, not per module.',
+        description: 'Matrix cells that still need the model, in matrix order: sorted modules outer, the configured class order inner, then repository-scoped cells under the `.` module. Inert modules carry no module-class surface and are never listed; a repository-scoped class is listed once, not per module. The math lives in `uncoveredCellsFromState`.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'one entry per uncovered matrix cell, empty without a matrix.',
       },
       {
-        signature: 'coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number }',
-        description: 'Verdicted matrix cells partitioned by who decided them: the model\'s own reads, batch clears the harness grep confirmed, and the purely mechanical inert-module screen. A cell carrying no source reads as `model`, so older logs partition unchanged.',
+        signature: 'coverageBySource(agent: Agent): CoverageBySource',
+        description: 'Verdicted matrix cells partitioned by who decided them: the model\'s own reads, batch clears the harness grep confirmed, and the purely mechanical inert-module screen. A cell carrying no source reads as `model`, so older logs partition unchanged. The math lives in `coverageBySourceFromState` — the same function the pilot report reads after folding the log.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the three counts; all zero without a matrix.',
       },
       {
         signature: 'openWork(agent: Agent): string[]',
-        description: 'Model-facing open work summary: pending verifications, unresolved states, coverage cells that still owe work, and batch-cleared cells the deterministic screen spot-check sends back for a manual re-read.',
+        description: 'Model-facing open work summary: pending verifications, unresolved states, coverage cells that still owe work, and batch-cleared cells the deterministic screen spot-check sends back for a manual re-read. The math lives in `openWorkFromState`.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'bounded human-readable work items, empty when nothing is open.',
       },
@@ -5005,6 +5011,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CompactionTrigger = \'pressure\' | \'context-overflow\';',
   },
   {
+    name: 'CompletionAssessment',
+    declaration: 'export type CompletionAssessment = {\n    complete: boolean;\n    blockers: readonly string[];\n};',
+  },
+  {
     name: 'CompositionRowEnablement',
     declaration: 'export type CompositionRowEnablement = boolean | \'conditional\';',
   },
@@ -5175,6 +5185,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CoverageAuditCell',
     declaration: 'export interface CoverageAuditCell {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: \'cleared\' | \'suspicious\' | \'uncovered\';\n    readonly declaredSinks: readonly string[];\n}',
+  },
+  {
+    name: 'CoverageBySource',
+    declaration: 'export type CoverageBySource = {\n    model: number;\n    modelVerified: number;\n    harness: number;\n};',
+  },
+  {
+    name: 'CoverageProgress',
+    declaration: 'export type CoverageProgress = {\n    verdicted: number;\n    total: number;\n};',
   },
   {
     name: 'CoverageReopenRecord',
@@ -6575,6 +6593,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RedactedSecret',
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
+  },
+  {
+    name: 'RefutationBreakdown',
+    declaration: 'export type RefutationBreakdown = {\n    readonly byCause: Readonly<Record<string, number>>;\n    readonly protocolFailures: number;\n    readonly genuineRefutations: number;\n    readonly infrastructure: number;\n};',
   },
   {
     name: 'Registry',

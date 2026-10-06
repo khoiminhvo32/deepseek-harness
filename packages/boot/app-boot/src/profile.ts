@@ -219,6 +219,17 @@ const RETIRED_BUNDLES: ReadonlySet<string> = new Set([
 export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@deepseek-ai/dsh-base']
 
 /**
+ * Experimental bundles a shipped template selects, read by name by the
+ * default-product isolation gate. The gate refuses experimental packages
+ * everywhere else; these are the declared exceptions — each backs an opt-in
+ * profile someone asks for by name (`hard`, `hard-web`), never a default
+ * installation.
+ */
+export const TEMPLATE_EXPERIMENTAL_BUNDLES: ReadonlySet<string> = new Set([
+  '@deepseek-ai/dsh-experimental-hard-bundle',
+])
+
+/**
  * The bundles the dsh installation ships for a person to switch on: each a
  * runtime dependency of the installation that declares `dsh.bundle.patch`,
  * an `icon`, and `./locale/*.json` display metadata, selected by no shipped

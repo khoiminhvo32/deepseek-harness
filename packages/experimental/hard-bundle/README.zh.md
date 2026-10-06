@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-启用这个可选组合包会以单一层挂载全部九个 hard 插件：`hard-ledger` 拥有持久的 findings、假设与覆盖记录，`hard-verifier` 执行 findings 的效果证明并重算其 CVSS 4.0 分数，`hard-tools` 是面向模型的外表，`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要，`hard-rounds` 以 A/B 轮换记录轮次账目，`hard-deepread` 拥有深读契约。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。
+启用这个可选组合包会以单一层挂载全部九个 hard 插件：`hard-ledger` 拥有持久的 findings、假设与覆盖记录，`hard-verifier` 执行 findings 的效果证明并重算其 CVSS 4.0 分数，`hard-tools` 是面向模型的外表，`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要，`hard-rounds` 以 A/B 轮换记录轮次账目，`hard-deepread` 拥有深读契约。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。Web 覆盖面板随同层携带，在 `hard-web` 之外保持禁用。
 
 ## 目录
 

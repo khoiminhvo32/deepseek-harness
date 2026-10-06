@@ -9,7 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { applyHardLedgerProjection, coverageBySourceFromState, coverageProgressFromState, emptyHardLedgerState, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, coverageBySourceFromState, coverageProgressFromState, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -890,5 +890,34 @@ describe('hard ledger aggregates over folded state', () => {
       genuineRefutations: 0,
       infrastructure: 0,
     })
+  })
+
+  it('publishes the client wire view: schema-validated matrix, cells, aggregates, and gate', () => {
+    const definition = hardLedgerProjectionDefinition()
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['data/manuals', 'src'], bugClasses: ['cmdi'], inertModules: ['data/manuals'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] } },
+      // Off-matrix and legacy cells stay out of the client's cell list.
+      { type: 'hard/coverage/cell', data: { module: 'poc', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['x'], source: 'model-verified' } },
+    ])
+    const view = definition.wire.view(state)
+    // The view schema round-trips: the wire value is what the client store publishes.
+    expect(definition.wire.viewSchema.parse(view)).toEqual(view)
+    expect(view.matrix).toEqual({
+      modules: ['data/manuals', 'src'], bugClasses: ['cmdi'], inertModules: ['data/manuals'],
+      targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+    })
+    expect(view.cells).toEqual([{ module: 'src', bugClass: 'cmdi', verdict: 'cleared', source: undefined }])
+    expect(view.progress).toEqual({ verdicted: 2, total: 2 })
+    expect(view.bySource).toEqual({ model: 1, modelVerified: 0, harness: 1 })
+    // The gate comes from the same assessment the service reports.
+    expect(view.gate.complete).toBe(false)
+    expect(view.gate.blockers.length).toBeGreaterThan(0)
   })
 })

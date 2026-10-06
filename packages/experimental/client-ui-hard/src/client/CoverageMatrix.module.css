@@ -1,0 +1,159 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 12px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.progress {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.target {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--dsw-alias-label-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gate {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.gateOk {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.gateBlocked {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.blockers {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.scroll {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.grid {
+  border-collapse: collapse;
+}
+
+.moduleHead,
+.classHead {
+  padding: 2px 6px 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.moduleCell {
+  padding: 2px 10px 2px 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cellSlot {
+  padding: 1px;
+}
+
+.cell {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+/* Cleared by the model's own read: the business tint. */
+.model {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
+}
+
+/* Cleared by the harness-verified batch grep: the success tint. */
+.model-verified {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, transparent);
+}
+
+/* Harness screen (inert modules): the neutral fill. */
+.harness {
+  background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 45%, transparent);
+}
+
+/* Reopened by the harness cross-check: the error tint. */
+.suspicious-harness {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 55%, transparent);
+}
+
+/* Suspicious by the model's own call: the warn tint. */
+.suspicious-model {
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 60%, transparent);
+}
+
+/* No verdict yet. */
+.uncovered {
+  border: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  padding-top: 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+
+.legend .cell {
+  width: 10px;
+  height: 10px;
+  margin-left: 8px;
+}
+
+.legend .cell:first-child {
+  margin-left: 0;
+}

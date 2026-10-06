@@ -12,6 +12,18 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import {
+  completionAssessmentFromState,
+  coverageBySourceFromState,
+  coverageProgressFromState,
+  DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+  DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
+  emptySweepRunFromState,
+  openWorkFromState,
+  refutationBreakdownFromState,
+  uncoveredCellsFromState,
+} from './aggregate.ts'
+import type { CompletionAssessment, CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
 import type {
   HardCoverageCellData,
   HardCoverageSource,
@@ -30,9 +42,6 @@ import type {
 } from './types.ts'
 import type { HardCoverageMatrix, HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
 import { hardLedgerProjectionDefinition } from './projection.ts'
-import { coverageBySourceFromState, coverageProgressFromState, refutationBreakdownFromState } from './aggregate.ts'
-import type { CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
-import { cellSampledForPercent, classScope } from './scope.ts'
 import './domain.ts'
 
 export type {
@@ -52,6 +61,7 @@ export type {
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
+  HardLedgerClientView,
   HardMissionArmedData,
   HardSweepSummaryData,
   HardVerdict,
@@ -59,12 +69,17 @@ export type {
 export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition, hardLedgerStateSchema } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 export {
+  completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
+  emptySweepRunFromState,
   matrixCellsFromState,
+  openWorkFromState,
   refutationBreakdownFromState,
+  uncoveredCellsFromState,
 } from './aggregate.ts'
-export type { CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
+export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
+export type { CompletionAssessment, CoverageBySource, CoverageProgress, LedgerThresholds, RefutationBreakdown } from './aggregate.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -93,12 +108,6 @@ export interface Config {
    */
   emptySweepsToFinish?: number
 }
-
-/** Default share of screened cells the openWork re-read sends back. */
-export const DEFAULT_SCREEN_SPOT_CHECK_PERCENT = 5
-
-/** Default number of trailing sweeps the completion assessment requires. */
-export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
 
 /** Schemastery config for the ledger service. */
 export const Config: z<Config> = z.object({
@@ -152,7 +161,7 @@ export class HardLedger extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'hardLedger')
     this.resolved = resolveConfig(config)
-    ctx.sessionProjections.register(hardLedgerProjectionDefinition)
+    ctx.sessionProjections.register(hardLedgerProjectionDefinition(this.resolved))
   }
 
   /**
@@ -632,18 +641,12 @@ export class HardLedger extends Service {
   /**
    * Consecutive empty-verified sweep summaries ending at the latest one.
    * Proof validity is a record-time invariant, so `newFindings === 0` is the
-   * whole predicate here.
+   * whole predicate here. The math lives in `emptySweepRunFromState`.
    * @param agent - the live agent whose ledger state is read.
    * @returns the trailing run length, bounded by the projection's sweep window.
    */
   emptySweepRun(agent: Agent): number {
-    const recent = [...this.state(agent.session).recentSweeps].reverse()
-    let run = 0
-    for (const sweep of recent) {
-      if (sweep.newFindings !== 0) break
-      run += 1
-    }
-    return run
+    return emptySweepRunFromState(this.state(agent.session))
   }
 
   /**
@@ -665,34 +668,13 @@ export class HardLedger extends Service {
    * service's `emptySweepsToFinish` config, so every consumer reads one
    * answer), and at least one model-audited coverage cell or resolved
    * hypothesis so a fully harness-screened repository reads as "nothing
-   * audited yet", not "done".
+   * audited yet", not "done". The math lives in
+   * `completionAssessmentFromState`, shared with the projection's wire view.
    * @param agent - the live agent whose ledger state is read.
    * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
    */
-  completionAssessment(agent: Agent): {
-    complete: boolean
-    blockers: readonly string[]
-  } {
-    const blockers: string[] = []
-    const work = this.openWork(agent)
-    if (work.length > 0) {
-      blockers.push(...work.slice(0, HARD_BLOCKER_LIMIT))
-      if (work.length > HARD_BLOCKER_LIMIT) blockers.push(`…and ${work.length - HARD_BLOCKER_LIMIT} more open item(s)`)
-    }
-    const emptySweepsToFinish = this.resolved.emptySweepsToFinish
-    if (emptySweepsToFinish > 0) {
-      const trailing = this.emptySweepRun(agent)
-      if (trailing < emptySweepsToFinish) {
-        blockers.push(`${trailing} of ${emptySweepsToFinish} final sweeps are empty-verified`)
-      }
-    }
-    const bySource = this.coverageBySource(agent)
-    const resolved = this.hypotheses(agent)
-      .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
-    if (bySource.model === 0 && bySource.modelVerified === 0 && resolved === 0) {
-      blockers.push('no model-audited coverage cell or resolved hypothesis exists yet')
-    }
-    return { complete: blockers.length === 0, blockers }
+  completionAssessment(agent: Agent): CompletionAssessment {
+    return completionAssessmentFromState(this.state(agent.session), this.resolved)
   }
 
   /**
@@ -724,30 +706,12 @@ export class HardLedger extends Service {
    * outer, the configured class order inner, then repository-scoped cells
    * under the `.` module. Inert modules carry no module-class surface and are
    * never listed; a repository-scoped class is listed once, not per module.
+   * The math lives in `uncoveredCellsFromState`.
    * @param agent - the live agent whose ledger state is read.
    * @returns one entry per uncovered matrix cell, empty without a matrix.
    */
   uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[] {
-    const state = this.state(agent.session)
-    const matrix = state.matrix
-    if (matrix === undefined) return []
-    const inert = new Set(matrix.inertModules ?? [])
-    const verdicted = new Set(this.coverage(agent).map(cell => `${cell.module}\u0000${cell.bugClass}`))
-    const uncovered: { module: string; bugClass: string }[] = []
-    for (const module of matrix.modules) {
-      if (inert.has(module)) continue
-      for (const bugClass of matrix.bugClasses) {
-        if (classScope(bugClass) === 'module' && !verdicted.has(`${module}\u0000${bugClass}`)) {
-          uncovered.push({ module, bugClass })
-        }
-      }
-    }
-    for (const bugClass of matrix.bugClasses) {
-      if (classScope(bugClass) === 'repo' && !this.coverage(agent).some(cell => cell.bugClass === bugClass)) {
-        uncovered.push({ module: '.', bugClass })
-      }
-    }
-    return uncovered
+    return uncoveredCellsFromState(this.state(agent.session))
   }
 
   /**
@@ -766,39 +730,13 @@ export class HardLedger extends Service {
   /**
    * Model-facing open work summary: pending verifications, unresolved
    * states, coverage cells that still owe work, and batch-cleared cells the
-   * deterministic screen spot-check sends back for a manual re-read.
+   * deterministic screen spot-check sends back for a manual re-read. The
+   * math lives in `openWorkFromState`.
    * @param agent - the live agent whose ledger state is read.
    * @returns bounded human-readable work items, empty when nothing is open.
    */
   openWork(agent: Agent): string[] {
-    const work: string[] = []
-    for (const record of this.state(agent.session).findings) {
-      if (record.verdict === undefined) work.push(`finding ${record.proposed.id} awaits verification`)
-      if (record.verdict?.verdict === 'flaky') {
-        work.push(`finding ${record.proposed.id} is flaky: ${record.verdict.reason}`)
-      }
-    }
-    for (const hypothesis of this.state(agent.session).hypotheses) {
-      if (hypothesis.status === 'proposed' || hypothesis.status === 'testing' || hypothesis.status === 'deferred') {
-        work.push(`hypothesis ${hypothesis.id} is ${hypothesis.status}`)
-      }
-    }
-    const uncovered = this.uncoveredCells(agent)
-    if (uncovered.length > 0) {
-      work.push(`${uncovered.length} coverage cell(s) have no verdict yet`)
-      for (const cell of uncovered.slice(0, 5)) {
-        work.push(`cell ${cell.module} × ${cell.bugClass} has no verdict`)
-      }
-    }
-    for (const cell of this.coverage(agent)) {
-      if (cell.verdict === 'suspicious') {
-        work.push(`cell ${cell.module} × ${cell.bugClass} is suspicious: re-verify the declared sinks`)
-      }
-      if (cell.source === 'model-verified' && cellSampledForPercent(cell, this.resolved.screenSpotCheckPercent)) {
-        work.push(`cell ${cell.module} × ${cell.bugClass} was batch-cleared; verify the mechanical screen`)
-      }
-    }
-    return work
+    return openWorkFromState(this.state(agent.session), this.resolved)
   }
 
   /** Read the projection state for one agent's session. */

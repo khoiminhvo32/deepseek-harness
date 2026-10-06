@@ -23,3 +23,10 @@
       name: '@deepseek-ai/dsh-experimental-hard-rounds'
     - id: hard-deepread
       name: '@deepseek-ai/dsh-experimental-hard-deepread'
+    # The browser coverage panel rides this same bundle so hard-web needs no
+    # extra layer, but a headless `hard` composition must not mount a client
+    # UI — the profileContext check disables the row there instead of
+    # splitting a second bundle whose only difference would be this row.
+    - id: ui-hard
+      name: '@deepseek-ai/dsh-experimental-client-ui-hard'
+      disabled: !!js "ctx.get('profileContext')?.name !== 'hard-web'"

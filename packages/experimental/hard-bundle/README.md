@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Enable this optional bundle to mount all nine hard plugins as one layer: `hard-mission` arms the configured objective as a durable session goal, `hard-stopgate` steers the turn boundary back to work while that goal stands, `hard-standby` waits out terminal quota failures and wakes the mission at the reset time, and `hard-handoff` injects the durable ledger summary after each successful compaction. The bundle ships with a blank objective and a blank target repo path, and fails the load until the deployment supplies both through its own patch.
+Enable this optional bundle to mount all nine hard plugins as one layer: `hard-mission` arms the configured objective as a durable session goal, `hard-stopgate` steers the turn boundary back to work while that goal stands, `hard-standby` waits out terminal quota failures and wakes the mission at the reset time, and `hard-handoff` injects the durable ledger summary after each successful compaction. The bundle ships with a blank objective and a blank target repo path, and fails the load until the deployment supplies both through its own patch. The Web coverage panel rides the same layer, disabled outside `hard-web`.
 
 ## Table of Contents
 

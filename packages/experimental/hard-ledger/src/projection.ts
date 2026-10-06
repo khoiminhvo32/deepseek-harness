@@ -9,10 +9,20 @@
 
 import { z as zod } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
+import {
+  completionAssessmentFromState,
+  coverageBySourceFromState,
+  coverageProgressFromState,
+  matrixCellsFromState,
+  DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+  DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
+} from './aggregate.ts'
+import type { LedgerThresholds } from './aggregate.ts'
 import type {
   HardEmptySweepProof,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardLedgerClientView,
 } from './types.ts'
 
 /** Sweep summaries the trailing-empty-sweep condition looks back over. */
@@ -208,26 +218,112 @@ export function emptyHardLedgerState(): HardLedgerProjectionState {
 /** The coverage matrix folded from the mission arming record, when one exists. */
 export type HardCoverageMatrix = NonNullable<HardLedgerProjectionState['matrix']>
 
-/** The host-only projection unit registered by the hard-ledger service. */
-export const hardLedgerProjectionDefinition = {
-  key: 'hardLedger',
-  stateSchema: hardLedgerStateSchema,
-  init: (): HardLedgerProjectionState => ({
-    findings: [],
-    hypotheses: [],
-    coverage: [],
-    sweeps: { A: 0, B: 0 },
-    recentSweeps: [],
-    failure: null,
+/** The wire schema of the client view; strict so a drifted summary fails loud. */
+const clientViewSchema = zod.object({
+  matrix: zod.object({
+    modules: zod.array(zod.string()),
+    bugClasses: zod.array(zod.string()),
+    inertModules: zod.array(zod.string()).optional(),
+    targetRepo: zod.string(),
+    commit: zod.string(),
+  }).optional(),
+  cells: zod.array(zod.object({
+    module: zod.string(),
+    bugClass: zod.string(),
+    verdict: zod.enum(['cleared', 'suspicious', 'uncovered']),
+    source: zod.enum(['model', 'model-verified', 'harness']).optional(),
+  })),
+  progress: zod.object({
+    verdicted: zod.number().int().min(0),
+    total: zod.number().int().min(0),
   }),
-  apply: applyHardLedgerProjection,
-  // Version 4 changes the empty-sweep proof from free text to a verifiable
-  // reference and adds the bounded sweep window plus the armed goal id; the
-  // bump forces a full log rebuild so both recover on resume. The flow
-  // documents added after it fold into an optional state field, so no
-  // rebuild is required.
-  stateVersion: 4,
-} satisfies ProjectionDefinition<'hardLedger', HardLedgerProjectionState>
+  bySource: zod.object({
+    model: zod.number().int().min(0),
+    modelVerified: zod.number().int().min(0),
+    harness: zod.number().int().min(0),
+  }),
+  gate: zod.object({
+    complete: zod.boolean(),
+    blockers: zod.array(zod.string()),
+  }),
+}).strict() as zod.ZodType<HardLedgerClientView>
+
+/**
+ * Build the client view of one folded state. Deliberately unmemoized: every
+ * `hard/*` event changes some field the view carries, so a reused-reference
+ * optimization would only save a 32-cell object per event.
+ * @param state - the folded ledger projection state.
+ * @param thresholds - the ledger's spot-check percent and trailing-sweep requirement, shared with the service.
+ * @returns the summary the client store publishes under `hardLedger`.
+ */
+function buildHardLedgerView(state: HardLedgerProjectionState, thresholds: LedgerThresholds): HardLedgerClientView {
+  const matrix = state.matrix
+  return {
+    ...(matrix === undefined ? {} : {
+      matrix: {
+        modules: [...matrix.modules],
+        bugClasses: [...matrix.bugClasses],
+        ...(matrix.inertModules === undefined ? {} : { inertModules: [...matrix.inertModules] }),
+        targetRepo: matrix.targetRepo,
+        commit: matrix.commit,
+      },
+    }),
+    cells: matrixCellsFromState(state).map(cell => ({
+      module: cell.module,
+      bugClass: cell.bugClass,
+      verdict: cell.verdict,
+      ...(cell.source === undefined ? {} : { source: cell.source }),
+    })),
+    progress: coverageProgressFromState(state),
+    bySource: coverageBySourceFromState(state),
+    gate: completionAssessmentFromState(state, thresholds),
+  }
+}
+
+/** The registered hard-ledger projection: the fold plus its required client wire view. */
+export type HardLedgerProjectionDefinition = Omit<
+  ProjectionDefinition<'hardLedger', HardLedgerProjectionState>,
+  'wire'
+> & {
+  wire: {
+    viewSchema: zod.ZodType<HardLedgerClientView>
+    view: (state: HardLedgerProjectionState) => HardLedgerClientView
+  }
+}
+
+/**
+ * The hard-ledger projection unit registered by the hard-ledger service.
+ * The thresholds parameterize the gate blockers the wire view carries, and
+ * the service passes its resolved config so the panel reads one answer; the
+ * defaults exist so direct unit tests fold without constructing a service.
+ * @param thresholds - the ledger's screen spot-check percent and trailing-sweep requirement.
+ * @returns the projection definition with its client wire view.
+ */
+export function hardLedgerProjectionDefinition(thresholds: LedgerThresholds = {
+  screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
+  emptySweepsToFinish: DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+}): HardLedgerProjectionDefinition {
+  return {
+    key: 'hardLedger',
+    stateSchema: hardLedgerStateSchema,
+    init: (): HardLedgerProjectionState => ({
+      findings: [],
+      hypotheses: [],
+      coverage: [],
+      sweeps: { A: 0, B: 0 },
+      recentSweeps: [],
+      failure: null,
+    }),
+    apply: applyHardLedgerProjection,
+    wire: { viewSchema: clientViewSchema, view: state => buildHardLedgerView(state, thresholds) },
+    // Version 4 changes the empty-sweep proof from free text to a verifiable
+    // reference and adds the bounded sweep window plus the armed goal id; the
+    // bump forces a full log rebuild so both recover on resume. The flow
+    // documents added after it fold into an optional state field, so no
+    // rebuild is required.
+    stateVersion: 4,
+  } satisfies HardLedgerProjectionDefinition
+}
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {

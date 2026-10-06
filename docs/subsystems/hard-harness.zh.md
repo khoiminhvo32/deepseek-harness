@@ -180,7 +180,7 @@ sweepCount(agent: Agent, phase: 'A' | 'B'): number
 /**
  * Consecutive empty-verified sweep summaries ending at the latest one.
  * Proof validity is a record-time invariant, so `newFindings === 0` is the
- * whole predicate here.
+ * whole predicate here. The math lives in `emptySweepRunFromState`.
  * @param agent - the live agent whose ledger state is read.
  * @returns the trailing run length, bounded by the projection's sweep window.
  */
@@ -203,11 +203,12 @@ armedGoalId(agent: Agent): string | undefined
  * service's `emptySweepsToFinish` config, so every consumer reads one
  * answer), and at least one model-audited coverage cell or resolved
  * hypothesis so a fully harness-screened repository reads as "nothing
- * audited yet", not "done".
+ * audited yet", not "done". The math lives in
+ * `completionAssessmentFromState`, shared with the projection's wire view.
  * @param agent - the live agent whose ledger state is read.
  * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
  */
-completionAssessment(agent: Agent): { complete: boolean blockers: readonly string[] }
+completionAssessment(agent: Agent): CompletionAssessment
 
 /**
  * The coverage matrix folded from the mission arming record.
@@ -234,6 +235,7 @@ coverageProgress(agent: Agent): CoverageProgress
  * outer, the configured class order inner, then repository-scoped cells
  * under the `.` module. Inert modules carry no module-class surface and are
  * never listed; a repository-scoped class is listed once, not per module.
+ * The math lives in `uncoveredCellsFromState`.
  * @param agent - the live agent whose ledger state is read.
  * @returns one entry per uncovered matrix cell, empty without a matrix.
  */
@@ -253,7 +255,8 @@ coverageBySource(agent: Agent): CoverageBySource
 /**
  * Model-facing open work summary: pending verifications, unresolved
  * states, coverage cells that still owe work, and batch-cleared cells the
- * deterministic screen spot-check sends back for a manual re-read.
+ * deterministic screen spot-check sends back for a manual re-read. The
+ * math lives in `openWorkFromState`.
  * @param agent - the live agent whose ledger state is read.
  * @returns bounded human-readable work items, empty when nothing is open.
  */

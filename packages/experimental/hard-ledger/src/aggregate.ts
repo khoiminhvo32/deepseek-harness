@@ -6,9 +6,15 @@
  * @module @deepseek-ai/dsh-experimental-hard-ledger
  */
 
-import { classScope } from './scope.ts'
+import { cellSampledForPercent, classScope } from './scope.ts'
 import type { HardCoverageCellData, HardCoverageSource } from './types.ts'
 import type { HardLedgerProjectionState } from './projection.ts'
+
+/** Default share of screened cells the openWork re-read sends back. */
+export const DEFAULT_SCREEN_SPOT_CHECK_PERCENT = 5
+
+/** Default number of trailing sweeps the completion assessment requires. */
+export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
 
 /** Verdicted matrix cells over the matrix cell total, `0/0` without a matrix. */
 export type CoverageProgress = { verdicted: number; total: number }
@@ -29,6 +35,14 @@ export type RefutationBreakdown = {
 
 /** One coverage entry as the projection folds it: zod's optional keeps `| undefined`. */
 type FoldedCoverageCell = HardLedgerProjectionState['coverage'][number]
+
+/** The two ledger thresholds the work and gate aggregates need. */
+export interface LedgerThresholds {
+  /** Share of batch-cleared cells openWork sends back for a manual re-read, in percent. */
+  readonly screenSpotCheckPercent: number
+  /** Trailing empty-verified sweeps the completion assessment requires. */
+  readonly emptySweepsToFinish: number
+}
 
 /** Re-shape one folded cell so the optional source drops its `| undefined`. */
 function cellData(cell: FoldedCoverageCell): HardCoverageCellData {
@@ -158,4 +172,129 @@ export function refutationBreakdownFromState(state: HardLedgerProjectionState): 
     else if (cause === 'timeout' || cause === 'aborted' || cause === 'no-runs') infrastructure += 1
   }
   return { byCause, protocolFailures, genuineRefutations, infrastructure }
+}
+
+/**
+ * Matrix cells that still need the model, in matrix order: sorted modules
+ * outer, the configured class order inner, then repository-scoped cells
+ * under the `.` module. Inert modules carry no module-class surface and are
+ * never listed; a repository-scoped class is listed once, not per module.
+ * @param state - the folded ledger projection state.
+ * @returns one entry per uncovered matrix cell, empty without a matrix.
+ */
+export function uncoveredCellsFromState(state: HardLedgerProjectionState): readonly { module: string; bugClass: string }[] {
+  const matrix = state.matrix
+  if (matrix === undefined) return []
+  const inert = new Set(matrix.inertModules ?? [])
+  const verdicted = new Set(state.coverage.map(cell => `${cell.module}\u0000${cell.bugClass}`))
+  const uncovered: { module: string; bugClass: string }[] = []
+  for (const module of matrix.modules) {
+    if (inert.has(module)) continue
+    for (const bugClass of matrix.bugClasses) {
+      if (classScope(bugClass) === 'module' && !verdicted.has(`${module}\u0000${bugClass}`)) {
+        uncovered.push({ module, bugClass })
+      }
+    }
+  }
+  for (const bugClass of matrix.bugClasses) {
+    if (classScope(bugClass) === 'repo' && !state.coverage.some(cell => cell.bugClass === bugClass)) {
+      uncovered.push({ module: '.', bugClass })
+    }
+  }
+  return uncovered
+}
+
+/**
+ * Model-facing open work summary, identical to the service method's output:
+ * pending verifications, unresolved states, coverage cells that still owe
+ * work, and batch-cleared cells the deterministic screen spot-check sends
+ * back for a manual re-read.
+ * @param state - the folded ledger projection state.
+ * @param thresholds - the ledger's screen spot-check percent.
+ * @returns bounded human-readable work items, empty when nothing is open.
+ */
+export function openWorkFromState(state: HardLedgerProjectionState, thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent'>): string[] {
+  const work: string[] = []
+  for (const record of state.findings) {
+    if (record.verdict === undefined) work.push(`finding ${record.proposed.id} awaits verification`)
+    if (record.verdict?.verdict === 'flaky') {
+      work.push(`finding ${record.proposed.id} is flaky: ${record.verdict.reason}`)
+    }
+  }
+  for (const hypothesis of state.hypotheses) {
+    if (hypothesis.status === 'proposed' || hypothesis.status === 'testing' || hypothesis.status === 'deferred') {
+      work.push(`hypothesis ${hypothesis.id} is ${hypothesis.status}`)
+    }
+  }
+  const uncovered = uncoveredCellsFromState(state)
+  if (uncovered.length > 0) {
+    work.push(`${uncovered.length} coverage cell(s) have no verdict yet`)
+    for (const cell of uncovered.slice(0, 5)) {
+      work.push(`cell ${cell.module} × ${cell.bugClass} has no verdict`)
+    }
+  }
+  for (const cell of state.coverage) {
+    if (cell.verdict === 'suspicious') {
+      work.push(`cell ${cell.module} × ${cell.bugClass} is suspicious: re-verify the declared sinks`)
+    }
+    if (cell.source === 'model-verified' && cellSampledForPercent(cell, thresholds.screenSpotCheckPercent)) {
+      work.push(`cell ${cell.module} × ${cell.bugClass} was batch-cleared; verify the mechanical screen`)
+    }
+  }
+  return work
+}
+
+/**
+ * Consecutive empty-verified sweep summaries ending at the latest one. Proof
+ * validity is a record-time invariant, so `newFindings === 0` is the whole
+ * predicate here.
+ * @param state - the folded ledger projection state.
+ * @returns the trailing run length, bounded by the projection's sweep window.
+ */
+export function emptySweepRunFromState(state: HardLedgerProjectionState): number {
+  const recent = [...state.recentSweeps].reverse()
+  let run = 0
+  for (const sweep of recent) {
+    if (sweep.newFindings !== 0) break
+    run += 1
+  }
+  return run
+}
+
+/** The harness's verdict on one completion attempt, with its bounded blockers. */
+export type CompletionAssessment = { complete: boolean; blockers: readonly string[] }
+
+/** Maximum blocking items one completion assessment lists before it summarizes the rest. */
+const AGGREGATE_BLOCKER_LIMIT = 8
+
+/**
+ * Whether the harness certifies the mission complete, identical to the
+ * service method's output: no open work, the trailing sweep window all
+ * empty-verified, and at least one model-audited coverage cell or resolved
+ * hypothesis so a fully harness-screened repository reads as "nothing
+ * audited yet", not "done". Never counts findings.
+ * @param state - the folded ledger projection state.
+ * @param thresholds - the ledger's spot-check percent and trailing-sweep requirement.
+ * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
+ */
+export function completionAssessmentFromState(state: HardLedgerProjectionState, thresholds: LedgerThresholds): CompletionAssessment {
+  const blockers: string[] = []
+  const work = openWorkFromState(state, thresholds)
+  if (work.length > 0) {
+    blockers.push(...work.slice(0, AGGREGATE_BLOCKER_LIMIT))
+    if (work.length > AGGREGATE_BLOCKER_LIMIT) blockers.push(`…and ${work.length - AGGREGATE_BLOCKER_LIMIT} more open item(s)`)
+  }
+  if (thresholds.emptySweepsToFinish > 0) {
+    const trailing = emptySweepRunFromState(state)
+    if (trailing < thresholds.emptySweepsToFinish) {
+      blockers.push(`${trailing} of ${thresholds.emptySweepsToFinish} final sweeps are empty-verified`)
+    }
+  }
+  const bySource = coverageBySourceFromState(state)
+  const resolved = state.hypotheses
+    .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
+  if (bySource.model === 0 && bySource.modelVerified === 0 && resolved === 0) {
+    blockers.push('no model-audited coverage cell or resolved hypothesis exists yet')
+  }
+  return { complete: blockers.length === 0, blockers }
 }

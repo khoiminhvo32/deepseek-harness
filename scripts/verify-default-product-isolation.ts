@@ -86,6 +86,10 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const profilePath = resolve(root, PROFILE_SOURCE)
   const selection = existsSync(profilePath) ? profilePackages(readFileSync(profilePath, 'utf8')) : undefined
   const optionalBundles = new Set(selection?.optionalBundles ?? [])
+  // Experimental bundles a template selects by name: accepted as blocks whose
+  // dependency graph stays outside the default product's walk, like optional
+  // bundles; an experimental package NOT declared there still fails below.
+  const templateExperimental = new Set(selection?.declaredTemplateExperimental ?? [])
   for (const name of optionalBundles) {
     if (cli?.manifest.dependencies?.[name] === undefined) {
       failures.push(`${PROFILE_SOURCE}: optional bundle ${name} must be a runtime dependency of apps/cli`)
@@ -136,6 +140,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
       return
     }
     const packageName = barePackageName(name)
+    if (templateExperimental.has(packageName)) return
     if (packageName.startsWith(EXPERIMENTAL_PREFIX)) {
       failures.push(`${origin} -> ${name}: default product must not include experimental packages`)
       return
@@ -355,16 +360,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Read the literal package lists that define installation-owned profile defaults and the optional bundles it ships. */
-function profilePackages(source: string): { packages: string[]; webBundles: string[]; optionalBundles: string[] } {
+function profilePackages(source: string): {
+  packages: string[]
+  webBundles: string[]
+  optionalBundles: string[]
+  /** Experimental bundles a template selects, as declared in `TEMPLATE_EXPERIMENTAL_BUNDLES`. */
+  declaredTemplateExperimental: string[]
+} {
   const file = ts.createSourceFile(PROFILE_SOURCE, source, ts.ScriptTarget.Latest, true)
   const required = new Set(['PROFILE_TEMPLATES', 'DEFAULT_PROFILE_BUNDLES'])
   const found = new Set<string>()
   const packages: string[] = []
   const webBundles: string[] = []
   const optionalBundles: string[] = []
+  const declaredTemplateExperimental: string[] = []
   const literals = (node: ts.Node, path: string[]): void => {
     if (ts.isStringLiteralLike(node)) {
       if (path[0] === 'OPTIONAL_BUNDLES') optionalBundles.push(node.text)
+      else if (path[0] === 'TEMPLATE_EXPERIMENTAL_BUNDLES') declaredTemplateExperimental.push(node.text)
       else if (node.text.startsWith('@')) packages.push(node.text)
       if (path.join('.') === 'PROFILE_TEMPLATES.web.bundles') webBundles.push(node.text)
     } else if (ts.isArrayLiteralExpression(node)) node.elements.forEach((child) => { literals(child, path) })
@@ -377,6 +390,9 @@ function profilePackages(source: string): { packages: string[]; webBundles: stri
     }
     else if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isParenthesizedExpression(node)) {
       literals(node.expression, path)
+    } else if (ts.isNewExpression(node) || ts.isCallExpression(node)) {
+      // `new Set([...])` and similar literal wrappers stay static lists.
+      node.arguments?.forEach((child) => { literals(child, path) })
     } else throw new Error(`${PROFILE_SOURCE}: default profile packages must use static literal lists`)
   }
   for (const statement of file.statements) {
@@ -384,19 +400,20 @@ function profilePackages(source: string): { packages: string[]; webBundles: stri
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name)
         || !required.has(declaration.name.text) && declaration.name.text !== 'INSTALLATION_OWNED_PROFILE_TUPLES'
-        && declaration.name.text !== 'OPTIONAL_BUNDLES') continue
+        && declaration.name.text !== 'OPTIONAL_BUNDLES' && declaration.name.text !== 'TEMPLATE_EXPERIMENTAL_BUNDLES') continue
       if (declaration.initializer === undefined) continue
       if (required.has(declaration.name.text)) found.add(declaration.name.text)
       const before = packages.length
       literals(declaration.initializer, [declaration.name.text])
-      if (declaration.name.text !== 'OPTIONAL_BUNDLES' && packages.length === before) {
+      if (declaration.name.text !== 'OPTIONAL_BUNDLES' && declaration.name.text !== 'TEMPLATE_EXPERIMENTAL_BUNDLES'
+        && packages.length === before) {
         throw new Error(`${PROFILE_SOURCE}: ${declaration.name.text} has no default bundles`)
       }
     }
   }
   if (found.size !== required.size) throw new Error(`${PROFILE_SOURCE}: missing default profile declarations`)
   if (webBundles.length === 0) throw new Error(`${PROFILE_SOURCE}: missing default Web bundle list`)
-  return { packages, webBundles, optionalBundles }
+  return { packages, webBundles, optionalBundles, declaredTemplateExperimental }
 }
 
 if (import.meta.main) {

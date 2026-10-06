@@ -59,6 +59,7 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-claude-code-mods',
       '@deepseek-ai/dsh-experimental-client-ui-agent-team',
       '@deepseek-ai/dsh-experimental-client-ui-claude-code-mods',
+      '@deepseek-ai/dsh-experimental-client-ui-hard',
       '@deepseek-ai/dsh-experimental-client-ui-voice-input',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',

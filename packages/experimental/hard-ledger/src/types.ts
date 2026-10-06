@@ -268,8 +268,8 @@ export interface HardMissionArmedData {
   readonly bugClasses: readonly string[]
   /**
    * Sorted subset of `modules` where every tracked file carries an inert
-   * extension: no code, so no module-class surface. Optional so the change
-   * is additive; absent reads as an empty screen.
+   * extension: no code, so no module-class surface. Optional so the change is
+   * additive; absent reads as an empty screen.
    */
   readonly inertModules?: readonly string[]
   /**
@@ -278,4 +278,42 @@ export interface HardMissionArmedData {
    * never fires for them.
    */
   readonly goalId?: string
+}
+
+/**
+ * The client view of one folded hard-ledger state — the projection's wire
+ * value, deliberately a summary: the armed matrix axes, every event-backed
+ * matrix cell's verdict and decider, the coverage aggregates, and the gate's
+ * current assessment. Full findings, hypotheses, and declared sinks stay
+ * host-side; the panel renders the matrix, not the transcript.
+ */
+export interface HardLedgerClientView {
+  /** The armed matrix axes and pinned target, absent until the mission arms. */
+  readonly matrix?: {
+    readonly modules: readonly string[]
+    readonly bugClasses: readonly string[]
+    readonly inertModules?: readonly string[]
+    readonly targetRepo: string
+    readonly commit: string
+  }
+  /** Latest verdict per event-backed matrix cell; off-matrix cells are absent. */
+  readonly cells: readonly {
+    readonly module: string
+    readonly bugClass: string
+    readonly verdict: HardCoverageVerdict
+    readonly source?: HardCoverageSource
+  }[]
+  /** Verdicted matrix cells over the matrix cell total. */
+  readonly progress: { readonly verdicted: number; readonly total: number }
+  /** The same cells partitioned by decider. */
+  readonly bySource: { readonly model: number; readonly modelVerified: number; readonly harness: number }
+  /** The harness's current completion assessment with its bounded blockers. */
+  readonly gate: { readonly complete: boolean; readonly blockers: readonly string[] }
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  /** The hard ledger's client-visible wire value. */
+  interface SessionProjectionMap {
+    hardLedger: HardLedgerClientView
+  }
 }

@@ -1,5 +1,5 @@
 /** Persistent manager behavior through a real profile Include and Loader. */
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
@@ -229,11 +229,10 @@ it.each(['github:acme/connected', 'https://github.com/acme/connected.git', 'git+
   },
 )
 
-it.each(['missing package', 'invalid manifest', 'not a bundle', 'missing patch', 'invalid patch'])(
+it.each(['invalid manifest', 'not a bundle', 'missing patch', 'invalid patch'])(
   'boots with %s, lists its error, and permits deselection without enabling the broken bundle', async (failure) => {
     const { manager, dir, ctx } = await fixture('live', false, undefined, {}, undefined, (dir) => {
       const path = join(dir, 'node_modules', 'extra')
-      if (failure === 'missing package') rmSync(path, { recursive: true })
       if (failure === 'invalid manifest') writeFileSync(join(path, 'package.json'), '{')
       if (failure === 'not a bundle') writeFileSync(join(path, 'package.json'), '{}')
       if (failure === 'missing patch') rmSync(join(path, 'cordis.patch.yml'))
@@ -249,6 +248,33 @@ it.each(['missing package', 'invalid manifest', 'not a bundle', 'missing patch',
   },
 )
 
+it('refuses to boot when a bundle package is missing instead of skipping it', () => {
+  // A missing package is a missing referent, not a content failure: the
+  // resolve-failure contract propagates instead of running the session
+  // without the bundle the profile asked for.
+  const temporaryHome = mkdtempSync(join(tmpdir(), 'plugin-manager-'))
+  try {
+    const home = realpathSync(temporaryHome)
+    const dir = join(home, 'profiles', 'test')
+    const anchor = join(home, 'package.json')
+    writeFileSync(anchor, '{"name":"installation","dependencies":{}}\n')
+    initProfile(dir, ['core', 'extra'])
+    const bundle = (name: string): void => {
+      const path = join(dir, 'node_modules', name)
+      mkdirSync(path, { recursive: true })
+      writeFileSync(join(path, 'package.json'), JSON.stringify({ name, version: '1.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+      writeFileSync(join(path, 'cordis.patch.yml'), JSON.stringify([{ insert: [{ id: 'managed', name: './plugin.mjs' }] }]))
+      writeFileSync(join(path, 'plugin.mjs'), 'export function apply() {}\n')
+    }
+    bundle('core')
+    bundle('extra')
+    rmSync(join(dir, 'node_modules', 'extra'), { recursive: true })
+    expect(() => loadProfileDirectory('test', dir, anchor)).toThrow('cannot resolve profile bundle "extra"')
+  } finally {
+    rmSync(temporaryHome, { recursive: true, force: true })
+  }
+})
+
 it.each(['missing files', 'missing declaration'])('keeps a running management bundle protected with %s', async (failure) => {
   const { manager, dir } = await fixture()
   if (failure === 'missing files') rmSync(join(dir, 'node_modules', 'core'), { recursive: true })
@@ -261,9 +287,11 @@ it.each(['missing files', 'missing declaration'])('keeps a running management bu
   })
 })
 
-it.each(['live', 'startup'] as const)('removes a bundle skipped at startup in a %s profile', async (mode) => {
+it.each(['live', 'startup'] as const)('removes a bundle skipped at startup for invalid content in a %s profile', async (mode) => {
   const { manager, dir } = await fixture(mode, false, undefined, {}, undefined, (dir) => {
-    rmSync(join(dir, 'node_modules', 'extra'), { recursive: true })
+    // Invalid patch content keeps the deliberate skip channel; a missing
+    // package would refuse the boot instead (the resolve-failure contract).
+    writeFileSync(join(dir, 'node_modules', 'extra', 'cordis.patch.yml'), '[invalid')
   })
   const remove = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
     const manifest = readProfileManifest('test', dir)

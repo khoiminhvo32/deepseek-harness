@@ -776,6 +776,19 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr10-review-live">
+  <h2><span class="h2-index">19</span>PR10 review: evidence sống + bundle fail loud</h2>
+  <p class="intro">Hai điểm review trên PR10, cả hai cùng một chủ đề: dữ liệu và cấu hình phải nói thật thay vì dựa vào mặc định. Kèm reviewer sửa thẳng pilot/run.sh — thiếu bước nối bundle vào profile khiến harness vẫn chạy, vẫn tốn token, nhưng không mount plugin hard nào; "skipping profile bundle" không bị gate nào trong repo bắt.</p>
+  <table>
+    <thead><tr><th>Điểm</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Evidence là trường chết</td><td><span class="chip pass">xong</span></td><td>Type/schema/JSDoc có nhưng không nhánh nào gán — confirm cũ (trước specificity check) và confirm mới đọc giống hệt nhau, trong khi confirm cũ thật ra yếu hơn. Sửa: classifyRuns gán <code>evidence: 'demonstrated'</code> ở nhánh confirmed; vắng mặt giờ có nghĩa riêng — log cũ không có benign arm, yếu hơn demonstrated. JSDoc + README ledger en/zh + subsystems đổi câu "absent reads as demonstrated"; record prose cập nhật; snapshot refresh (F-3 mang evidence), replay exact; e2e assert evidence trên confirmed</td></tr>
+      <tr><td>Bundle không resolve phải fail loud</td><td><span class="chip pass">xong</span></td><td>resolveBundleDir đã throw nhưng loadProfileDirectory đập vỡ thành warning + skip — đúng chế độ hỏng đắt nhất reviewer tìm thấy khi boot-check pilot. Sửa: resolve-failure thoát khỏi try (missing referent — tiếp tục sẽ chạy session không plugin); content-failure (manifest/patch/peers) giữ kênh skip có chủ đích; test matrix tách 'missing package' thành test riêng expect throw. app-boot 5603/5604 xanh. Preflight (endpoint chết, không tốn token) vào hard-smoke/run.sh; guard pilot/run.sh bắt thêm thông điệp throw mới — kiểm cả hai nhánh: có symlink exit 0, gỡ symlink exit 1 + LOI</td></tr>
+      <tr><td>Preflight + --dry (reviewer sửa thẳng run.sh)</td><td><span class="chip pass">xong</span></td><td>Reviewer tự sửa pilot/run.sh: prepare() nối bundle symlink, preflight boot endpoint chết rồi mới chạy thật, --dry dừng sau preflight, set +e giữ exit code để báo cáo không mất khi dsh exit nonzero. Đã review: đúng hướng; lỗi false-pass của chính reviewer (gỡ dòng script nhưng symlink cũ còn trên đĩa) chỉ ra vì sao guard phải test cả hai phía — giữ lại như ghi chú bài học</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

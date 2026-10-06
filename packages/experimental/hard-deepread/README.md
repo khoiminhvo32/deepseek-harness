@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-deepread` owns the Phase B contract of the hard mission as the `hard:deep-read` system-prompt section. When a round names phase B, the section directs the model to fan out one subagent per module or module cluster (bounded per pass), demand a structured flow document — entry points, dataflow, trust boundaries, state machines, assumptions, suspicious quirks — save it under `.dsh-hard/flow/<module>.md`, and record every quirk as a ledger hypothesis with a concrete falsification step.
+`dsh-experimental-hard-deepread` owns the Phase B contract of the hard mission as the `hard:deep-read` system-prompt section. When a round names phase B, the section directs the model to fan out one subagent per module or module cluster (bounded per pass), demand a structured flow document — entry points, dataflow, trust boundaries, state machines, assumptions, suspicious quirks — record it through `hard_record_flow` (the verifier resolves every path:line citation against the pinned commit and rejects the whole record naming the failed cites), and record every quirk as a ledger hypothesis with a concrete falsification step.
 
 ## Table of Contents
 
@@ -66,12 +66,12 @@ Mount the plugin beside the hard mission and the ledger tools in hard-harness co
 
 #### What the model sees
 
-A fixed Phase B contract: read up to `maxModulesPerPass` modules per pass, spawn one subagent per module demanding the six-section flow document, save documents as `.dsh-hard/flow/<module>.md`, record quirks as hypotheses through `hard_update_hypothesis`, convert surviving quirks into findings with real PoCs, and summarize a quirk-free pass with `hard_sweep_summary` phase B plus an `emptyProof`.
+A fixed Phase B contract: read up to `maxModulesPerPass` modules per pass, spawn one subagent per module demanding the six-section flow document, record each document through `hard_record_flow` with per-entry `path:line` citations and snippets, record quirks as hypotheses through `hard_update_hypothesis`, convert surviving quirks into findings with real PoCs, and summarize a quirk-free pass with `hard_sweep_summary` phase B citing the recorded flow documents as the empty proof.
 
 ##### Deep-read policy
 
 ```markdown
-Deep-reading pass (Phase B): when a round names phase B, read 6 module or module-cluster at a time for understanding rather than pattern matching. For each module, spawn one subagent whose prompt demands a structured flow document with exactly these sections: entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks. Save each document as .dsh-hard/flow/<module>.md and cite it later by path. Record every suspicious quirk as a hypothesis with hard_update_hypothesis: status proposed first, then testing with a concrete falsification step; never mark confirmed without executed evidence. Quirks that survive testing convert into findings submitted with hard_submit_finding and a real PoC. A deep-reading pass with no quirks found still records its progress: summarize the pass with hard_sweep_summary phase B and an emptyProof naming the modules read and the assumptions checked.
+Deep-reading pass (Phase B): when a round names phase B, read 6 module or module-cluster at a time for understanding rather than pattern matching. For each module, spawn one subagent whose prompt demands a structured flow document with exactly these sections: entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks. Record each document with hard_record_flow: every section takes path:line citations plus a short snippet copied from the cited lines, and the harness resolves every citation against the pinned commit — a citation the working tree satisfies but the pinned tree does not fails the whole record, so cite what you actually read. Record every suspicious quirk as a hypothesis with hard_update_hypothesis: status proposed first, then testing with a concrete falsification step; never mark confirmed without executed evidence. Quirks that survive testing convert into findings submitted with hard_submit_finding and a real PoC. A deep-reading pass with no quirks found still records its progress: summarize the pass with hard_sweep_summary phase B, citing the recorded flow documents as the empty proof.
 ```
 
 #### Token effect
@@ -87,7 +87,7 @@ Prefix-stable while the plugin scope and configured bound are unchanged; activat
 <a id="known-limitations-and-deferred-work"></a>
 
 - **Subagent quality is model judgment** — the contract names the document sections but cannot enforce their depth; the ledger's hypothesis lifecycle is the enforcement point.
-- **Flow docs are file artifacts** — documents live under `.dsh-hard/flow/` and are cited by path; only the ledger records are durable session events.
+- **Flow docs are durable records** — `hard/flow/doc` carries the section and citation counts the harness verified; notes and snippets stay in the tool result, and the log holds only what resolved.
 
 <a id="dev-note"></a>
 ### Dev Note

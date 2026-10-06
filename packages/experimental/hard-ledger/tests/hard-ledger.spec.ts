@@ -194,6 +194,14 @@ describe('hard ledger findings', () => {
     })
     expect(parsed.findings[0]?.verdict?.runs).toBe(0)
     expect(parsed.findings[0]?.verdict?.cause).toBe('benign-arm-passed')
+    // Cached states from before the flow-document event carry no flowDocs at
+    // all; the schema must keep reading them.
+    expect(parsed.flowDocs).toBeUndefined()
+    const withFlow = hardLedgerStateSchema.parse({
+      ...state,
+      flowDocs: [{ module: 'src/web', sections: { entryPoints: 1, dataflows: 0, trustBoundaries: 0, stateMachines: 0, assumptions: 0, quirks: 0 }, citations: 1 }],
+    })
+    expect(withFlow.flowDocs).toHaveLength(1)
   })
 })
 
@@ -290,7 +298,7 @@ describe('hard ledger coverage and sweeps', () => {
   it('requires empty-sweep proof and validates counters', async () => {
     const { ctx, root } = await harness()
     expect(() => { ctx.hardLedger.recordSweep(root.agent, { phase: 'A', cellsTouched: 4, newFindings: 0 }) })
-      .toThrow('an empty sweep requires emptyProofRef evidence')
+      .toThrow('an empty sweep requires emptyProofRef or emptyProofFlowDoc evidence')
     expect(() => { ctx.hardLedger.recordSweep(root.agent, {
       phase: 'A', cellsTouched: -1, newFindings: 1, emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-1' },
     }) }).toThrow('cellsTouched must be a non-negative safe integer')
@@ -312,6 +320,63 @@ describe('hard ledger coverage and sweeps', () => {
     expect(ctx.hardLedger.sweepCount(root.agent, 'A')).toBe(1)
     expect(ctx.hardLedger.sweepCount(root.agent, 'B')).toBe(0)
     expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
+  })
+})
+
+describe('hard ledger flow documents', () => {
+  const FULL_SECTIONS = {
+    entryPoints: 1, dataflows: 2, trustBoundaries: 0, stateMachines: 0, assumptions: 1, quirks: 1,
+  }
+
+  it('records flow documents, folds the latest per module, and rejects inconsistent counts', async () => {
+    const { ctx, root } = await harness()
+    ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/web', sections: FULL_SECTIONS, citations: 5, quirkIds: ['H-1'],
+    })
+    ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/web', sections: { ...FULL_SECTIONS, quirks: 0 }, citations: 4,
+    })
+    const docs = ctx.hardLedger.flowDocs(root.agent)
+    expect(docs).toHaveLength(1)
+    expect(docs[0]).toMatchObject({ module: 'src/web', citations: 4, sections: { quirks: 0 } })
+    expect(docs[0]?.quirkIds).toBeUndefined()
+    // The summary counts must agree: every entry carries exactly one citation.
+    expect(() => { ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/db', sections: FULL_SECTIONS, citations: 4,
+    }) }).toThrow('citations must equal the sum of the section counts')
+    expect(() => { ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/db', sections: { ...FULL_SECTIONS, entryPoints: -1 }, citations: 5,
+    }) }).toThrow('sections.entryPoints must be a non-negative safe integer')
+    expect(() => { ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/db', sections: FULL_SECTIONS, citations: 5, quirkIds: ['H-1', 'H-2'],
+    }) }).toThrow('quirkIds must name every recorded quirk')
+  })
+
+  it('accepts a recorded flow document as an empty-sweep proof and rejects unrecorded or citation-free ones', async () => {
+    const { ctx, root } = await harness()
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'B', cellsTouched: 1, newFindings: 0, emptyProofFlowDoc: 'src/web',
+    }) }).toThrow('empty sweep proof must cite a recorded flow document; none exists for src/web')
+    ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/web', sections: { entryPoints: 0, dataflows: 0, trustBoundaries: 0, stateMachines: 0, assumptions: 0, quirks: 0 },
+      citations: 0,
+    })
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'B', cellsTouched: 1, newFindings: 0, emptyProofFlowDoc: 'src/web',
+    }) }).toThrow('empty sweep proof must cite a flow document with resolvable citations; src/web recorded none')
+    ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/db', sections: FULL_SECTIONS, citations: 5, quirkIds: ['H-1'],
+    })
+    ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'B', cellsTouched: 1, newFindings: 0, emptyProofFlowDoc: 'src/db',
+    })
+    expect(ctx.hardLedger.sweepCount(root.agent, 'B')).toBe(1)
+    expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
+    // The reference and the flow-document proof are mutually exclusive.
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'B', cellsTouched: 1, newFindings: 0,
+      emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' }, emptyProofFlowDoc: 'src/db',
+    }) }).toThrow('emptyProofRef and emptyProofFlowDoc are mutually exclusive')
   })
 })
 

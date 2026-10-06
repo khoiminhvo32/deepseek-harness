@@ -16,9 +16,6 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 export const name = 'hard-deepread'
 export const inject = ['systemPrompt']
 
-/** Repository directory holding one flow document per module or module cluster. */
-export const FLOW_DOC_DIR = '.dsh-hard/flow'
-
 /** Deep-read plugin config. */
 export interface Config {
   /**
@@ -53,12 +50,14 @@ function deepReadContract(resolved: ResolvedConfig): string {
     + 'or module-cluster at a time for understanding rather than pattern matching. '
     + 'For each module, spawn one subagent whose prompt demands a structured flow document with exactly these sections: '
     + 'entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks. '
-    + `Save each document as ${FLOW_DOC_DIR}/<module>.md and cite it later by path. `
+    + 'Record each document with hard_record_flow: every section takes path:line citations plus a short snippet '
+    + 'copied from the cited lines, and the harness resolves every citation against the pinned commit — a citation '
+    + 'the working tree satisfies but the pinned tree does not fails the whole record, so cite what you actually read. '
     + 'Record every suspicious quirk as a hypothesis with hard_update_hypothesis: status proposed first, '
     + 'then testing with a concrete falsification step; never mark confirmed without executed evidence. '
     + 'Quirks that survive testing convert into findings submitted with hard_submit_finding and a real PoC. '
     + 'A deep-reading pass with no quirks found still records its progress: '
-    + 'summarize the pass with hard_sweep_summary phase B and an emptyProof naming the modules read and the assumptions checked.'
+    + 'summarize the pass with hard_sweep_summary phase B, citing the recorded flow documents as the empty proof.'
 }
 
 /** Register the deep-reading contract section. */

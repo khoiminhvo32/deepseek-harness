@@ -149,6 +149,7 @@ describe('the hard-web profile boots the hard harness inside the Web composition
         .filter(name => name.startsWith('hard_')).sort()).toEqual([
         'hard_clear_modules',
         'hard_mark_coverage',
+        'hard_record_flow',
         'hard_submit_finding',
         'hard_sweep_summary',
         'hard_update_hypothesis',

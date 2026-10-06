@@ -1,10 +1,13 @@
 /**
- * Fixed sink-pattern protocol for the deterministic coverage cross-check:
- * one extended-regex alternation per bug class, joined into a single
+ * Fixed pattern protocol for the deterministic coverage cross-check: one
+ * extended-regex alternation per bug class, joined into a single
  * `grep -rInE` expression over the swept module. Patterns are security
  * invariants, not tunables: they name the mechanical source-to-sink shapes
  * each class guards, so a `cleared` cell whose module still matches an
- * undeclared sink reopens with the match as evidence.
+ * undeclared sink reopens with the match as evidence. `GUARDED_SURFACE_PATTERNS`
+ * holds the two absence classes whose patterns name the guarded surface — the
+ * exported operation — instead of the guard, and `surfaceOperands` reduces a
+ * matched line back to the operation names the model must have declared.
  * @module
  */
 
@@ -90,4 +93,67 @@ export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
     '(new Thread|asyncio\\.(create_task|ensure_future)|go func|pthread_create)',
     '(lock|mutex|acquire|synchronized)',
   ],
+}
+
+/**
+ * Extended-regex alternations naming the exported surface itself — operations
+ * that leave the module, not the guards over them. Shared by the guarded-surface
+ * classes below; the approximate shape is deliberate, a real call graph is out
+ * of scope.
+ */
+const EXPORTED_SURFACE_PATTERNS: readonly string[] = [
+  'export (async )?function \\w+',
+  'export const \\w+ =',
+  'module\\.exports',
+  'exports\\.\\w+ =',
+  '(app|router)\\.(get|post|put|delete|patch)\\(',
+  '@(Get|Post|Put|Delete|RequestMapping)\\(',
+]
+
+/**
+ * Bug classes where the bug is the ABSENCE of a guard: the pattern names the
+ * surface that needs protecting (the exported operation), not the guard. The
+ * opposite reading of `SINK_PATTERNS`, whose patterns name the dangerous site
+ * itself. For these classes a cross-check match is an operation the model must
+ * have declared a guard for — or declared deliberately unguarded, with the
+ * reason — and zero matches prove no exported surface exists, which is a clean
+ * result rather than a suspicious one.
+ */
+export const GUARDED_SURFACE_PATTERNS: Readonly<Record<string, readonly string[]>> = {
+  authz: EXPORTED_SURFACE_PATTERNS,
+  'authn-bypass': EXPORTED_SURFACE_PATTERNS,
+}
+
+/** JS regexes that extract the operation name from one matched surface line; first match wins. */
+const OPERAND_PATTERNS: readonly { readonly regex: RegExp; readonly operand: (match: RegExpExecArray) => readonly string[] }[] = [
+  { regex: /export\s+(?:async\s+)?function\s+(\w+)/, operand: match => [match[1] ?? ''] },
+  { regex: /export\s+const\s+(\w+)\s*=/, operand: match => [match[1] ?? ''] },
+  { regex: /exports\.(\w+)\s*=/, operand: match => [match[1] ?? ''] },
+  { regex: /(?:app|router)\.(?:get|post|put|delete|patch)\(\s*['"`]([^'"`]+)['"`]/, operand: match => [match[1] ?? ''] },
+  { regex: /@(Get|Post|Put|Delete|RequestMapping)(?:\(\s*['"`]?([^'"`\s)]*))?/, operand: match => match[2] === undefined || match[2] === '' ? [match[1] ?? ''] : [match[2]] },
+  {
+    regex: /module\.exports\s*=\s*\{([^}]*)\}/,
+    operand: match => (match[1] ?? '')
+      .split(',')
+      .map(name => name.trim().split(/[:\s]/u)[0] ?? '')
+      .filter(name => /^\w+$/u.test(name)),
+  },
+]
+
+/**
+ * Name the exported operations one matched surface line declares, so the
+ * cross-check can compare them with the operations the model declared. A line
+ * whose shape no extractor recognizes falls back to the whole trimmed line.
+ * @param line - one `grep` match line, typically `path:line:content`.
+ * @returns the operation names to check against the model's declarations.
+ */
+export function surfaceOperands(line: string): readonly string[] {
+  for (const { regex, operand } of OPERAND_PATTERNS) {
+    const match = regex.exec(line)
+    if (match !== null) {
+      const named = operand(match).filter(name => name.length > 0)
+      if (named.length > 0) return named
+    }
+  }
+  return [line.trim()]
 }

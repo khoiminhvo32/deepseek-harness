@@ -137,6 +137,9 @@ describe('dsh --profile hard fabrication traps', () => {
         tsconfigPath,
         env: {
           DSH_HOME: home,
+          // Hermetic like the snapshot seeding: a developer's global agent
+          // skills must not decide which user messages this run records.
+          DSH_AGENTS_HOME: join(home, '.agents'),
           DEEPSEEK_BASE_URL: 'http://127.0.0.1:9',
         },
       })
@@ -206,6 +209,20 @@ describe('dsh --profile hard fabrication traps', () => {
         expect.objectContaining({ verdict: 'cleared', source: 'model-verified' }),
       ])
       expect(coverage.slice(0, 3).every(cell => cell.source === undefined)).toBe(true)
+
+      // The Phase B record: the fabricated citation was rejected naming the
+      // cite, and the resolvable one landed as hard/flow/doc with its count.
+      const flowError = sessionFiles.find(event => event.type === 'tool/result'
+        && JSON.stringify(event.data).includes('src/reports.js:999'))
+      expect(flowError).toBeDefined()
+      expect((flowError?.data as { message?: { isError?: boolean } }).message?.isError).toBe(true)
+      const flowDocs = sessionFiles.filter(event => event.type === 'hard/flow/doc')
+        .map(event => event.data as { module: string; citations: number; sections: Record<string, number> })
+      expect(flowDocs).toEqual([{
+        module: 'src',
+        citations: 1,
+        sections: { entryPoints: 1, dataflows: 0, trustBoundaries: 0, stateMachines: 0, assumptions: 0, quirks: 0 },
+      }])
 
       // The empty sweep cites the model-cleared cell as its verifiable proof.
       const sweeps = sessionFiles.filter(event => event.type === 'hard/sweep/summary')

@@ -32,7 +32,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`, `grep` | `ctx.tools`, `ctx.subprocess`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments. |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_record_flow`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/flow/doc`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1384,7 +1384,7 @@ create, edit, pause, and resume require direct-human root authority; complete an
 
 ### `hard_clear_modules`
 
-Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) are refused: there, an empty grep is suspicious, not clean.
+Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. login-bypass is refused: its sinks are protective checks, so an empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations instead of sinks: an empty grep proves the module exports nothing to protect, and any match names an operation whose guard hard_mark_coverage must declare.
 
 ```json
 {
@@ -1420,7 +1420,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_mark_coverage`
 
-Record one coverage cell verdict for the systematic pass: a module swept for one bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list.
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
 
 ```json
 {
@@ -1452,6 +1452,165 @@ Record one coverage cell verdict for the systematic pass: a module swept for one
     "module",
     "bug_class",
     "verdict"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_record_flow`
+
+Record one flow document for a module after the deep-reading pass. All six sections are required; an empty section means you explicitly found nothing, not that you skipped it. Every entry carries cite, snippet, and note: cite is a path:line or path:line-line reference into the target repository, snippet is the short source text at those lines, note is your reading of them. The harness resolves every citation against the pinned commit — never the working tree — and rejects the whole record naming the failed cites, so copy snippets from what you actually read. Each quirk entry automatically opens a proposed hypothesis.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "string",
+      "description": "Module or module-cluster read, target-repo relative."
+    },
+    "entry_points": {
+      "type": "array",
+      "description": "Entry-point citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "dataflows": {
+      "type": "array",
+      "description": "Dataflow citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "trust_boundaries": {
+      "type": "array",
+      "description": "Trust-boundary citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "state_machines": {
+      "type": "array",
+      "description": "State-machine citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Assumption citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "quirks": {
+      "type": "array",
+      "description": "Suspicious-quirk citations; each opens a proposed hypothesis.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "module",
+    "entry_points",
+    "dataflows",
+    "trust_boundaries",
+    "state_machines",
+    "assumptions",
+    "quirks"
   ]
 }
 ```
@@ -1524,7 +1683,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_sweep_summary`
 
-Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.
+Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep was not skipped.
 
 ```json
 {
@@ -1551,7 +1710,8 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
       "description": "Required when new_findings is zero: what proves this sweep did work.",
       "enum": [
         "hypothesis",
-        "cell"
+        "cell",
+        "flow"
       ]
     },
     "empty_proof_id": {
@@ -1560,7 +1720,7 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
     },
     "empty_proof_module": {
       "type": "string",
-      "description": "With empty_proof_kind cell: the module of the cleared cell being cited."
+      "description": "With empty_proof_kind cell or flow: the module being cited."
     },
     "empty_proof_bug_class": {
       "type": "string",

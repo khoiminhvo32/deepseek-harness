@@ -11506,6 +11506,131 @@
       }
     },
     {
+      "key": "event:hard/flow/doc",
+      "kind": "event",
+      "event": "hard/flow/doc",
+      "surface": false,
+      "digest": "01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "citations",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "quirkIds",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "sections",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "assumptions",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "dataflows",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryPoints",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "quirks",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "stateMachines",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "trustBoundaries",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/flow/doc"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:hard/gate/decision",
       "kind": "event",
       "event": "hard/gate/decision",
@@ -12379,7 +12504,7 @@
       "kind": "event",
       "event": "hard/sweep/summary",
       "surface": false,
-      "digest": "53eefd2160b1a8732740741877d174a72ed34016e7a2641be5fe424ccd55e75a",
+      "digest": "86d644bd25fa85186753fe688a9f5b3304ed56264923f4ab6f3e9fc65f598a45",
       "schema": {
         "root": 0,
         "nodes": [
@@ -12424,6 +12549,11 @@
               },
               {
                 "name": "emptyProof",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "emptyProofFlowDoc",
                 "type": 3,
                 "optional": true
               },
@@ -25357,6 +25487,11 @@
       "sources": []
     },
     {
+      "digest": "01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "0203243b72fc867afc81aff5f4cf2167e564ed342534eb612fc92f295cf07789",
       "names": [],
       "sources": []
@@ -26065,6 +26200,11 @@
       ]
     },
     {
+      "digest": "27e73907e16ed7e868f4a4d5a9fbdd9c1867ac8c86dd3de383882006437e5939",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "287211846beea1eccb5f9acee00d20388a38fcb2e95858fa2332d6f58529379a",
       "names": [],
       "sources": [
@@ -26085,15 +26225,6 @@
       "digest": "297fbd8067d7815adae02b89790ec6ff5fb7c2cb0d0eb026e1746c24ec857761",
       "names": [],
       "sources": []
-    },
-    {
-      "digest": "2983c2eee94f8b64b2d61fa34e2fc39da5b073d19ec3372b95aa065ad3e8b0f2",
-      "names": [
-        "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
-      ],
-      "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:171"
-      ]
     },
     {
       "digest": "2a1f3aaa145bbe3ab4147928e0d4184eb8d6e3b1b84a78efc5f839b5dd169887",
@@ -26138,7 +26269,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:218"
+        "packages/experimental/hard-ledger/src/types.ts:258"
       ]
     },
     {
@@ -26282,7 +26413,7 @@
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:198"
+        "packages/experimental/hard-ledger/src/types.ts:238"
       ]
     },
     {
@@ -26294,7 +26425,7 @@
       "digest": "34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:193"
+        "packages/experimental/hard-ledger/src/types.ts:233"
       ]
     },
     {
@@ -26656,6 +26787,15 @@
       "sources": []
     },
     {
+      "digest": "4b96af071f799a94eaa2006f91c1f89ef810727e16a80d4e7a3ed3bb812ac9b1",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:202"
+      ]
+    },
+    {
       "digest": "4bb451330ff699f36b45539ceb0eb2606ead72084e2c5bb637c36cc80e2252db",
       "names": [],
       "sources": [
@@ -26843,17 +26983,21 @@
       ]
     },
     {
+      "digest": "53341efe447fbbf4904e24a350324a12b97a0dba40bba3baf4c9978c5ab1f830",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFlowDocSections"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:171"
+      ]
+    },
+    {
       "digest": "539702ecb130e299ea6c3e5801e0a5388860f6f3ee9419f38947dae51803f1de",
       "names": [],
       "sources": []
     },
     {
       "digest": "53cf1704ae0709c7678bcf070c83c619fc48ca1b5c173b74cfa8702f22a8e492",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "53eefd2160b1a8732740741877d174a72ed34016e7a2641be5fe424ccd55e75a",
       "names": [],
       "sources": []
     },
@@ -27726,6 +27870,11 @@
       ]
     },
     {
+      "digest": "86d644bd25fa85186753fe688a9f5b3304ed56264923f4ab6f3e9fc65f598a45",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "86e1e384495ee09ac2d60c9db3610f1f1fddac2d248f6f1d6000e78054680219",
       "names": [
         "packages/llm/llm/src/message.ts#ContextSnapshotSection"
@@ -27942,7 +28091,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:204"
+        "packages/experimental/hard-ledger/src/types.ts:244"
       ]
     },
     {
@@ -28827,6 +28976,15 @@
       "sources": []
     },
     {
+      "digest": "c646495b1e023e8a6708d453a92efe8e6de16ccc7f76d4b9165f0e20d1b0bb65",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFlowDocData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:187"
+      ]
+    },
+    {
       "digest": "c748fb42c80a120038a8c587af80ec39924803c401364db11c8974d5bf6d0262",
       "names": [],
       "sources": []
@@ -29146,7 +29304,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:188"
+        "packages/experimental/hard-ledger/src/types.ts:228"
       ]
     },
     {
@@ -29301,7 +29459,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:196"
+        "packages/experimental/hard-ledger/src/types.ts:236"
       ]
     },
     {

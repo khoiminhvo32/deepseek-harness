@@ -999,7 +999,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-deepread`
 
 - `inject`: `systemPrompt`
-- `source`: [`packages/experimental/hard-deepread/src/index.ts:23`](../packages/experimental/hard-deepread/src/index.ts)
+- `source`: [`packages/experimental/hard-deepread/src/index.ts:20`](../packages/experimental/hard-deepread/src/index.ts)
 
 ```ts config-catalog
 /** Deep-read plugin config. */
@@ -1036,7 +1036,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:66`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:69`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1217,7 +1217,7 @@ export interface Config {}
 ## `@deepseek-ai/dsh-experimental-hard-verifier`
 
 - `inject`: `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-verifier/src/index.ts:49`](../packages/experimental/hard-verifier/src/index.ts)
+- `source`: [`packages/experimental/hard-verifier/src/index.ts:50`](../packages/experimental/hard-verifier/src/index.ts)
 
 ```ts config-catalog
 /** Verifier plugin config. */

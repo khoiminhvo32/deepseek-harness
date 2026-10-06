@@ -42,6 +42,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'hard/coverage/cell',
   'hard/finding/proposed',
   'hard/finding/verdict',
+  'hard/flow/doc',
   'hard/gate/decision',
   'hard/hypothesis/state',
   'hard/mission/armed',

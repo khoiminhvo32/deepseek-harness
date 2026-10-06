@@ -1271,8 +1271,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
-        description: 'Append one completed sweep summary. An empty sweep must cite verifiable evidence the ledger can check — a refuted hypothesis, or a model-cleared cell with declared sinks; a harness-screened cell cannot prove a sweep did work. A sweep with findings carries no proof. The legacy free-text `emptyProof` is only read from older logs; new records always use `emptyProofRef`.',
+        description: 'Append one completed sweep summary. An empty sweep must cite verifiable evidence the ledger can check — a refuted hypothesis, a model-cleared cell with declared sinks, or a recorded flow document with resolvable citations; a harness-screened cell cannot prove a sweep did work. A sweep with findings carries no proof. The legacy free-text `emptyProof` is only read from older logs; new records carry `emptyProofRef` or `emptyProofFlowDoc`.',
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the sweep phase, counters, and conditional empty proof.' }],
+      },
+      {
+        signature: 'recordFlowDoc(agent: Agent, data: HardFlowDocData): void',
+        description: 'Append one recorded flow document for a module. The verifier must have resolved every citation against the pinned commit before this append — the tool rejects the whole record when any cite fails, so a recorded document certifies reads, not promises.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the summary to persist: section counts, resolved citation count, and the quirks\' hypothesis ids.' }],
+      },
+      {
+        signature: 'flowDocs(agent: Agent): readonly HardFlowDocData[]',
+        description: 'Flow documents folded to their latest record per module.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per module, in first-recorded order.',
       },
       {
         signature: 'findings(agent: Agent): readonly HardLedgerFindingEntry[]',
@@ -1367,17 +1378,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>',
-        description: 'Deterministic cross-check of one `cleared` coverage cell: re-grep the module against the bug class\'s fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. The grep runs from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without patterns, a missing matrix, or a grep with no undeclared matches returns `undefined` and changes nothing. The check fails closed: a grep that errors, times out, or is aborted never reads as a clean cell.',
+        description: 'Deterministic cross-check of one `cleared` coverage cell, branched by the class\'s reading. Presence classes (the default): re-grep the module against the fixed sink patterns and reopen the cell as `suspicious` when undeclared sink sites surface. Guarded-surface classes (`authz`, `authn-bypass`): re-grep for the exported operations and reopen when the module still exports an operation the model never declared a guard for — the reopening evidence is the missed operation names. Both greps run from the pinned target repository the armed coverage matrix records, so the module path is always target-repo relative. Sampling follows the configured spot-check percent by cell hash; an unsampled cell, a non-cleared cell, a class without applicable patterns, a missing matrix, or a grep with no undeclared matches returns `undefined` and changes nothing. The check fails closed: a grep that errors, times out, or is aborted never reads as a clean cell.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'cell', description: 'the coverage cell the model just marked `cleared`.' }],
         returns: 'the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.',
         throws: ['`HARD_VERIFIER_AUDIT_FAILED` when the cross-check grep errors, times out, or is aborted — an unevaluated grep is not evidence of absence.'],
       },
       {
+        signature: 'async checkFlowCitations( agent: Agent, citations: readonly FlowCitationEntry[], ): Promise<{ rejected: readonly FlowCitationReject[] }>',
+        description: 'Resolve every flow-document citation against the pinned target commit — `git show <sha>:<path>`, never the working tree — so a citation the model edited into existence after the arming cannot resolve. A cite passes only when the path is tracked at the pinned commit, the line exists there, and the snippet is a trimmed substring of that line\'s content. The check is the flow-document floor: prose cannot be verified, but a resolvable citation forces the model to open the right file at the right lines, so fabricating one costs approximately what reading it does. It fails closed: a git invocation that errors, times out, or is aborted throws instead of reading as a failed citation.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the pinned commit.' }, { name: 'citations', description: 'the citations to resolve, in any order.' }],
+        returns: 'the rejected citations with per-cite reasons; empty means every cite resolved.',
+        throws: ['`HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.', '`HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.'],
+      },
+      {
         signature: 'async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>',
-        description: 'Mechanical absence screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed sink patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD coverage, never subtract — a narrow pattern choice cannot sneak past the harness table. An empty grep on every module proves the absence predicate; any match fails the whole batch and returns the matching lines as evidence for a manual read. Absence-shaped classes are refused: for their protective sinks, an empty grep is suspicious, not clean.',
+        description: 'Mechanical absence screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD coverage, never subtract — a narrow pattern choice cannot sneak past the harness table. An empty grep on every module proves the absence predicate; any match fails the whole batch and returns the matching lines as evidence for a manual read. The pattern table follows the class\'s reading: guarded-surface classes grep for the exported operations (zero matches = no exported surface), sink classes grep for the sink shapes, and the one remaining absence-shaped class (`login-bypass`) is refused — for its protective sinks an empty grep is suspicious, not clean.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'bugClass', description: 'the bug class to prove absent.' }, { name: 'modules', description: 'the target-repo-relative modules to grep.' }, { name: 'patterns', description: 'the model\'s own extended-regex absence patterns.' }],
         returns: '`clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.',
-        throws: ['when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.'],
+        throws: ['when the class is absence-shaped or has no fixed patterns, the grep errors, or no matrix is armed.'],
       },
     ],
   },
@@ -5421,6 +5439,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FinishReasonMap {\n    \'stop\': {\n        kind: \'stop\';\n    };\n    \'tool-calls\': {\n        kind: \'tool-calls\';\n    };\n    \'max-tokens\': {\n        kind: \'max-tokens\';\n    };\n    \'aborted\': {\n        kind: \'aborted\';\n        failure: LlmFailure;\n    };\n    \'error\': {\n        kind: \'error\';\n        failure: LlmFailure;\n    };\n}',
   },
   {
+    name: 'FlowCitationEntry',
+    declaration: 'export interface FlowCitationEntry {\n    readonly cite: string;\n    readonly snippet: string;\n}',
+  },
+  {
+    name: 'FlowCitationReject',
+    declaration: 'export interface FlowCitationReject {\n    readonly cite: string;\n    readonly reason: string;\n}',
+  },
+  {
     name: 'FrequencyTooHighError',
     declaration: 'export interface FrequencyTooHighError {\n    readonly code: \'frequency_too_high\';\n    readonly message: string;\n}',
   },
@@ -5573,6 +5599,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n    readonly benignArm?: HardBenignArmResult;\n    readonly cause?: HardFindingCause;\n    readonly evidence?: HardFindingEvidence;\n}',
   },
   {
+    name: 'HardFlowDocData',
+    declaration: 'export interface HardFlowDocData {\n    readonly module: string;\n    readonly sections: HardFlowDocSections;\n    readonly citations: number;\n    readonly quirkIds?: readonly string[];\n}',
+  },
+  {
+    name: 'HardFlowDocSections',
+    declaration: 'export interface HardFlowDocSections {\n    readonly entryPoints: number;\n    readonly dataflows: number;\n    readonly trustBoundaries: number;\n    readonly stateMachines: number;\n    readonly assumptions: number;\n    readonly quirks: number;\n}',
+  },
+  {
     name: 'HardHypothesisId',
     declaration: 'export type HardHypothesisId = Branded<\'HardHypothesisId\'>;',
   },
@@ -5598,7 +5632,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardSweepSummaryData',
-    declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n    readonly emptyProofRef?: HardEmptySweepProof;\n}',
+    declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n    readonly emptyProofRef?: HardEmptySweepProof;\n    readonly emptyProofFlowDoc?: string;\n}',
   },
   {
     name: 'HardVerdict',

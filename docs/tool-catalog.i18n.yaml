@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: 2a3a043ba6dc1fc3
-  zh: 1bc6b94efa61ee23
+  en: c68dafd2b847e67f
+  zh: 4c8fea21b9275b24
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -174,17 +174,20 @@
   en: f0cf411916ffdb04
   zh: f0cf411916ffdb04
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-clear-modules:
-  en: b799496088d759c9
-  zh: b799496088d759c9
+  en: 0c97aac7998487c4
+  zh: 0c97aac7998487c4
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-mark-coverage:
-  en: dca76a330926ff86
-  zh: dca76a330926ff86
+  en: 4f47d168cd805fc8
+  zh: 4f47d168cd805fc8
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-record-flow:
+  en: f0ba66ed4deb5523
+  zh: f0ba66ed4deb5523
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-submit-finding:
   en: 7a884dd91c476460
   zh: 7a884dd91c476460
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-sweep-summary:
-  en: 7a85a6c3fd429161
-  zh: 7a85a6c3fd429161
+  en: 0974ceeba8baa277
+  zh: 0974ceeba8baa277
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-update-hypothesis:
   en: 1a9d5c0a2c62f421
   zh: 1a9d5c0a2c62f421

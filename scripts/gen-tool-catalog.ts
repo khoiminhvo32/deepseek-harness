@@ -437,7 +437,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     dir: 'hard-tools',
     source: 'packages/experimental/hard-tools/src/index.ts',
     requires: ['ctx.tools', 'ctx.hardLedger', 'ctx.hardVerifier', 'ctx.shell for proof execution', 'a live Agent'],
-    writes: ['tool/call', 'hard/finding/proposed', 'hard/finding/verdict', 'hard/hypothesis/state', 'hard/coverage/cell', 'hard/sweep/summary', 'tool/result'],
+    writes: ['tool/call', 'hard/finding/proposed', 'hard/finding/verdict', 'hard/hypothesis/state', 'hard/flow/doc', 'hard/coverage/cell', 'hard/sweep/summary', 'tool/result'],
     async mount(ctx) {
       class CatalogShell extends Service {
         constructor(shellCtx: CordisContext) {

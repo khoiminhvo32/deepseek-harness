@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-deepread` 以 `hard:deep-read` 系统提示节的形式拥有 hard 任务的 Phase B 契约。当轮次命名 phase B 时，该节指引模型按模块或模块簇扇出子代理（每次 pass 有上限），要求一份结构化 flow 文档——入口、数据流、信任边界、状态机、假设、可疑怪癖——将其保存到 `.dsh-hard/flow/<module>.md`，并把每个怪癖作为带具体证伪步骤的台账假设记录下来。
+`dsh-experimental-hard-deepread` 以 `hard:deep-read` 系统提示节的形式拥有 hard 任务的 Phase B 契约。当轮次命名 phase B 时，该节指引模型按模块或模块簇扇出子代理（每次 pass 有上限），要求一份结构化 flow 文档——入口、数据流、信任边界、状态机、假设、可疑怪癖——通过 `hard_record_flow` 记录（校验器将每条 path:line 引用对照钉住的提交解析，并点名失败的引用拒绝整份记录），并把每个怪癖作为带具体证伪步骤的台账假设记录下来。
 
 ## 目录
 
@@ -66,12 +66,12 @@ kind: "package-reference"
 
 #### What the model sees
 
-固定的 Phase B 契约：每次 pass 最多读 `maxModulesPerPass` 个模块，每模块一个子代理并要求六节 flow 文档，文档保存为 `.dsh-hard/flow/<module>.md`，怪癖经 `hard_update_hypothesis` 记录为假设，存活下来的怪癖转为带真实 PoC 的 finding，无怪癖的 pass 以 `hard_sweep_summary` phase B 加 `emptyProof` 收尾。
+固定的 Phase B 契约：每次 pass 最多读 `maxModulesPerPass` 个模块，每模块一个子代理并要求六节 flow 文档，每份文档经 `hard_record_flow` 记录并携带逐条 `path:line` 引用与片段，怪癖经 `hard_update_hypothesis` 记录为假设，存活下来的怪癖转为带真实 PoC 的 finding，无怪癖的 pass 以 `hard_sweep_summary` phase B 引用已记录的 flow 文档作为空扫描证明收尾。
 
 ##### Deep-read policy
 
 ```markdown
-Deep-reading pass (Phase B): when a round names phase B, read 6 module or module-cluster at a time for understanding rather than pattern matching. For each module, spawn one subagent whose prompt demands a structured flow document with exactly these sections: entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks. Save each document as .dsh-hard/flow/<module>.md and cite it later by path. Record every suspicious quirk as a hypothesis with hard_update_hypothesis: status proposed first, then testing with a concrete falsification step; never mark confirmed without executed evidence. Quirks that survive testing convert into findings submitted with hard_submit_finding and a real PoC. A deep-reading pass with no quirks found still records its progress: summarize the pass with hard_sweep_summary phase B and an emptyProof naming the modules read and the assumptions checked.
+Deep-reading pass (Phase B): when a round names phase B, read 6 module or module-cluster at a time for understanding rather than pattern matching. For each module, spawn one subagent whose prompt demands a structured flow document with exactly these sections: entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks. Record each document with hard_record_flow: every section takes path:line citations plus a short snippet copied from the cited lines, and the harness resolves every citation against the pinned commit — a citation the working tree satisfies but the pinned tree does not fails the whole record, so cite what you actually read. Record every suspicious quirk as a hypothesis with hard_update_hypothesis: status proposed first, then testing with a concrete falsification step; never mark confirmed without executed evidence. Quirks that survive testing convert into findings submitted with hard_submit_finding and a real PoC. A deep-reading pass with no quirks found still records its progress: summarize the pass with hard_sweep_summary phase B, citing the recorded flow documents as the empty proof.
 ```
 
 #### Token effect
@@ -87,7 +87,7 @@ Deep-reading pass (Phase B): when a round names phase B, read 6 module or module
 <a id="known-limitations-and-deferred-work"></a>
 
 - **子代理质量是模型判断** — 契约命名了文档分节但无法强制其深度；台账的假设生命周期才是强制点。
-- **flow 文档是文件工件** — 文档位于 `.dsh-hard/flow/` 下并以路径引用；只有台账记录是持久的会话事件。
+- **flow 文档是持久记录** — `hard/flow/doc` 携带 harness 检验过的各节条目数与引用数；笔记与片段留在工具结果里，日志只保存解析通过的内容。
 
 <a id="dev-note"></a>
 ### 开发备注

@@ -40,18 +40,42 @@ const HYPOTHESIS_DESCRIPTION = 'Propose a new hypothesis, or move an existing on
   + 'an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.'
 
 const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systematic pass: a module swept for one '
-  + 'bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; '
-  + 'the harness may re-grep the module against your declared list.'
+  + 'bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol '
+  + 'references; the harness may re-grep the module against your declared list. '
+  + 'For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it '
+  + 'exports, so cleared requires one declaration per exported operation — name the guard that protects it, '
+  + 'or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any '
+  + 'operation none of your declarations mention.'
 
 const CLEAR_MODULES_DESCRIPTION = 'Batch-clear one bug class across several modules WITH harness verification. '
   + 'Provide extended-regex patterns that prove this class\'s sinks are absent from those modules; the harness greps '
   + 'each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, '
   + 'never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the '
-  + 'matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) '
-  + 'are refused: there, an empty grep is suspicious, not clean.'
+  + 'matching lines for a manual read. login-bypass is refused: its sinks are protective checks, so an empty grep '
+  + 'is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations instead of '
+  + 'sinks: an empty grep proves the module exports nothing to protect, and any match names an operation whose '
+  + 'guard hard_mark_coverage must declare.'
 
 const SWEEP_DESCRIPTION = 'Record one completed sweep pass. When the pass found nothing, empty_proof is required: '
-  + 'name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.'
+  + 'name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep '
+  + 'was not skipped.'
+
+const FLOW_DESCRIPTION = 'Record one flow document for a module after the deep-reading pass. All six sections are '
+  + 'required; an empty section means you explicitly found nothing, not that you skipped it. Every entry carries '
+  + 'cite, snippet, and note: cite is a path:line or path:line-line reference into the target repository, snippet '
+  + 'is the short source text at those lines, note is your reading of them. The harness resolves every citation '
+  + 'against the pinned commit — never the working tree — and rejects the whole record naming the failed cites, '
+  + 'so copy snippets from what you actually read. Each quirk entry automatically opens a proposed hypothesis.'
+
+/** Schema of one flow-document entry shared by the six sections; value-schema items are total. */
+const FLOW_ENTRY_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    cite: { type: 'string', description: 'path:line or path:line-line, target-repo relative.' },
+    snippet: { type: 'string', description: 'The short source text at those lines, copied verbatim.' },
+    note: { type: 'string', description: 'Your reading of the cited lines.' },
+  },
+} as const
 
 /** Compact generic presentation shared by the hard tools. */
 function present(title: string, rawInput: unknown): GenericCallView {
@@ -74,9 +98,68 @@ function renderJson(_args: unknown, value: unknown): { type: 'text'; text: strin
   return [{ type: 'text', text: JSON.stringify(value) }]
 }
 
-/** Register the five hard-harness tools. */
-export function apply(ctx: Context, _config: Config): void {
-  const ledger = ctx.hardLedger
+/** The tool argument key of each flow-document section, in contract order. */
+const FLOW_SECTION_KEYS = ['entry_points', 'dataflows', 'trust_boundaries', 'state_machines', 'assumptions', 'quirks'] as const
+
+type FlowSectionKey = (typeof FLOW_SECTION_KEYS)[number]
+
+/** One validated flow-document entry. */
+interface FlowEntry {
+  readonly cite: string
+  readonly snippet: string
+  readonly note: string
+}
+
+/**
+ * Read one required string field of a flow entry, rejecting blanks and
+ * unbounded text: the snippet and note ride the tool result, so their sizes
+ * are bounded here rather than by the log.
+ * @param section - the section key, worded for the error message.
+ * @param source - the raw entry object.
+ * @param field - the field to read.
+ * @param limit - the character bound.
+ * @returns the trimmed field value.
+ */
+function flowField(section: string, source: Record<string, unknown>, field: 'cite' | 'snippet' | 'note', limit: number): string {
+  const value = source[field]
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${section} entries require a non-empty ${field}`)
+  }
+  if (value.length > limit) {
+    throw new Error(`${section} ${field} must not exceed ${limit} characters`)
+  }
+  return value
+}
+
+/**
+ * Read and validate the six flow sections: each required, each an array (an
+ * empty one is an explicit empty section), each entry carrying a bounded
+ * cite, snippet, and note.
+ * @param args - the raw tool arguments.
+ * @returns the six validated sections in contract order.
+ */
+function readFlowSections(args: Record<FlowSectionKey, unknown>): Record<FlowSectionKey, readonly FlowEntry[]> {
+  const sections = {} as Record<FlowSectionKey, readonly FlowEntry[]>
+  for (const key of FLOW_SECTION_KEYS) {
+    const raw = args[key]
+    if (!Array.isArray(raw)) {
+      throw new Error(`${key} must be an array (an empty one records an explicit empty section)`)
+    }
+    sections[key] = raw.map((item): FlowEntry => {
+      if (typeof item !== 'object' || item === null) throw new Error(`${key} entries must be objects`)
+      const source = item as Record<string, unknown>
+      return {
+        cite: flowField(key, source, 'cite', 500),
+        snippet: flowField(key, source, 'snippet', 500),
+        note: flowField(key, source, 'note', 1000),
+      }
+    })
+  }
+  return sections
+}
+
+/** Register the six hard-harness tools. */
+export function apply(ctx: Context, _config: Config): void {  const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
 
   ctx.tools.register(defineTool({
@@ -263,6 +346,75 @@ export function apply(ctx: Context, _config: Config): void {
   }))
 
   ctx.tools.register(defineTool({
+    name: 'hard_record_flow',
+    description: FLOW_DESCRIPTION,
+    parameters: {
+      module: { type: 'string', required: true, description: 'Module or module-cluster read, target-repo relative.' },
+      entry_points: { type: 'array', required: true, description: 'Entry-point citations; an empty array records an explicit empty section.', items: FLOW_ENTRY_SCHEMA },
+      dataflows: { type: 'array', required: true, description: 'Dataflow citations; an empty array records an explicit empty section.', items: FLOW_ENTRY_SCHEMA },
+      trust_boundaries: { type: 'array', required: true, description: 'Trust-boundary citations; an empty array records an explicit empty section.', items: FLOW_ENTRY_SCHEMA },
+      state_machines: { type: 'array', required: true, description: 'State-machine citations; an empty array records an explicit empty section.', items: FLOW_ENTRY_SCHEMA },
+      assumptions: { type: 'array', required: true, description: 'Assumption citations; an empty array records an explicit empty section.', items: FLOW_ENTRY_SCHEMA },
+      quirks: { type: 'array', required: true, description: 'Suspicious-quirk citations; each opens a proposed hypothesis.', items: FLOW_ENTRY_SCHEMA },
+    },
+    output: {
+      schema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          flow: {
+            type: 'object', additionalProperties: false, required: true,
+            properties: {
+              module: { type: 'string', required: true },
+              citations: { type: 'integer', required: true },
+              quirkIds: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      } as const,
+      render: renderJson,
+    },
+    execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_record_flow requires a live agent')
+      const sections = readFlowSections(args)
+      const citations = FLOW_SECTION_KEYS.flatMap(key => sections[key]
+        .map(entry => ({ cite: entry.cite, snippet: entry.snippet })))
+      return verifier.checkFlowCitations(agent, citations).then(({ rejected }) => {
+        if (rejected.length > 0) {
+          throw new Error('hard_record_flow rejected — every citation must resolve at the pinned commit: '
+            + rejected.map(entry => `${entry.cite} (${entry.reason})`).join('; '))
+        }
+        const quirkIds = sections.quirks.map(entry => ledger.writeHypothesis(agent, {
+          statement: `quirk ${entry.cite}: ${entry.note}`,
+          status: 'proposed',
+        }))
+        ledger.recordFlowDoc(agent, {
+          module: args.module,
+          sections: {
+            entryPoints: sections.entry_points.length,
+            dataflows: sections.dataflows.length,
+            trustBoundaries: sections.trust_boundaries.length,
+            stateMachines: sections.state_machines.length,
+            assumptions: sections.assumptions.length,
+            quirks: sections.quirks.length,
+          },
+          citations: citations.length,
+          ...(quirkIds.length === 0 ? {} : { quirkIds }),
+        })
+        return {
+          flow: {
+            module: args.module,
+            citations: citations.length,
+            ...(quirkIds.length === 0 ? {} : { quirkIds }),
+          },
+        }
+      })
+    },
+    presentCall: args => present(`Flow doc ${args.module}: `
+      + `${args.entry_points.length + args.dataflows.length + args.trust_boundaries.length + args.state_machines.length + args.assumptions.length + args.quirks.length} citations`, args.module),
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'hard_clear_modules',
     description: CLEAR_MODULES_DESCRIPTION,
     parameters: {
@@ -357,7 +509,7 @@ export function apply(ctx: Context, _config: Config): void {
       cells_touched: { type: 'number', required: true, description: 'Coverage cells touched this pass.' },
       new_findings: { type: 'number', required: true, description: 'Confirmed findings this pass produced.' },
       empty_proof_kind: {
-        type: 'string', enum: ['hypothesis', 'cell'],
+        type: 'string', enum: ['hypothesis', 'cell', 'flow'],
         description: 'Required when new_findings is zero: what proves this sweep did work.',
       },
       empty_proof_id: {
@@ -366,7 +518,7 @@ export function apply(ctx: Context, _config: Config): void {
       },
       empty_proof_module: {
         type: 'string',
-        description: 'With empty_proof_kind cell: the module of the cleared cell being cited.',
+        description: 'With empty_proof_kind cell or flow: the module being cited.',
       },
       empty_proof_bug_class: {
         type: 'string',
@@ -392,6 +544,7 @@ export function apply(ctx: Context, _config: Config): void {
                   bugClass: { type: 'string' },
                 },
               },
+              emptyProofFlowDoc: { type: 'string', description: 'The cited flow-document module, for empty_proof_kind flow.' },
             },
           },
         },
@@ -400,19 +553,19 @@ export function apply(ctx: Context, _config: Config): void {
     },
     execute(args, exec) {
       if (exec.agent === undefined) throw new Error('hard_sweep_summary requires a live agent')
-      const emptyProofRef = emptyProofFrom(args)
+      const proof = emptyProofFrom(args)
       ledger.recordSweep(exec.agent, {
         phase: args.phase,
         cellsTouched: args.cells_touched,
         newFindings: args.new_findings,
-        ...emptyProofRef === undefined ? {} : { emptyProofRef },
+        ...(proof === undefined ? {} : proof.kind === 'flow' ? { emptyProofFlowDoc: proof.module } : { emptyProofRef: proof }),
       })
       return Promise.resolve({
         sweep: {
           phase: args.phase,
           cellsTouched: args.cells_touched,
           newFindings: args.new_findings,
-          ...emptyProofRef === undefined ? {} : { emptyProofRef },
+          ...(proof === undefined ? {} : proof.kind === 'flow' ? { emptyProofFlowDoc: proof.module } : { emptyProofRef: proof }),
         },
       })
     },
@@ -420,13 +573,16 @@ export function apply(ctx: Context, _config: Config): void {
   }))
 }
 
+/** The assembled empty-sweep proof: a ledger reference, or the flow-document module. */
+type EmptyProof = HardEmptySweepProof | { readonly kind: 'flow'; readonly module: string }
+
 /** Assemble the structured empty-sweep proof from the model's arguments, failing loud on a half-specified one. */
 function emptyProofFrom(args: {
-  empty_proof_kind?: 'hypothesis' | 'cell'
+  empty_proof_kind?: 'hypothesis' | 'cell' | 'flow'
   empty_proof_id?: string
   empty_proof_module?: string
   empty_proof_bug_class?: string
-}): HardEmptySweepProof | undefined {
+}): EmptyProof | undefined {
   const kind = args.empty_proof_kind
   if (kind === undefined) {
     if (args.empty_proof_id !== undefined || args.empty_proof_module !== undefined
@@ -449,9 +605,17 @@ function emptyProofFrom(args: {
     throw new Error('empty_proof_id is valid only with empty_proof_kind hypothesis')
   }
   const module = args.empty_proof_module
-  const bugClass = args.empty_proof_bug_class
-  if (module === undefined || module.trim().length === 0 || bugClass === undefined || bugClass.trim().length === 0) {
-    throw new Error('empty_proof_kind cell requires a non-empty empty_proof_module and empty_proof_bug_class')
+  if (module === undefined || module.trim().length === 0) {
+    throw new Error(`empty_proof_kind ${kind} requires a non-empty empty_proof_module`)
+  }
+  if (kind === 'flow') {
+    if (args.empty_proof_bug_class !== undefined) {
+      throw new Error('empty_proof_bug_class is valid only with empty_proof_kind cell')
+    }
+    return { kind: 'flow', module }
+  }  const bugClass = args.empty_proof_bug_class
+  if (bugClass === undefined || bugClass.trim().length === 0) {
+    throw new Error('empty_proof_kind cell requires a non-empty empty_proof_bug_class')
   }
   return { kind: 'cell', module, bugClass }
 }

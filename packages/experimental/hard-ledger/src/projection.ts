@@ -30,6 +30,10 @@ const sweepSummarySchema = zod.object({
   // Legacy free-text proof; only older logs carry it.
   emptyProof: zod.string().optional(),
   emptyProofRef: emptyProofSchema.optional(),
+  // The flow-document proof rides beside the reference union: opening the
+  // union itself would change the payload contract and force a Session-format
+  // bump, while the recorded documents keep growing.
+  emptyProofFlowDoc: zod.string().min(1).optional(),
 })
 
 /** One proposed finding with its verifier verdict once recorded. */
@@ -82,6 +86,21 @@ const coverageSchema = zod.object({
   source: zod.enum(['model', 'model-verified', 'harness']).optional(),
 })
 
+/** Validates one folded flow-document record: section and citation counts per module. */
+const flowDocSchema = zod.object({
+  module: zod.string().min(1),
+  sections: zod.object({
+    entryPoints: zod.number().int().min(0),
+    dataflows: zod.number().int().min(0),
+    trustBoundaries: zod.number().int().min(0),
+    stateMachines: zod.number().int().min(0),
+    assumptions: zod.number().int().min(0),
+    quirks: zod.number().int().min(0),
+  }),
+  citations: zod.number().int().min(0),
+  quirkIds: zod.array(zod.string().min(1)).readonly().optional(),
+})
+
 /** Validates one folded mission arming record: the pinned target and the matrix axes. */
 const matrixSchema = zod.object({
   modules: zod.array(zod.string().min(1)).readonly(),
@@ -96,6 +115,8 @@ export const hardLedgerStateSchema = zod.object({
   findings: zod.array(zod.object({ proposed: proposedSchema, verdict: verdictSchema.optional() })),
   hypotheses: zod.array(hypothesisSchema),
   coverage: zod.array(coverageSchema),
+  // Optional: cached states from before the flow-document event fold without one.
+  flowDocs: zod.array(flowDocSchema).optional(),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
   recentSweeps: zod.array(sweepSummarySchema).max(HARD_SWEEP_WINDOW).readonly(),
   goalId: zod.string().min(1).optional(),
@@ -136,6 +157,13 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
         ? [...state.coverage, event.data]
         : state.coverage.map((record, position) => position === index ? event.data : record)
       return { ...state, coverage }
+    }
+    case 'hard/flow/doc': {
+      const index = state.flowDocs?.findIndex(record => record.module === event.data.module) ?? -1
+      const flowDocs = index === -1
+        ? [...state.flowDocs ?? [], event.data]
+        : (state.flowDocs ?? []).map((record, position) => position === index ? event.data : record)
+      return { ...state, flowDocs }
     }
     case 'hard/sweep/summary':
       return {
@@ -195,7 +223,9 @@ export const hardLedgerProjectionDefinition = {
   apply: applyHardLedgerProjection,
   // Version 4 changes the empty-sweep proof from free text to a verifiable
   // reference and adds the bounded sweep window plus the armed goal id; the
-  // bump forces a full log rebuild so both recover on resume.
+  // bump forces a full log rebuild so both recover on resume. The flow
+  // documents added after it fold into an optional state field, so no
+  // rebuild is required.
   stateVersion: 4,
 } satisfies ProjectionDefinition<'hardLedger', HardLedgerProjectionState>
 

@@ -1,0 +1,293 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/flow/doc",
+      "kind": "event",
+      "event": "hard/flow/doc",
+      "surface": false,
+      "digest": "01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "citations",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "quirkIds",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "sections",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "assumptions",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "dataflows",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryPoints",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "quirks",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "stateMachines",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "trustBoundaries",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/flow/doc"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/sweep/summary",
+      "kind": "event",
+      "event": "hard/sweep/summary",
+      "surface": false,
+      "digest": "86d644bd25fa85186753fe688a9f5b3304ed56264923f4ab6f3e9fc65f598a45",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cellsTouched",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "emptyProof",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "emptyProofFlowDoc",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "emptyProofRef",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "newFindings",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              7
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClass",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "cell"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "hypothesisId",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "hypothesis"
+          },
+          {
+            "kind": "union",
+            "types": [
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "A"
+          },
+          {
+            "kind": "literal",
+            "value": "B"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/sweep/summary"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

@@ -9,7 +9,7 @@ import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
-import HardVerifier, { SINK_PATTERNS, claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import HardVerifier, { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { Config as VerifierConfig } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { HardFindingId } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -367,7 +367,7 @@ function armMatrix(ctx: Context, targetRepo: string): Agent {
 }
 
 describe('hard verifier coverage cross-check', () => {
-  it('keeps every sink pattern single-line so a shell-quoted grep parses', () => {
+  it('keeps every sink and surface pattern single-line so a shell-quoted grep parses', () => {
     for (const [bugClass, patterns] of Object.entries(SINK_PATTERNS)) {
       for (const pattern of patterns) {
         // A real control character inside the quoted grep pattern makes BSD
@@ -375,6 +375,25 @@ describe('hard verifier coverage cross-check', () => {
         expect(pattern, `${bugClass}: ${pattern}`).not.toMatch(/[\u0000-\u001f]/u)
       }
     }
+    for (const [bugClass, patterns] of Object.entries(GUARDED_SURFACE_PATTERNS)) {
+      for (const pattern of patterns) {
+        expect(pattern, `${bugClass}: ${pattern}`).not.toMatch(/[\u0000-\u001f]/u)
+      }
+    }
+  })
+
+  it('reduces matched surface lines back to the operations they declare', async () => {
+    const { surfaceOperands } = await import('@deepseek-ai/dsh-experimental-hard-verifier')
+    expect(surfaceOperands('src/web/render.js:13:module.exports = { renderPage }')).toEqual(['renderPage'])
+    expect(surfaceOperands('src/db/index.js:30:module.exports = { findUser, countSessions }')).toEqual(['findUser', 'countSessions'])
+    expect(surfaceOperands('src/api.ts:3:export async function handler(req) {')).toEqual(['handler'])
+    expect(surfaceOperands('src/api.ts:9:export const routes = [1];')).toEqual(['routes'])
+    expect(surfaceOperands('src/legacy.js:2:exports.util = buildUtil;')).toEqual(['util'])
+    expect(surfaceOperands('src/app.ts:12:app.get(\'/view/:id\', handler)')).toEqual(['/view/:id'])
+    expect(surfaceOperands('src/api.ts:4:@Get(\'/account\')')).toEqual(['/account'])
+    expect(surfaceOperands('src/api.ts:5:@Get')).toEqual(['Get'])
+    // A line no extractor recognizes falls back to the whole matched line.
+    expect(surfaceOperands('src/odd.js:1:some unmatched line')).toEqual(['src/odd.js:1:some unmatched line'])
   })
 
 
@@ -452,6 +471,108 @@ describe('hard verifier coverage cross-check', () => {
   it('validates the spot-check percent fail-loud', () => {
     expect(() => new HardVerifier(new Context(), { coverageSpotCheckPercent: 101 }))
       .toThrow('coverageSpotCheckPercent must be a safe integer from 0 through 100')
+  })
+
+  it('audits guarded-surface classes by exported operations and reopens naming the undeclared ones', async () => {
+    const { ctx, shell } = await harness(
+      [{ exitCode: 0, stdoutText: 'src/web/render.js:13:module.exports = { renderPage }\nsrc/web/routes.js:20:module.exports = { handleDashboardQuery }\n' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, {
+      module: 'src/auth', bugClass: 'authz', verdict: 'cleared',
+      declaredSinks: ['renderPage → requireRole(\'editor\')'],
+    })
+    expect(reopened).toEqual({
+      module: 'src/auth', bugClass: 'authz', verdict: 'suspicious', declaredSinks: ['handleDashboardQuery'],
+    })
+    expect(shell.runs[0]?.command).toContain('module\\.exports')
+    // Declaring every exported operation keeps the cell standing.
+    const declared = await harness(
+      [{ exitCode: 1, stdoutText: '' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const declaredRoot = armMatrix(declared.ctx, '/tmp/hard-target')
+    expect(await declared.ctx.hardVerifier.auditCoverage(declaredRoot, {
+      module: 'src/auth', bugClass: 'authz', verdict: 'cleared', declaredSinks: ['renderPage', 'handleDashboardQuery'],
+    })).toBeUndefined()
+  })
+
+  it('throws without a matrix when resolving flow citations', async () => {
+    const { ctx } = await harness([])
+    const root = root0Agent(ctx)
+    const failure = await ctx.hardVerifier.checkFlowCitations(root, [
+      { cite: 'src/web/render.js:5', snippet: 'function renderPage' },
+    ]).catch((error: unknown) => error)
+    expect((failure as { code?: string }).code).toBe('HARD_VERIFIER_NO_MATRIX')
+  })
+
+  it('resolves citations against the pinned commit through ls-tree and piped git show', async () => {
+    const { ctx, shell } = await harness(
+      [
+        { exitCode: 0, stdoutText: 'src/web/render.js\n' },
+        { exitCode: 0, stdoutText: "function renderPage(slug) {\n  const fragment = 'pages/' + slug + '.html'\n" },
+      ],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const result = await ctx.hardVerifier.checkFlowCitations(root, [
+      { cite: 'src/web/render.js:5-6', snippet: 'function renderPage(slug) {' },
+    ])
+    expect(result.rejected).toEqual([])
+    expect(shell.runs[0]?.command).toBe(`git ls-tree --name-only '${'a'.repeat(40)}' -- 'src/web/render.js'`)
+    expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
+    expect(shell.runs[1]?.command).toContain(`git show '${'a'.repeat(40)}:src/web/render.js'`)
+    expect(shell.runs[1]?.command).toContain('sed -n \'5,6p\'')
+    expect(shell.runs[1]?.command).toContain('set -o pipefail')
+  })
+
+  it('rejects untracked paths, missing lines, and mismatched snippets without throwing', async () => {
+    const { ctx } = await harness(
+      [
+        { exitCode: 0, stdoutText: '' }, // untracked path
+        { exitCode: 0, stdoutText: 'src/web/render.js\n' }, // tracked, but the read misses
+        { exitCode: 0, stdoutText: 'other content entirely\n' }, // snippet mismatch
+        { exitCode: 0, stdoutText: '' }, // sed beyond the file end
+      ],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const result = await ctx.hardVerifier.checkFlowCitations(root, [
+      { cite: 'src/web/ghost.js:1', snippet: 'anything' },
+      { cite: 'src/web/render.js:5', snippet: 'function renderPage' },
+      { cite: 'src/web/render.js:2', snippet: 'function renderPage' },
+      { cite: 'src/web/render.js:500', snippet: 'far away' },
+    ])
+    expect(result.rejected.map(entry => `${entry.cite}: ${entry.reason}`)).toEqual([
+      'src/web/ghost.js:1: path is not tracked at the pinned commit',
+      'src/web/render.js:5: snippet does not match the file content at the pinned commit',
+      'src/web/render.js:2: snippet does not match the file content at the pinned commit',
+      'src/web/render.js:500: snippet does not match the file content at the pinned commit',
+    ])
+  })
+
+  it('rejects malformed cites without a shell run and fails closed on an unsettled git call', async () => {
+    const malformed = await harness([{ exitCode: 0, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
+    const malformedRoot = armMatrix(malformed.ctx, '/tmp/hard-target')
+    const result = await malformed.ctx.hardVerifier.checkFlowCitations(malformedRoot, [
+      { cite: 'src/web/render.js', snippet: 'x' },
+      { cite: 'src/web/render.js:0', snippet: 'x' },
+      { cite: 'src/web/render.js:5-2', snippet: 'x' },
+    ])
+    expect(result.rejected).toHaveLength(3)
+    expect(malformed.shell.runs).toEqual([])
+
+    const unsettled = await harness(
+      [{ exitCode: 2, stderrText: 'fatal: not a git repository', stdoutText: '' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const unsettledRoot = armMatrix(unsettled.ctx, '/tmp/hard-target')
+    const failed = await unsettled.ctx.hardVerifier.checkFlowCitations(unsettledRoot, [
+      { cite: 'src/web/render.js:5', snippet: 'x' },
+    ]).catch((error: unknown) => error)
+    expect((failed as { code?: string }).code).toBe('HARD_VERIFIER_CITATION_FAILED')
+    expect((failed as Error).message).toContain('hard flow citations: ls-tree over src/web/render.js failed with exit 2')
   })
 })
 

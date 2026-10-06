@@ -21,6 +21,7 @@ import type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFlowDocData,
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
@@ -43,6 +44,8 @@ export type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFlowDocData,
+  HardFlowDocSections,
   HardGateDecisionData,
   HardHypothesisId,
   HardHypothesisStateData,
@@ -309,11 +312,12 @@ export class HardLedger extends Service {
 
   /**
    * Append one completed sweep summary. An empty sweep must cite verifiable
-   * evidence the ledger can check — a refuted hypothesis, or a model-cleared
-   * cell with declared sinks; a harness-screened cell cannot prove a sweep
-   * did work. A sweep with findings carries no proof. The legacy free-text
-   * `emptyProof` is only read from older logs; new records always use
-   * `emptyProofRef`.
+   * evidence the ledger can check — a refuted hypothesis, a model-cleared
+   * cell with declared sinks, or a recorded flow document with resolvable
+   * citations; a harness-screened cell cannot prove a sweep did work. A sweep
+   * with findings carries no proof. The legacy free-text `emptyProof` is only
+   * read from older logs; new records carry `emptyProofRef` or
+   * `emptyProofFlowDoc`.
    * @param agent - the live agent whose session receives the record.
    * @param request - the sweep phase, counters, and conditional empty proof.
    */
@@ -325,23 +329,51 @@ export class HardLedger extends Service {
       throw new HarnessError('newFindings must be a non-negative safe integer', 'HARD_LEDGER_INVALID_SWEEP')
     }
     if (request.newFindings === 0) {
-      if (request.emptyProofRef === undefined) {
+      const proofs = [request.emptyProofRef, request.emptyProofFlowDoc].filter(proof => proof !== undefined)
+      if (proofs.length === 0) {
         throw new HarnessError(
-          'an empty sweep requires emptyProofRef evidence', 'HARD_LEDGER_EMPTY_PROOF_REQUIRED',
+          'an empty sweep requires emptyProofRef or emptyProofFlowDoc evidence', 'HARD_LEDGER_EMPTY_PROOF_REQUIRED',
+        )
+      }
+      if (proofs.length > 1) {
+        throw new HarnessError(
+          'emptyProofRef and emptyProofFlowDoc are mutually exclusive', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
         )
       }
       if (request.emptyProof !== undefined) {
         throw new HarnessError(
-          'the legacy emptyProof text is no longer accepted; cite emptyProofRef', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
+          'the legacy emptyProof text is no longer accepted; cite emptyProofRef or emptyProofFlowDoc',
+          'HARD_LEDGER_EMPTY_PROOF_INVALID',
         )
       }
-      this.assertEmptySweepProof(agent, request.emptyProofRef)
-    } else if (request.emptyProofRef !== undefined) {
-      throw new HarnessError(
-        'a sweep with findings carries no empty proof', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
-      )
+      if (request.emptyProofRef !== undefined) this.assertEmptySweepProof(agent, request.emptyProofRef)
+      else this.assertFlowDocProof(agent, request.emptyProofFlowDoc as string)
+    } else {
+      if (request.emptyProofRef !== undefined || request.emptyProofFlowDoc !== undefined) {
+        throw new HarnessError(
+          'a sweep with findings carries no empty proof', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
+        )
+      }
     }
     agent.session.append('hard/sweep/summary', request)
+  }
+
+  /** The recorded-document check behind one empty sweep's flow proof. */
+  private assertFlowDocProof(agent: Agent, module: string): void {
+    this.assertText('emptyProofFlowDoc', module)
+    const doc = (this.state(agent.session).flowDocs ?? []).find(entry => entry.module === module)
+    if (doc === undefined) {
+      throw new HarnessError(
+        `empty sweep proof must cite a recorded flow document; none exists for ${module}`,
+        'HARD_LEDGER_UNKNOWN_FLOW_DOC',
+      )
+    }
+    if (doc.citations === 0) {
+      throw new HarnessError(
+        `empty sweep proof must cite a flow document with resolvable citations; ${module} recorded none`,
+        'HARD_LEDGER_EMPTY_PROOF_INVALID',
+      )
+    }
   }
 
   /** The verified-referent check behind one empty sweep's proof. */
@@ -380,6 +412,60 @@ export class HardLedger extends Service {
         'HARD_LEDGER_EMPTY_PROOF_INVALID',
       )
     }
+  }
+
+  /**
+   * Append one recorded flow document for a module. The verifier must have
+   * resolved every citation against the pinned commit before this append —
+   * the tool rejects the whole record when any cite fails, so a recorded
+   * document certifies reads, not promises.
+   * @param agent - the live agent whose session receives the record.
+   * @param data - the summary to persist: section counts, resolved citation count, and the quirks' hypothesis ids.
+   */
+  recordFlowDoc(agent: Agent, data: HardFlowDocData): void {
+    this.assertText('module', data.module)
+    const sections = data.sections
+    for (const [section, count] of Object.entries(sections)) {
+      if (!Number.isSafeInteger(count) || count < 0) {
+        throw new HarnessError(
+          `sections.${section} must be a non-negative safe integer`, 'HARD_LEDGER_INVALID_FLOW_DOC',
+        )
+      }
+    }
+    const sectionTotal = sections.entryPoints + sections.dataflows + sections.trustBoundaries
+      + sections.stateMachines + sections.assumptions + sections.quirks
+    if (!Number.isSafeInteger(data.citations) || data.citations !== sectionTotal) {
+      throw new HarnessError(
+        'citations must equal the sum of the section counts (every entry carries one citation)',
+        'HARD_LEDGER_INVALID_FLOW_DOC',
+      )
+    }
+    if (data.quirkIds !== undefined) {
+      if (data.quirkIds.length !== sections.quirks) {
+        throw new HarnessError(
+          'quirkIds must name every recorded quirk', 'HARD_LEDGER_INVALID_FLOW_DOC',
+        )
+      }
+      for (const id of data.quirkIds) this.assertText('quirkIds[]', id)
+    }
+    agent.session.append('hard/flow/doc', {
+      module: data.module,
+      sections: { ...data.sections },
+      citations: data.citations,
+      ...(data.quirkIds === undefined ? {} : { quirkIds: [...data.quirkIds] }),
+    })
+  }
+
+  /**
+   * Flow documents folded to their latest record per module.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per module, in first-recorded order.
+   */
+  flowDocs(agent: Agent): readonly HardFlowDocData[] {
+    return (this.state(agent.session).flowDocs ?? []).map(({ quirkIds, ...doc }) => ({
+      ...doc,
+      ...(quirkIds === undefined ? {} : { quirkIds }),
+    }))
   }
 
   /**

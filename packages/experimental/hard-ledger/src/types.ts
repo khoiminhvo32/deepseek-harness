@@ -167,6 +167,37 @@ export type HardEmptySweepProof =
   | { readonly kind: 'hypothesis'; readonly hypothesisId: string }
   | { readonly kind: 'cell'; readonly module: string; readonly bugClass: string }
 
+/** Per-section entry counts of one flow document, in contract order. */
+export interface HardFlowDocSections {
+  readonly entryPoints: number
+  readonly dataflows: number
+  readonly trustBoundaries: number
+  readonly stateMachines: number
+  readonly assumptions: number
+  readonly quirks: number
+}
+
+/**
+ * One recorded flow document for a module, the durable Phase B record. The
+ * verifier resolved every citation against the pinned commit before this
+ * record was appended, so the counts certify reads, not promises. Notes and
+ * snippets are deliberately absent — prose belongs to the tool result, and
+ * the log carries only what the harness checked.
+ */
+export interface HardFlowDocData {
+  /** The module the document reads, target-repo relative. */
+  readonly module: string
+  /** Entries recorded per section, in contract order. */
+  readonly sections: HardFlowDocSections
+  /** Total citations the verifier resolved for this document. */
+  readonly citations: number
+  /**
+   * Hypothesis ids opened from the document's quirks, in quirk order.
+   * Optional so the change is additive; absent reads as none.
+   */
+  readonly quirkIds?: readonly string[]
+}
+
 /** One completed sweep pass summary; purely informational. */
 export interface HardSweepSummaryData {
   readonly phase: 'A' | 'B'
@@ -182,6 +213,15 @@ export interface HardSweepSummaryData {
    * refuted hypothesis, or a model-cleared cell with declared sinks.
    */
   readonly emptyProofRef?: HardEmptySweepProof
+  /**
+   * A Phase B empty sweep's alternative proof: the module whose recorded flow
+   * document (a `hard/flow/doc` with at least one resolved citation) proves
+   * the deep-reading pass ran. A sibling of `emptyProofRef`, not a variant of
+   * it: opening the reference union would change the payload contract and
+   * force a Session-format bump, while the recorded documents keep growing.
+   * Optional so the change is additive; the two fields are mutually exclusive.
+   */
+  readonly emptyProofFlowDoc?: string
 }
 
 /** The harness's recorded decision on one completion attempt. */

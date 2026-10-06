@@ -177,7 +177,7 @@
     },
     {
       "name": "hard_clear_modules",
-      "description": "Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) are refused: there, an empty grep is suspicious, not clean.",
+      "description": "Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. login-bypass is refused: its sinks are protective checks, so an empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations instead of sinks: an empty grep proves the module exports nothing to protect, and any match names an operation whose guard hard_mark_coverage must declare.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -208,7 +208,7 @@
     },
     {
       "name": "hard_mark_coverage",
-      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list.",
+      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -238,6 +238,160 @@
           "module",
           "bug_class",
           "verdict"
+        ]
+      }
+    },
+    {
+      "name": "hard_record_flow",
+      "description": "Record one flow document for a module after the deep-reading pass. All six sections are required; an empty section means you explicitly found nothing, not that you skipped it. Every entry carries cite, snippet, and note: cite is a path:line or path:line-line reference into the target repository, snippet is the short source text at those lines, note is your reading of them. The harness resolves every citation against the pinned commit — never the working tree — and rejects the whole record naming the failed cites, so copy snippets from what you actually read. Each quirk entry automatically opens a proposed hypothesis.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "description": "Module or module-cluster read, target-repo relative."
+          },
+          "entry_points": {
+            "type": "array",
+            "description": "Entry-point citations; an empty array records an explicit empty section.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          },
+          "dataflows": {
+            "type": "array",
+            "description": "Dataflow citations; an empty array records an explicit empty section.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          },
+          "trust_boundaries": {
+            "type": "array",
+            "description": "Trust-boundary citations; an empty array records an explicit empty section.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          },
+          "state_machines": {
+            "type": "array",
+            "description": "State-machine citations; an empty array records an explicit empty section.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          },
+          "assumptions": {
+            "type": "array",
+            "description": "Assumption citations; an empty array records an explicit empty section.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          },
+          "quirks": {
+            "type": "array",
+            "description": "Suspicious-quirk citations; each opens a proposed hypothesis.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cite": {
+                  "type": "string",
+                  "description": "path:line or path:line-line, target-repo relative."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The short source text at those lines, copied verbatim."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Your reading of the cited lines."
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "module",
+          "entry_points",
+          "dataflows",
+          "trust_boundaries",
+          "state_machines",
+          "assumptions",
+          "quirks"
         ]
       }
     },
@@ -302,7 +456,7 @@
     },
     {
       "name": "hard_sweep_summary",
-      "description": "Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.",
+      "description": "Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep was not skipped.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -327,7 +481,8 @@
             "description": "Required when new_findings is zero: what proves this sweep did work.",
             "enum": [
               "hypothesis",
-              "cell"
+              "cell",
+              "flow"
             ]
           },
           "empty_proof_id": {
@@ -336,7 +491,7 @@
           },
           "empty_proof_module": {
             "type": "string",
-            "description": "With empty_proof_kind cell: the module of the cleared cell being cited."
+            "description": "With empty_proof_kind cell or flow: the module being cited."
           },
           "empty_proof_bug_class": {
             "type": "string",

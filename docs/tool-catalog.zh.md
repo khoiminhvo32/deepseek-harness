@@ -45,7 +45,7 @@
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 9 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_record_flow`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/flow/doc`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
@@ -1392,7 +1392,7 @@ create、edit、pause 和 resume 要求直接来自人类的根权限；complete
 
 ### `hard_clear_modules`
 
-Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. Classes whose sinks are protective checks (authz, authn-bypass, login-bypass) are refused: there, an empty grep is suspicious, not clean.
+Batch-clear one bug class across several modules WITH harness verification. Provide extended-regex patterns that prove this class's sinks are absent from those modules; the harness greps each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the matching lines for a manual read. login-bypass is refused: its sinks are protective checks, so an empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations instead of sinks: an empty grep proves the module exports nothing to protect, and any match names an operation whose guard hard_mark_coverage must declare.
 
 ```json
 {
@@ -1428,7 +1428,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_mark_coverage`
 
-Record one coverage cell verdict for the systematic pass: a module swept for one bug class. cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list.
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. Most classes: cleared requires the concrete sink sites you inspected, listed as file:symbol references; the harness may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
 
 ```json
 {
@@ -1460,6 +1460,165 @@ Record one coverage cell verdict for the systematic pass: a module swept for one
     "module",
     "bug_class",
     "verdict"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_record_flow`
+
+Record one flow document for a module after the deep-reading pass. All six sections are required; an empty section means you explicitly found nothing, not that you skipped it. Every entry carries cite, snippet, and note: cite is a path:line or path:line-line reference into the target repository, snippet is the short source text at those lines, note is your reading of them. The harness resolves every citation against the pinned commit — never the working tree — and rejects the whole record naming the failed cites, so copy snippets from what you actually read. Each quirk entry automatically opens a proposed hypothesis.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "string",
+      "description": "Module or module-cluster read, target-repo relative."
+    },
+    "entry_points": {
+      "type": "array",
+      "description": "Entry-point citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "dataflows": {
+      "type": "array",
+      "description": "Dataflow citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "trust_boundaries": {
+      "type": "array",
+      "description": "Trust-boundary citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "state_machines": {
+      "type": "array",
+      "description": "State-machine citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Assumption citations; an empty array records an explicit empty section.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    },
+    "quirks": {
+      "type": "array",
+      "description": "Suspicious-quirk citations; each opens a proposed hypothesis.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cite": {
+            "type": "string",
+            "description": "path:line or path:line-line, target-repo relative."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The short source text at those lines, copied verbatim."
+          },
+          "note": {
+            "type": "string",
+            "description": "Your reading of the cited lines."
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "module",
+    "entry_points",
+    "dataflows",
+    "trust_boundaries",
+    "state_machines",
+    "assumptions",
+    "quirks"
   ]
 }
 ```
@@ -1532,7 +1691,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_sweep_summary`
 
-Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis or the cleared coverage cell that proves the sweep was not skipped.
+Record one completed sweep pass. When the pass found nothing, empty_proof is required: name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep was not skipped.
 
 ```json
 {
@@ -1559,7 +1718,8 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
       "description": "Required when new_findings is zero: what proves this sweep did work.",
       "enum": [
         "hypothesis",
-        "cell"
+        "cell",
+        "flow"
       ]
     },
     "empty_proof_id": {
@@ -1568,7 +1728,7 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
     },
     "empty_proof_module": {
       "type": "string",
-      "description": "With empty_proof_kind cell: the module of the cleared cell being cited."
+      "description": "With empty_proof_kind cell or flow: the module being cited."
     },
     "empty_proof_bug_class": {
       "type": "string",

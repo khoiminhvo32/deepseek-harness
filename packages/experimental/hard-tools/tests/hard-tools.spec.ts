@@ -144,10 +144,10 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('hard tools registration', () => {
-  it('registers the five tools and disposes them with the fiber', async () => {
+  it('registers the six tools and disposes them with the fiber', async () => {
     const { ctx, fiber } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
-    expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules']
-      .map(name => ctx.tools.get(name)?.name)).toHaveLength(5)
+    expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules']
+      .map(name => ctx.tools.get(name)?.name)).toHaveLength(6)
     await fiber.dispose()
     expect(ctx.tools.get('hard_submit_finding')).toBeUndefined()
     expect(ctx.tools.get('hard_sweep_summary')).toBeUndefined()
@@ -169,6 +169,7 @@ describe('hard tools agentless and presentation', () => {
       ['hard_submit_finding', { title: 'x', bug_class: 'sqli', component: 'c', claim: 'x', cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p', payload: "x' OR 1=1 --" }],
       ['hard_update_hypothesis', { statement: 'x', status: 'proposed' }],
       ['hard_mark_coverage', { module: 'm', bug_class: 'sqli', verdict: 'suspicious', declared_sinks: [] }],
+      ['hard_record_flow', { module: 'm', entry_points: [], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] }],
       ['hard_sweep_summary', { phase: 'A', cells_touched: 1, new_findings: 1 }],
     ] as const) {
       const result = await ctx.tools.execute({
@@ -190,6 +191,10 @@ describe('hard tools agentless and presentation', () => {
       .toMatchObject({ title: 'Hypothesis H-1: testing' })
     expect(ctx.tools.get('hard_mark_coverage')?.presentCall?.({ module: 'm', bug_class: 'sqli', verdict: 'cleared' }))
       .toMatchObject({ title: 'Coverage m x sqli: cleared' })
+    expect(ctx.tools.get('hard_record_flow')?.presentCall?.({
+      module: 'm', entry_points: [{ cite: 'a:1', snippet: 's', note: 'n' }], dataflows: [], trust_boundaries: [],
+      state_machines: [], assumptions: [], quirks: [],
+    })).toMatchObject({ title: 'Flow doc m: 1 citations' })
     expect(ctx.tools.get('hard_sweep_summary')?.presentCall?.({ phase: 'B', cells_touched: 2, new_findings: 3 }))
       .toMatchObject({ title: 'Sweep B: 3 findings' })
   })
@@ -412,17 +417,23 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
   })
 
-  it('refuses absence-shaped classes and unknown modules with clear reasons', async () => {
+  it('batch-clears guarded-surface classes when the module exports nothing, and refuses login-bypass', async () => {
+    // The guarded-surface grep names exported operations: zero matches prove
+    // the module exposes no operation for these classes to guard.
     const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
       targetRepo: '/tmp/hard-target',
       commit: 'a'.repeat(40),
       modules: ['src'],
-      bugClasses: ['authz', 'sqli'],
+      bugClasses: ['authz', 'login-bypass', 'sqli'],
     })
-    const refused = await execute(ctx, 'hard_clear_modules', {
+    const guarded = resultJson(await execute(ctx, 'hard_clear_modules', {
       modules: ['src'], bug_class: 'authz', patterns: ['checkPermission'], rationale: 'r',
+    }, root.agent))
+    expect(guarded.cleared).toBe(1)
+    const refused = await execute(ctx, 'hard_clear_modules', {
+      modules: ['src'], bug_class: 'login-bypass', patterns: ['login'], rationale: 'r',
     }, root.agent)
     expect(refused.isError).toBe(true)
     expect(refused.content[0]).toMatchObject({ type: 'text' })
@@ -514,5 +525,120 @@ describe('hard_update_hypothesis and methodology tools', () => {
     }, root.agent)
     expect(screened.isError).toBe(true)
     expect(screened.error?.message).toContain('empty sweep proof cannot cite a harness-screened cell')
+  })
+
+  it('cites a recorded flow document as an empty-sweep proof and refuses a citation-free one', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    ctx.hardLedger.recordFlowDoc(root.agent, {
+      module: 'src/web',
+      sections: { entryPoints: 1, dataflows: 0, trustBoundaries: 0, stateMachines: 0, assumptions: 0, quirks: 0 },
+      citations: 1,
+    })
+    const proven = resultJson(await execute(ctx, 'hard_sweep_summary', {
+      phase: 'B', cells_touched: 1, new_findings: 0, empty_proof_kind: 'flow', empty_proof_module: 'src/web',
+    }, root.agent))
+    expect(proven.sweep).toMatchObject({ emptyProofFlowDoc: 'src/web' })
+    const halfSpecified = await execute(ctx, 'hard_sweep_summary', {
+      phase: 'B', cells_touched: 1, new_findings: 0, empty_proof_kind: 'flow',
+      empty_proof_module: 'src/web', empty_proof_bug_class: 'cmdi',
+    }, root.agent)
+    expect(halfSpecified.isError).toBe(true)
+    expect(halfSpecified.error?.message).toContain('empty_proof_bug_class is valid only with empty_proof_kind cell')
+  })
+})
+
+describe('hard_record_flow', () => {
+  const RENDER_LINES = [
+    '\'use strict\'',
+    '',
+    "const { execSync } = require('node:child_process')",
+    '',
+    'function renderPage(slug) {',
+    "  const fragment = 'pages/' + slug + '.html'",
+    "  return execSync('wc -c ' + fragment, { encoding: 'utf8' }).trim()",
+    '}',
+    '',
+    'module.exports = { renderPage }',
+  ]
+  const RENDER_LINES_ARRAY = RENDER_LINES
+
+  function renderShow(startLine: number, endLine: number): ScriptedRun {
+    const slice = RENDER_LINES_ARRAY.slice(startLine - 1, endLine)
+    return { exitCode: 0, stdoutText: slice.length === 0 ? '' : slice.join('\n') + '\n' }
+  }
+
+  function flowArgs(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+    return {
+      module: 'src/web',
+      entry_points: [{ cite: 'src/web/render.js:5', snippet: 'function renderPage', note: 'the one module entry point' }],
+      dataflows: [{ cite: 'src/web/render.js:7', snippet: 'execSync', note: 'fragment reaches wc' }],
+      trust_boundaries: [],
+      state_machines: [],
+      assumptions: [],
+      quirks: [{ cite: 'src/web/render.js:7', snippet: 'execSync', note: 'unquoted shell build' }],
+      ...overrides,
+    }
+  }
+
+  it('resolves citations at the pinned commit, opens quirk hypotheses, and records the flow doc', async () => {
+    const { ctx, root } = await harness([
+      // One ls-tree per unique path, then one piped git-show read per cite.
+      { exitCode: 0, stdoutText: 'src/web/render.js\n' },
+      renderShow(5, 5),
+      renderShow(7, 7),
+      renderShow(7, 7),
+    ])
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['src/web'], bugClasses: ['cmdi'],
+    })
+    const result = resultJson(await execute(ctx, 'hard_record_flow', flowArgs(), root.agent))
+    expect(result.flow).toMatchObject({ module: 'src/web', citations: 3, quirkIds: ['H-1'] })
+    expect(ctx.hardLedger.flowDocs(root.agent)[0]).toMatchObject({
+      module: 'src/web', citations: 3, sections: { entryPoints: 1, dataflows: 1, quirks: 1 },
+    })
+    expect(ctx.hardLedger.hypotheses(root.agent)[0]).toMatchObject({ id: 'H-1', status: 'proposed' })
+    expect(ctx.hardLedger.hypotheses(root.agent)[0]?.statement).toContain('src/web/render.js:7')
+  })
+
+  it('rejects the whole record naming every failed citation and records nothing', async () => {
+    const { ctx, root } = await harness([
+      { exitCode: 0, stdoutText: 'src/web/render.js\n' }, // ls-tree: the path is tracked
+      { exitCode: 0, stdoutText: 'unrelated content\n' }, // the first cite's snippet does not match
+      { exitCode: 0, stdoutText: '' }, // ls-tree finds nothing for the second path
+      { exitCode: 0, stdoutText: 'unrelated content\n' }, // the third cite's snippet does not match
+    ])
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['src/web'], bugClasses: ['cmdi'],
+    })
+    const refused = await execute(ctx, 'hard_record_flow', flowArgs({
+      dataflows: [{ cite: 'src/web/missing.js:2-3', snippet: 'whatever', note: 'n' }],
+    }), root.agent)
+    expect(refused.isError).toBe(true)
+    const text = (refused.content[0] as { type: string; text: string }).text
+    expect(text).toContain('src/web/missing.js:2-3 (path is not tracked at the pinned commit)')
+    expect(text).toContain('src/web/render.js:7 (snippet does not match the file content at the pinned commit)')
+    expect(ctx.hardLedger.flowDocs(root.agent)).toEqual([])
+    expect(ctx.hardLedger.hypotheses(root.agent)).toEqual([])
+  })
+
+  it('fails loud without a matrix or a malformed citation before any shell run', async () => {
+    const { ctx, root } = await harness([{ exitCode: 0, stdoutText: '' }])
+    const noMatrix = await execute(ctx, 'hard_record_flow', flowArgs(), root.agent)
+    expect(noMatrix.isError).toBe(true)
+    expect(noMatrix.error?.message).toContain('no armed coverage matrix pins a commit')
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['src/web'], bugClasses: ['cmdi'],
+    })
+    const malformed = await execute(ctx, 'hard_record_flow', flowArgs({
+      entry_points: [{ cite: 'src/web/render.js', snippet: 'x', note: 'n' }],
+    }), root.agent)
+    expect(malformed.isError).toBe(true)
+    expect((malformed.content[0] as { type: string; text: string }).text).toContain('cite must be path:line or path:line-line')
   })
 })

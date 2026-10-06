@@ -19,9 +19,10 @@ describe('hard deepread section', () => {
     expect(section).toBeDefined()
     expect(section?.text).toContain('Deep-reading pass (Phase B): when a round names phase B, read 6 module')
     expect(section?.text).toContain('entry points; dataflow; trust boundaries; state machines; assumptions; suspicious quirks')
-    expect(section?.text).toContain('.dsh-hard/flow/<module>.md')
+    expect(section?.text).toContain('Record each document with hard_record_flow')
+    expect(section?.text).toContain('resolves every citation against the pinned commit')
     expect(section?.text).toContain('hard_update_hypothesis')
-    expect(section?.text).toContain('hard_sweep_summary phase B and an emptyProof')
+    expect(section?.text).toContain('citing the recorded flow documents as the empty proof')
   })
 
   it('honors the configured module bound', async () => {
@@ -41,6 +42,6 @@ describe('hard deepread section', () => {
   it('has the Loader-safe namespace export shape', () => {
     expect(hardDeepread.name).toBe('hard-deepread')
     expect(hardDeepread.inject).toEqual(['systemPrompt'])
-    expect(hardDeepread.FLOW_DOC_DIR).toBe('.dsh-hard/flow')
+    expect('FLOW_DOC_DIR' in hardDeepread).toBe(false)
   })
 })

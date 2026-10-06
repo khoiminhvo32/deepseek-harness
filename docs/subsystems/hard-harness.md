@@ -2,7 +2,7 @@
 
 English | [中文](hard-harness.zh.md)
 
-Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.md) executes findings' proofs of effect through the shell seam — benign arm first, exploit arm second, so the proof must depend on the payload — and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.md) steers the turn boundary back to work while an armed goal stands and owns completion: it runs the ledger's completion assessment on every `update_goal action complete` attempt, denies early attempts with the exact remaining work, and records each decision as a `hard/gate/decision` event, the [standby](../../packages/experimental/hard-standby/README.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
+Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.md) executes findings' proofs of effect through the shell seam — benign arm first, exploit arm second, so the proof must depend on the payload — and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.md) steers the turn boundary back to work while an armed goal stands and owns completion: it runs the ledger's completion assessment on every `update_goal action complete` attempt, denies early attempts with the exact remaining work, and records each decision as a `hard/gate/decision` event, the [standby](../../packages/experimental/hard-standby/README.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells — sink classes against the fixed sink patterns, and the guarded-surface classes `authz`/`authn-bypass` against the exported operations, reopening a cell whose module still matches an undeclared sink or exports an operation no declaration mentions — and the verifier resolves every `hard_record_flow` citation against the pinned commit before a `hard/flow/doc` summary is recorded.
 
 ## Running the profile
 
@@ -82,15 +82,33 @@ markCoverage(agent: Agent, request: HardCoverageCellData): void
 
 /**
  * Append one completed sweep summary. An empty sweep must cite verifiable
- * evidence the ledger can check — a refuted hypothesis, or a model-cleared
- * cell with declared sinks; a harness-screened cell cannot prove a sweep
- * did work. A sweep with findings carries no proof. The legacy free-text
- * `emptyProof` is only read from older logs; new records always use
- * `emptyProofRef`.
+ * evidence the ledger can check — a refuted hypothesis, a model-cleared
+ * cell with declared sinks, or a recorded flow document with resolvable
+ * citations; a harness-screened cell cannot prove a sweep did work. A sweep
+ * with findings carries no proof. The legacy free-text `emptyProof` is only
+ * read from older logs; new records carry `emptyProofRef` or
+ * `emptyProofFlowDoc`.
  * @param agent - the live agent whose session receives the record.
  * @param request - the sweep phase, counters, and conditional empty proof.
  */
 recordSweep(agent: Agent, request: HardSweepSummaryData): void
+
+/**
+ * Append one recorded flow document for a module. The verifier must have
+ * resolved every citation against the pinned commit before this append —
+ * the tool rejects the whole record when any cite fails, so a recorded
+ * document certifies reads, not promises.
+ * @param agent - the live agent whose session receives the record.
+ * @param data - the summary to persist: section counts, resolved citation count, and the quirks' hypothesis ids.
+ */
+recordFlowDoc(agent: Agent, data: HardFlowDocData): void
+
+/**
+ * Flow documents folded to their latest record per module.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per module, in first-recorded order.
+ */
+flowDocs(agent: Agent): readonly HardFlowDocData[]
 
 /**
  * Findings folded from the projection, proposal plus latest verdict when present.
@@ -240,16 +258,20 @@ The hard-harness verifier on the `hardVerifier` key: rejects duplicates, execute
 async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingProposedData, 'id'>, ): Promise<HardFindingVerdictData>
 
 /**
- * Deterministic cross-check of one `cleared` coverage cell: re-grep the
- * module against the bug class's fixed sink patterns and reopen the cell
- * as `suspicious` when undeclared sink sites surface. The grep runs from
+ * Deterministic cross-check of one `cleared` coverage cell, branched by the
+ * class's reading. Presence classes (the default): re-grep the module
+ * against the fixed sink patterns and reopen the cell as `suspicious` when
+ * undeclared sink sites surface. Guarded-surface classes (`authz`,
+ * `authn-bypass`): re-grep for the exported operations and reopen when the
+ * module still exports an operation the model never declared a guard for —
+ * the reopening evidence is the missed operation names. Both greps run from
  * the pinned target repository the armed coverage matrix records, so the
  * module path is always target-repo relative. Sampling follows the
  * configured spot-check percent by cell hash; an unsampled cell, a
- * non-cleared cell, a class without patterns, a missing matrix, or a grep
- * with no undeclared matches returns `undefined` and changes nothing. The
- * check fails closed: a grep that errors, times out, or is aborted never
- * reads as a clean cell.
+ * non-cleared cell, a class without applicable patterns, a missing matrix,
+ * or a grep with no undeclared matches returns `undefined` and changes
+ * nothing. The check fails closed: a grep that errors, times out, or is
+ * aborted never reads as a clean cell.
  * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param cell - the coverage cell the model just marked `cleared`.
  * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
@@ -259,21 +281,43 @@ async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingPropo
 async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined>
 
 /**
+ * Resolve every flow-document citation against the pinned target commit —
+ * `git show <sha>:<path>`, never the working tree — so a citation the model
+ * edited into existence after the arming cannot resolve. A cite passes only
+ * when the path is tracked at the pinned commit, the line exists there, and
+ * the snippet is a trimmed substring of that line's content. The check is
+ * the flow-document floor: prose cannot be verified, but a resolvable
+ * citation forces the model to open the right file at the right lines, so
+ * fabricating one costs approximately what reading it does. It fails
+ * closed: a git invocation that errors, times out, or is aborted throws
+ * instead of reading as a failed citation.
+ * @param agent - the live agent whose ledger matrix carries the pinned commit.
+ * @param citations - the citations to resolve, in any order.
+ * @returns the rejected citations with per-cite reasons; empty means every cite resolved.
+ * @throws `HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.
+ * @throws `HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.
+ */
+async checkFlowCitations( agent: Agent, citations: readonly FlowCitationEntry[], ): Promise<{ rejected: readonly FlowCitationReject[] }>
+
+/**
  * Mechanical absence screen behind the batch clear: grep the requested
- * modules for the union of the model's patterns and the class's fixed sink
+ * modules for the union of the model's patterns and the class's fixed
  * patterns, anchored at the pinned target repository. The union means the
  * model's patterns can only ADD coverage, never subtract — a narrow
  * pattern choice cannot sneak past the harness table. An empty grep on
  * every module proves the absence predicate; any match fails the whole
  * batch and returns the matching lines as evidence for a manual read.
- * Absence-shaped classes are refused: for their protective sinks, an empty
- * grep is suspicious, not clean.
+ * The pattern table follows the class's reading: guarded-surface classes
+ * grep for the exported operations (zero matches = no exported surface),
+ * sink classes grep for the sink shapes, and the one remaining
+ * absence-shaped class (`login-bypass`) is refused — for its protective
+ * sinks an empty grep is suspicious, not clean.
  * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param bugClass - the bug class to prove absent.
  * @param modules - the target-repo-relative modules to grep.
  * @param patterns - the model's own extended-regex absence patterns.
  * @returns `clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.
- * @throws when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.
+ * @throws when the class is absence-shaped or has no fixed patterns, the grep errors, or no matrix is armed.
  */
 async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>
 ```

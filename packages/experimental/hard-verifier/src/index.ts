@@ -18,16 +18,17 @@ import type {
 } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { cellSampledForPercent } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
-import { SINK_PATTERNS } from './sink-patterns.ts'
+import { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 
 /**
- * Bug classes whose sink patterns name PROTECTIVE checks (authorization
- * guards, authentication bypasses, login flows). For these, an empty grep
- * means no protective sink was found anywhere — a suspicious absence, not
- * a clean sweep — so batch clearing is refused and each cell needs an
- * individual model read.
+ * Bug class whose sink pattern names a PROTECTIVE check (the login flow). For
+ * this class an empty grep means no protective sink was found anywhere — a
+ * suspicious absence, not a clean sweep — so batch clearing is refused and
+ * each cell needs an individual model read. The other two absence classes
+ * (`authz`, `authn-bypass`) moved to `GUARDED_SURFACE_PATTERNS`, where the
+ * grep names the guarded surface and zero matches is the clean result.
  */
-export const ABSENCE_SINK_CLASSES: ReadonlySet<string> = new Set(['authz', 'authn-bypass', 'login-bypass'])
+export const ABSENCE_SINK_CLASSES: ReadonlySet<string> = new Set(['login-bypass'])
 import { classifyRuns, runSatisfied } from './verdict.ts'
 import type { PoCRunRecord } from './verdict.ts'
 // Loads the declaration-merged `shell` Context key this service executes through.
@@ -165,6 +166,20 @@ export interface CoverageAuditCell {
   readonly bugClass: string
   readonly verdict: 'cleared' | 'suspicious' | 'uncovered'
   readonly declaredSinks: readonly string[]
+}
+
+/** One model-supplied flow-document citation the harness must resolve. */
+export interface FlowCitationEntry {
+  /** `path:line` or `path:line-line`, target-repo relative. */
+  readonly cite: string
+  /** Short source text expected at the cited lines. */
+  readonly snippet: string
+}
+
+/** One citation the pinned-commit resolver refused, with the why. */
+export interface FlowCitationReject {
+  readonly cite: string
+  readonly reason: string
 }
 
 /** Structural reopening record the cross-check produces for a failed audit. */
@@ -307,16 +322,20 @@ export class HardVerifier extends Service {
   }
 
   /**
-   * Deterministic cross-check of one `cleared` coverage cell: re-grep the
-   * module against the bug class's fixed sink patterns and reopen the cell
-   * as `suspicious` when undeclared sink sites surface. The grep runs from
+   * Deterministic cross-check of one `cleared` coverage cell, branched by the
+   * class's reading. Presence classes (the default): re-grep the module
+   * against the fixed sink patterns and reopen the cell as `suspicious` when
+   * undeclared sink sites surface. Guarded-surface classes (`authz`,
+   * `authn-bypass`): re-grep for the exported operations and reopen when the
+   * module still exports an operation the model never declared a guard for —
+   * the reopening evidence is the missed operation names. Both greps run from
    * the pinned target repository the armed coverage matrix records, so the
    * module path is always target-repo relative. Sampling follows the
    * configured spot-check percent by cell hash; an unsampled cell, a
-   * non-cleared cell, a class without patterns, a missing matrix, or a grep
-   * with no undeclared matches returns `undefined` and changes nothing. The
-   * check fails closed: a grep that errors, times out, or is aborted never
-   * reads as a clean cell.
+   * non-cleared cell, a class without applicable patterns, a missing matrix,
+   * or a grep with no undeclared matches returns `undefined` and changes
+   * nothing. The check fails closed: a grep that errors, times out, or is
+   * aborted never reads as a clean cell.
    * @param agent - the live agent whose ledger matrix anchors the grep.
    * @param cell - the coverage cell the model just marked `cleared`.
    * @returns the reopening record to persist through the ledger, or `undefined` when the check passes or does not apply.
@@ -325,6 +344,8 @@ export class HardVerifier extends Service {
    */
   async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReopenRecord | undefined> {
     if (cell.verdict !== 'cleared') return undefined
+    const guardedPatterns = GUARDED_SURFACE_PATTERNS[cell.bugClass]
+    if (guardedPatterns !== undefined) return this.auditGuardedSurface(agent, cell, guardedPatterns)
     const patterns = SINK_PATTERNS[cell.bugClass]
     if (patterns === undefined || patterns.length === 0) return undefined
     if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
@@ -349,21 +370,143 @@ export class HardVerifier extends Service {
   }
 
   /**
+   * The guarded-surface half of the cross-check: grep the module for its
+   * exported operations, reduce each match back to the operation name, and
+   * reopen the cell naming every operation none of the model's declarations
+   * mention. A declaration may phrase the guard however it likes — the check
+   * only requires the operation's name to appear in it, because the absence
+   * contract is "for every exported operation, name what protects it — or
+   * declare it deliberately unguarded, with the reason".
+   * @param agent - the live agent whose ledger matrix anchors the grep.
+   * @param cell - the cleared coverage cell being audited.
+   * @param patterns - the class's guarded-surface grep patterns.
+   * @returns the reopening record whose `declaredSinks` list the missed operations, or `undefined` when none is missed.
+   * @throws `HARD_VERIFIER_AUDIT_FAILED` when the grep does not settle cleanly.
+   */
+  private async auditGuardedSurface(
+    agent: Agent,
+    cell: CoverageAuditCell,
+    patterns: readonly string[],
+  ): Promise<CoverageReopenRecord | undefined> {
+    if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
+    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
+    if (targetRepo === undefined) return undefined
+    const config = this.resolved
+    const spec = this.ctx.shell.resolve({
+      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)}`,
+      timeoutMs: config.timeoutSeconds * 1000,
+      stdoutMaxBytes: config.stdoutMaxBytes,
+      workdir: targetRepo,
+    })
+    const execution = await this.ctx.shell.execute(spec)
+    const result = await execution.result()
+    assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
+    const missed = [...new Set(result.stdout.text.split('\n').flatMap(line => surfaceOperands(line)))]
+      .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)))
+      .slice(0, 8)
+    if (missed.length === 0) return undefined
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed }
+  }
+
+  /**
+   * Resolve every flow-document citation against the pinned target commit —
+   * `git show <sha>:<path>`, never the working tree — so a citation the model
+   * edited into existence after the arming cannot resolve. A cite passes only
+   * when the path is tracked at the pinned commit, the line exists there, and
+   * the snippet is a trimmed substring of that line's content. The check is
+   * the flow-document floor: prose cannot be verified, but a resolvable
+   * citation forces the model to open the right file at the right lines, so
+   * fabricating one costs approximately what reading it does. It fails
+   * closed: a git invocation that errors, times out, or is aborted throws
+   * instead of reading as a failed citation.
+   * @param agent - the live agent whose ledger matrix carries the pinned commit.
+   * @param citations - the citations to resolve, in any order.
+   * @returns the rejected citations with per-cite reasons; empty means every cite resolved.
+   * @throws `HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.
+   * @throws `HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.
+   */
+  async checkFlowCitations(
+    agent: Agent,
+    citations: readonly FlowCitationEntry[],
+  ): Promise<{ rejected: readonly FlowCitationReject[] }> {
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) {
+      throw new HarnessError('hard flow citations: no armed coverage matrix pins a commit', 'HARD_VERIFIER_NO_MATRIX')
+    }
+    const { commit, targetRepo } = matrix
+    const config = this.resolved
+    const rejected: FlowCitationReject[] = []
+    // The tracked check separates "the model named a path the pinned tree
+    // never had" from infrastructure failure: once ls-tree settles, a later
+    // git failure is never a citation verdict.
+    const tracked = new Map<string, boolean>()
+    for (const { cite, snippet } of citations) {
+      const parsed = /^(?<path>.+):(?<start>\d{1,7})(?:-(?<end>\d{1,7}))?$/u.exec(cite.trim())
+      if (parsed?.groups === undefined) {
+        rejected.push({ cite, reason: 'cite must be path:line or path:line-line' })
+        continue
+      }
+      const path = parsed.groups.path ?? ''
+      const start = Number(parsed.groups.start ?? '0')
+      const end = parsed.groups.end === undefined ? start : Number(parsed.groups.end)
+      if (start < 1 || end < start) {
+        rejected.push({ cite, reason: 'cite must be path:line or path:line-line' })
+        continue
+      }
+      let isTracked = tracked.get(path)
+      if (isTracked === undefined) {
+        const spec = this.ctx.shell.resolve({
+          command: `git ls-tree --name-only ${shellQuote(commit)} -- ${shellQuote(path)}`,
+          timeoutMs: config.timeoutSeconds * 1000,
+          stdoutMaxBytes: config.stdoutMaxBytes,
+          workdir: targetRepo,
+        })
+        const execution = await this.ctx.shell.execute(spec)
+        const result = await execution.result()
+        assertGrepSettled(result, `flow citations: ls-tree over ${path}`, 'HARD_VERIFIER_CITATION_FAILED')
+        isTracked = result.stdout.text.split('\n').some(line => line.trim() === path)
+        tracked.set(path, isTracked)
+      }
+      if (!isTracked) {
+        rejected.push({ cite, reason: 'path is not tracked at the pinned commit' })
+        continue
+      }
+      const spec = this.ctx.shell.resolve({
+        command: `set -o pipefail; git show ${shellQuote(`${commit}:${path}`)}`
+          + ` | sed -n ${shellQuote(`${String(start)},${String(end)}p`)}`,
+        timeoutMs: config.timeoutSeconds * 1000,
+        stdoutMaxBytes: config.stdoutMaxBytes,
+        workdir: targetRepo,
+      })
+      const execution = await this.ctx.shell.execute(spec)
+      const result = await execution.result()
+      assertGrepSettled(result, `flow citations: read of ${path}`, 'HARD_VERIFIER_CITATION_FAILED')
+      if (!result.stdout.text.trim().includes(snippet.trim())) {
+        rejected.push({ cite, reason: 'snippet does not match the file content at the pinned commit' })
+      }
+    }
+    return { rejected }
+  }
+
+  /**
    * Mechanical absence screen behind the batch clear: grep the requested
-   * modules for the union of the model's patterns and the class's fixed sink
+   * modules for the union of the model's patterns and the class's fixed
    * patterns, anchored at the pinned target repository. The union means the
    * model's patterns can only ADD coverage, never subtract — a narrow
    * pattern choice cannot sneak past the harness table. An empty grep on
    * every module proves the absence predicate; any match fails the whole
    * batch and returns the matching lines as evidence for a manual read.
-   * Absence-shaped classes are refused: for their protective sinks, an empty
-   * grep is suspicious, not clean.
+   * The pattern table follows the class's reading: guarded-surface classes
+   * grep for the exported operations (zero matches = no exported surface),
+   * sink classes grep for the sink shapes, and the one remaining
+   * absence-shaped class (`login-bypass`) is refused — for its protective
+   * sinks an empty grep is suspicious, not clean.
    * @param agent - the live agent whose ledger matrix anchors the grep.
    * @param bugClass - the bug class to prove absent.
    * @param modules - the target-repo-relative modules to grep.
    * @param patterns - the model's own extended-regex absence patterns.
    * @returns `clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.
-   * @throws when the class is absence-shaped or has no sink patterns, the grep errors, or no matrix is armed.
+   * @throws when the class is absence-shaped or has no fixed patterns, the grep errors, or no matrix is armed.
    */
   async screenModules(
     agent: Agent,
@@ -371,7 +514,8 @@ export class HardVerifier extends Service {
     modules: readonly string[],
     patterns: readonly string[],
   ): Promise<{ clean: boolean; evidence: readonly string[] }> {
-    const classPatterns = SINK_PATTERNS[bugClass]
+    const guardedPatterns = GUARDED_SURFACE_PATTERNS[bugClass]
+    const classPatterns = guardedPatterns ?? SINK_PATTERNS[bugClass]
     if (classPatterns === undefined || classPatterns.length === 0) {
       throw new HarnessError(
         `hard screen: bug class ${bugClass} has no fixed sink patterns to verify against`,
@@ -409,7 +553,7 @@ export class HardVerifier extends Service {
 }
 
 export { parseVector, scoreVector, macroVector, severityBand } from './cvss4.ts'
-export { SINK_PATTERNS } from './sink-patterns.ts'
+export { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 export { claimHash, rootFingerprint } from './fingerprint.ts'
 export { classifyRuns, runSatisfied } from './verdict.ts'
 export type { PoCRunRecord } from './verdict.ts'

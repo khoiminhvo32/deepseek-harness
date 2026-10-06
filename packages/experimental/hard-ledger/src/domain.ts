@@ -10,6 +10,7 @@ import type {
   HardCoverageCellData,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardFlowDocData,
   HardGateDecisionData,
   HardHypothesisStateData,
   HardMissionArmedData,
@@ -33,6 +34,12 @@ declare module '@deepseek-ai/dsh-session/types' {
     'hard/finding/verdict': HardFindingVerdictData
     /** One hypothesis state transition in the deep-reading pass. */
     'hard/hypothesis/state': HardHypothesisStateData
+    /**
+     * One flow document recorded for a module, with every citation already
+     * resolved against the pinned commit; the ledger folds it as the durable
+     * Phase B record. Counts only — the prose lives in the tool result.
+     */
+    'hard/flow/doc': HardFlowDocData
     /** One coverage cell verdict for the systematic pass. */
     'hard/coverage/cell': HardCoverageCellData
     /**

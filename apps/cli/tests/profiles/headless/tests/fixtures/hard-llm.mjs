@@ -163,6 +163,17 @@ function script(messages) {
   if (!seen.includes('"cleared":1')) {
     return toolChunks([{ name: 'hard_clear_modules', args: { modules: ['src'], bug_class: 'sqli', patterns: ["SELECT[^\\n]*\\+"], rationale: 'The repository builds shell commands only; no SQL statement exists to concatenate.' } }])
   }
+  // 7b. Phase B proof trap: cite a line the pinned tree never had. The harness
+  // resolves citations at the pinned commit and rejects the whole record
+  // naming the failed cite.
+  if (!seen.includes('src/reports.js:999')) {
+    return toolChunks([{ name: 'hard_record_flow', args: { module: 'src', entry_points: [{ cite: 'src/reports.js:999', snippet: 'never there', note: 'fabricated reading' }], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] } }])
+  }
+  // 7c. The honest Phase B record: a citation that resolves at the pinned
+  // commit lands as hard/flow/doc.
+  if (!seen.includes('"flow"')) {
+    return toolChunks([{ name: 'hard_record_flow', args: { module: 'src', entry_points: [{ cite: 'src/reports.js:8', snippet: 'execSync', note: 'the user parameter reaches execSync through interpolation' }], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] } }])
+  }
   // 8. Empty-verified sweep the completion gate requires, citing the
   // model-cleared cell as the verifiable proof.
   if (!seen.includes('"emptyProofRef"')) {

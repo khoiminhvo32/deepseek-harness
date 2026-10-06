@@ -840,6 +840,20 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr14-target-hygiene-and-inert-guard">
+  <h2><span class="h2-index">23</span>PR14: target nhiễm bẩn giữa hai lần chạy + chặn cleared trên module inert + report đọc projection</h2>
+  <p class="intro">Lần chạy thứ hai phơi ba chuyện: setup.sh commit nhầm <code>poc/</code> của lần trước vào baseline khiến nó thành hàng hạng nhất của ma trận (hai lần chạy đo trên hai bề mặt khác nhau); model tự bịa tên module (data, lib, README.md, docs) — 16/44 cell event ngoài ma trận — và đánh 4 cell cleared trên data/manuals đã inert; report tự tính song song tạo mẫu số sai (48 trong khi ma trận 32).</p>
+  <table>
+    <thead><tr><th>Điểm</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>setup.sh dọn TRƯỚC khi add (pilot + hard-smoke)</td><td><span class="chip pass">xong</span></td><td><code>git clean -fdx</code> lúc .git còn sống xóa untracked, nhưng KHÔNG xóa được phần đã bị track nhầm từ một lần nhiễm trước — hard-smoke chứng minh: <code>.dsh-hard/</code> (PoC model ghi) đã tracked nên clean coi nó hợp lệ. Sửa: clean -fdx + <code>rm -rf .dsh-hard poc pages pwned* backup.tgz</code> tường minh, rồi mới rm .git / init / add -A / commit; bỏ <code>git clean -fdq</code> cuối (vô tác dụng — chạy sau commit). Thêm GIT_AUTHOR_DATE/COMMITTER_DATE cố định 2026-10-04T00:00:00Z — script cũ chưa từng fix date nên sha KHÔNG tái lập được dù task tưởng ngược lại. Verify: 3 lần chạy liên tiếp pilot (sạch / có poc+x.sh+pwned.txt / có poc+deep.js) ra CÙNG sha <code>d89c77ee…</code> + cùng ls-files; hard-smoke 2 lần ra cùng <code>2a7522ca…</code> với baseline sạch đúng 2 file.</td></tr>
+      <tr><td>Chặn cleared trên module inert</td><td><span class="chip pass">xong</span></td><td><code>assertClearableModules(agent, modules)</code> trên HardLedger: module ∈ inertModules + verdict cleared ⇒ HARD_LEDGER_INERT_MODULE ("inert — the harness already screened it as containing no code…record suspicious instead if you actually found something"). markCoverage chỉ áp cho cleared — suspicious VẪN nhận (đừng chặn tín hiệu: model thật sự thấy gì thì phải nói được). hard_clear_modules gọi cho cả lô TRƯỚC grep ⇒ một module inert ⇒ từ chối cả lô, không cell nào kịp mark, không lãng phí grep.</td></tr>
+      <tr><td>report.mjs đọc projection, hết tự tính</td><td><span class="chip pass">xong</span></td><td>Extract <code>src/aggregate.ts</code>: coverageProgressFromState / coverageBySourceFromState / refutationBreakdownFromState / matrixCellsFromState — service methods DELEGATE (một nguồn sự thật), pilot report fold log qua applyHardLedgerProjection rồi gọi đúng các hàm đó (import từ lib/index.js đã build, cạnh repo). ĐÍNH CHÍNH reviewer được ghi nhận: coverageBySource KHÔNG đếm trùng inert — cell model đánh thì tính cho model, chỉ ô inert KHÔNG ai động tới mới tính harness; không sửa. Kết quả trên log lần 2: Coverage 32/32 (ma trận thật, hết 48), Gaming 0/25 với mẫu số là cell cleared TRONG ma trận, model 28 + harness 4 (đúng 4 ô inert của data/manuals).</td></tr>
+      <tr><td>Gates</td><td><span class="chip pass">xong</span></td><td>10 package hard-* 180/180 (+4: inert refusal, inert batch, 2 aggregate fold tests); e2e fabrication + web-boot xanh; snapshot 181 passed (fail duy nhất browser-use-stagehand-native sẵn); typecheck 0; lint 0 (thêm 3 exemption type-link cho CoverageProgress/CoverageBySource/RefutationBreakdown + JSDoc đủ); doc-sync 42/42; READMEs ledger/tools en+zh; lib rebuild để report import được aggregate mới.</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

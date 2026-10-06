@@ -30,6 +30,8 @@ import type {
 } from './types.ts'
 import type { HardCoverageMatrix, HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
 import { hardLedgerProjectionDefinition } from './projection.ts'
+import { coverageBySourceFromState, coverageProgressFromState, refutationBreakdownFromState } from './aggregate.ts'
+import type { CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
 import { cellSampledForPercent, classScope } from './scope.ts'
 import './domain.ts'
 
@@ -56,6 +58,13 @@ export type {
 } from './types.ts'
 export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition, hardLedgerStateSchema } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
+export {
+  coverageBySourceFromState,
+  coverageProgressFromState,
+  matrixCellsFromState,
+  refutationBreakdownFromState,
+} from './aggregate.ts'
+export type { CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -289,6 +298,9 @@ export class HardLedger extends Service {
     this.assertText('module', request.module)
     this.assertText('bugClass', request.bugClass)
     this.assertModulesInMatrix(agent, [request.module])
+    // A cleared verdict on an inert module duplicates the screen the harness
+    // already ran; suspicious stays accept-able so a real sighting surfaces.
+    if (request.verdict === 'cleared') this.assertClearableModules(agent, [request.module])
     const verdicts: readonly HardCoverageVerdict[] = ['cleared', 'suspicious', 'uncovered']
     if (!verdicts.includes(request.verdict)) {
       throw new HarnessError(
@@ -340,6 +352,32 @@ export class HardLedger extends Service {
     throw new HarnessError(
       `${subject} not in the armed coverage matrix; the matrix rows at commit ${matrix.commit} are: ${listed.join(', ')}`,
       'HARD_LEDGER_MODULE_NOT_IN_MATRIX',
+    )
+  }
+
+  /**
+   * Reject `cleared` verdicts on inert modules. The harness already screened
+   * an inert module as carrying no code, so its cells stand as harness
+   * verdicts — a model `cleared` there is redundant work, not diligence.
+   * A `suspicious` verdict still passes: if the model really saw something
+   * in a module this size, that signal must not be blocked.
+   * @param agent - the live agent whose ledger matrix carries the inert screen.
+   * @param modules - the module names a `cleared` verdict is about to record.
+   * @throws `HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.
+   */
+  assertClearableModules(agent: Agent, modules: readonly string[]): void {
+    const matrix = this.coverageMatrix(agent)
+    const inert = matrix?.inertModules
+    if (inert === undefined || inert.length === 0) return
+    const blocked = [...new Set(modules)].filter(module => inert.includes(module))
+    if (blocked.length === 0) return
+    const subject = blocked.length === 1
+      ? `module "${blocked[0]}" is`
+      : `modules ${blocked.map(entry => `"${entry}"`).join(', ')} are`
+    throw new HarnessError(
+      `${subject} inert — the harness already screened it as containing no code, so a cleared verdict `
+      + 'is redundant work; record suspicious instead if you actually found something there',
+      'HARD_LEDGER_INERT_MODULE',
     )
   }
 
@@ -526,35 +564,16 @@ export class HardLedger extends Service {
 
   /**
    * Decompose the refuted verdicts by cause code, so one run can say whether
-   * it failed at the protocol layer or the target layer.
+   * it failed at the protocol layer or the target layer. The math lives in
+   * `refutationBreakdownFromState` — the same function the pilot report
+   * reads after folding the log.
    * @param agent - the live agent whose ledger holds the findings.
    * @returns refuted-verdict counts per cause plus the reading groups; a
    *   refuted verdict predating the cause codes counts under `unattributed`
    *   in `byCause` and in no group.
    */
-  refutationBreakdown(agent: Agent): {
-    readonly byCause: Readonly<Record<string, number>>
-    /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */
-    readonly protocolFailures: number
-    /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */
-    readonly genuineRefutations: number
-    /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */
-    readonly infrastructure: number
-  } {
-    const byCause: Record<string, number> = {}
-    let protocolFailures = 0
-    let genuineRefutations = 0
-    let infrastructure = 0
-    for (const entry of this.state(agent.session).findings) {
-      const verdict = entry.verdict
-      if (verdict === undefined || verdict.verdict !== 'refuted') continue
-      const cause = verdict.cause ?? 'unattributed'
-      byCause[cause] = (byCause[cause] ?? 0) + 1
-      if (cause === 'benign-arm-passed' || cause === 'no-marker') protocolFailures += 1
-      else if (cause === 'nonzero-exit') genuineRefutations += 1
-      else if (cause === 'timeout' || cause === 'aborted' || cause === 'no-runs') infrastructure += 1
-    }
-    return { byCause, protocolFailures, genuineRefutations, infrastructure }
+  refutationBreakdown(agent: Agent): RefutationBreakdown {
+    return refutationBreakdownFromState(this.state(agent.session))
   }
 
   /**
@@ -690,28 +709,14 @@ export class HardLedger extends Service {
    * Coverage progress over the matrix: matrix cells holding a verdict,
    * of the whole matrix. Cells outside the matrix never count. A
    * repository-scoped class is verdicted once for the whole repository, so
-   * its verdict lookup deliberately ignores the recorded cell's module.
+   * its verdict lookup deliberately ignores the recorded cell's module. The
+   * math lives in `coverageProgressFromState` — the same function the pilot
+   * report reads after folding the log.
    * @param agent - the live agent whose ledger state is read.
    * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
    */
-  coverageProgress(agent: Agent): { verdicted: number; total: number } {
-    const state = this.state(agent.session)
-    const matrix = state.matrix
-    if (matrix === undefined) return { verdicted: 0, total: 0 }
-    const inert = new Set(matrix.inertModules ?? [])
-    const moduleClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'module')
-    const repoClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'repo')
-    const verdictedModuleCells = new Set(this.coverage(agent).map(cell => `${cell.module}\u0000${cell.bugClass}`))
-    let verdicted = 0
-    for (const module of matrix.modules) {
-      for (const bugClass of moduleClasses) {
-        if (inert.has(module) || verdictedModuleCells.has(`${module}\u0000${bugClass}`)) verdicted += 1
-      }
-    }
-    for (const bugClass of repoClasses) {
-      if (this.coverage(agent).some(cell => cell.bugClass === bugClass)) verdicted += 1
-    }
-    return { verdicted, total: matrix.modules.length * moduleClasses.length + repoClasses.length }
+  coverageProgress(agent: Agent): CoverageProgress {
+    return coverageProgressFromState(this.state(agent.session))
   }
 
   /**
@@ -749,36 +754,13 @@ export class HardLedger extends Service {
    * Verdicted matrix cells partitioned by who decided them: the model's own
    * reads, batch clears the harness grep confirmed, and the purely mechanical
    * inert-module screen. A cell carrying no source reads as `model`, so older
-   * logs partition unchanged.
+   * logs partition unchanged. The math lives in `coverageBySourceFromState` —
+   * the same function the pilot report reads after folding the log.
    * @param agent - the live agent whose ledger state is read.
    * @returns the three counts; all zero without a matrix.
    */
-  coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number } {
-    const state = this.state(agent.session)
-    const matrix = state.matrix
-    if (matrix === undefined) return { model: 0, modelVerified: 0, harness: 0 }
-    const inert = new Set(matrix.inertModules ?? [])
-    const latest = new Map<string, HardCoverageCellData>()
-    for (const cell of this.coverage(agent)) latest.set(`${cell.module}\u0000${cell.bugClass}`, cell)
-    const moduleClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'module')
-    const repoClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'repo')
-    const counts = { model: 0, modelVerified: 0, harness: 0 }
-    const tally = (source: HardCoverageSource | undefined): void => {
-      if (source === 'model-verified') counts.modelVerified += 1
-      else counts.model += 1
-    }
-    for (const module of matrix.modules) {
-      for (const bugClass of moduleClasses) {
-        const cell = latest.get(`${module}\u0000${bugClass}`)
-        if (cell !== undefined) tally(cell.source)
-        else if (inert.has(module)) counts.harness += 1
-      }
-    }
-    for (const bugClass of repoClasses) {
-      const cell = [...this.coverage(agent)].reverse().find(entry => entry.bugClass === bugClass)
-      if (cell !== undefined) tally(cell.source)
-    }
-    return counts
+  coverageBySource(agent: Agent): CoverageBySource {
+    return coverageBySourceFromState(this.state(agent.session))
   }
 
   /**

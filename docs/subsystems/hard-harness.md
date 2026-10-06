@@ -95,6 +95,18 @@ markCoverage(agent: Agent, request: HardCoverageCellData): void
 assertModulesInMatrix(agent: Agent, modules: readonly string[]): void
 
 /**
+ * Reject `cleared` verdicts on inert modules. The harness already screened
+ * an inert module as carrying no code, so its cells stand as harness
+ * verdicts — a model `cleared` there is redundant work, not diligence.
+ * A `suspicious` verdict still passes: if the model really saw something
+ * in a module this size, that signal must not be blocked.
+ * @param agent - the live agent whose ledger matrix carries the inert screen.
+ * @param modules - the module names a `cleared` verdict is about to record.
+ * @throws `HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.
+ */
+assertClearableModules(agent: Agent, modules: readonly string[]): void
+
+/**
  * Append one completed sweep summary. An empty sweep must cite verifiable
  * evidence the ledger can check — a refuted hypothesis, a model-cleared
  * cell with declared sinks, or a recorded flow document with resolvable
@@ -133,13 +145,15 @@ findings(agent: Agent): readonly HardLedgerFindingEntry[]
 
 /**
  * Decompose the refuted verdicts by cause code, so one run can say whether
- * it failed at the protocol layer or the target layer.
+ * it failed at the protocol layer or the target layer. The math lives in
+ * `refutationBreakdownFromState` — the same function the pilot report
+ * reads after folding the log.
  * @param agent - the live agent whose ledger holds the findings.
  * @returns refuted-verdict counts per cause plus the reading groups; a
  *   refuted verdict predating the cause codes counts under `unattributed`
  *   in `byCause` and in no group.
  */
-refutationBreakdown(agent: Agent): { readonly byCause: Readonly<Record<string, number>> /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */ readonly protocolFailures: number /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */ readonly genuineRefutations: number /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */ readonly infrastructure: number }
+refutationBreakdown(agent: Agent): RefutationBreakdown
 
 /**
  * Hypotheses folded to their latest state per id.
@@ -207,11 +221,13 @@ coverageMatrix(agent: Agent): HardCoverageMatrix | undefined
  * Coverage progress over the matrix: matrix cells holding a verdict,
  * of the whole matrix. Cells outside the matrix never count. A
  * repository-scoped class is verdicted once for the whole repository, so
- * its verdict lookup deliberately ignores the recorded cell's module.
+ * its verdict lookup deliberately ignores the recorded cell's module. The
+ * math lives in `coverageProgressFromState` — the same function the pilot
+ * report reads after folding the log.
  * @param agent - the live agent whose ledger state is read.
  * @returns the verdicted count and the matrix cell total, `0/0` without a matrix.
  */
-coverageProgress(agent: Agent): { verdicted: number; total: number }
+coverageProgress(agent: Agent): CoverageProgress
 
 /**
  * Matrix cells that still need the model, in matrix order: sorted modules
@@ -227,11 +243,12 @@ uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
  * Verdicted matrix cells partitioned by who decided them: the model's own
  * reads, batch clears the harness grep confirmed, and the purely mechanical
  * inert-module screen. A cell carrying no source reads as `model`, so older
- * logs partition unchanged.
+ * logs partition unchanged. The math lives in `coverageBySourceFromState` —
+ * the same function the pilot report reads after folding the log.
  * @param agent - the live agent whose ledger state is read.
  * @returns the three counts; all zero without a matrix.
  */
-coverageBySource(agent: Agent): { model: number; modelVerified: number; harness: number }
+coverageBySource(agent: Agent): CoverageBySource
 
 /**
  * Model-facing open work summary: pending verifications, unresolved

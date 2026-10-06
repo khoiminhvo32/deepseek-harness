@@ -9,6 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, coverageBySourceFromState, coverageProgressFromState, emptyHardLedgerState, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -654,6 +655,29 @@ describe('hard ledger coverage matrix', () => {
     ctx.hardLedger.markCoverage(root.agent, { module: '.', bugClass: 'sqli', verdict: 'uncovered', declaredSinks: [] })
   })
 
+  it('refuses a cleared verdict on an inert module but keeps suspicious passable', async () => {
+    const { ctx, root } = await harness()
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['data/manuals', 'src'],
+      bugClasses: ['cmdi', 'sqli'],
+      inertModules: ['data/manuals'],
+    })
+    // Cleared there duplicates the harness screen — the pilot's second run
+    // burned four cells on exactly this.
+    expect(() => { ctx.hardLedger.markCoverage(root.agent, {
+      module: 'data/manuals', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['exec'],
+    }) }).toThrow('module "data/manuals" is inert — the harness already screened it as containing no code')
+    // A real sighting must surface, so suspicious still records.
+    ctx.hardLedger.markCoverage(root.agent, { module: 'data/manuals', bugClass: 'cmdi', verdict: 'suspicious', declaredSinks: [] })
+    expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(1)
+    // Non-inert modules clear normally.
+    ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['exec'] })
+    expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(2)
+  })
+
   it('bounds the valid-rows list in the rejection message', async () => {
     const { ctx, root } = await harness()
     ctx.hardLedger.recordMissionArmed(root.agent, {
@@ -806,5 +830,65 @@ describe('hard ledger service shape', () => {
   it('survives the Loader namespace rules for class plugins', () => {
     const loader = Object.create(Loader.prototype) as Loader
     expect(loader.unwrapExports(HardLedger)).toBe(HardLedger)
+  })
+})
+
+describe('hard ledger aggregates over folded state', () => {
+  /** The log shape the pilot report folds: raw {type, data} session events. */
+  function fold(events: readonly { type: string; data: unknown }[]): ReturnType<typeof emptyHardLedgerState> {
+    let state = emptyHardLedgerState()
+    for (const event of events) state = applyHardLedgerProjection(state, event as never)
+    return state
+  }
+
+  it('filters the matrix math to armed rows and attributes inert cells to the harness', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['data/manuals', 'src'], bugClasses: ['cmdi'], inertModules: ['data/manuals'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] } },
+      // A cell outside the matrix — recorded before the guard existed, or on a legacy log.
+      { type: 'hard/coverage/cell', data: { module: 'poc', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['x'] } },
+    ])
+    // The inert module counts as verdicted (its screen), so 2 of 2 cells are done
+    // — the off-matrix poc cell contributes nothing to either number.
+    expect(coverageProgressFromState(state)).toEqual({ verdicted: 2, total: 2 })
+    // The inert module has no event: its cell counts as the harness's screen.
+    expect(coverageBySourceFromState(state)).toEqual({ model: 1, modelVerified: 0, harness: 1 })
+    // matrixCellsFromState drives the gaming denominator: the off-matrix cell
+    // is absent, so "cleared cells" counts matrix rows only.
+    expect(matrixCellsFromState(state).map(cell => `${cell.module}×${cell.verdict}`)).toEqual(['src×cleared'])
+  })
+
+  it('decomposes refutations by cause from the folded findings', () => {
+    const state = fold([
+      {
+        type: 'hard/finding/proposed',
+        data: {
+          id: 'F-1', title: 't', bugClass: 'cmdi', component: 'c', claim: 'k',
+          cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H',
+          cvssClaimed: 9.3, pocPath: 'poc.sh', payload: 'x',
+          claimHash: CLAIM_HASH, fingerprint: FINGERPRINT,
+        },
+      },
+      {
+        type: 'hard/finding/verdict',
+        data: {
+          id: 'F-1', verdict: 'refuted', runs: 0, cvssComputed: 9.3, cvssMatch: true,
+          reason: 'benign payload satisfied the contract', fingerprint: FINGERPRINT,
+          benignArm: 'passed', cause: 'benign-arm-passed', evidence: 'demonstrated',
+        },
+      },
+    ])
+    expect(refutationBreakdownFromState(state)).toEqual({
+      byCause: { 'benign-arm-passed': 1 },
+      protocolFailures: 1,
+      genuineRefutations: 0,
+      infrastructure: 0,
+    })
   })
 })

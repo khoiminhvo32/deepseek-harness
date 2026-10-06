@@ -465,6 +465,9 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       if (modules.length === 0) throw new Error('modules must list at least one module')
       if (modules.length > 50) throw new Error('modules must not exceed 50 entries per batch')
       ledger.assertModulesInMatrix(agent, modules)
+      // A batch clear on an inert module duplicates the screen the harness
+      // already ran; refuse the whole batch before any grep runs.
+      ledger.assertClearableModules(agent, modules)
       if (args.patterns.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
         throw new Error('patterns entries must be non-empty strings')
       }

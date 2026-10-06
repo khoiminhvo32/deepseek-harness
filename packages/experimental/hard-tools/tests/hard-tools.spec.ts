@@ -450,8 +450,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(1)
   })
 
-  it('refuses a coverage cell outside the armed matrix, naming the valid rows', async () => {
-    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+  it('refuses a coverage cell outside the armed matrix, naming the valid rows', async () => {    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
       targetRepo: '/tmp/hard-target',
@@ -472,6 +471,26 @@ describe('hard_update_hypothesis and methodology tools', () => {
       module: 'poc', bug_class: 'cmdi', verdict: 'suspicious', declared_sinks: [],
     }, bare.root.agent))
     expect(unArmed.coverage).toMatchObject({ module: 'poc', verdict: 'suspicious' })
+  })
+
+  it('refuses a batch that contains an inert module before any grep runs', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['data/manuals', 'src'],
+      bugClasses: ['sqli'],
+      inertModules: ['data/manuals'],
+    })
+    const refused = await execute(ctx, 'hard_clear_modules', {
+      modules: ['data/manuals', 'src'], bug_class: 'sqli', patterns: ['SELECT'], rationale: 'r',
+    }, root.agent)
+    expect(refused.isError).toBe(true)
+    expect((refused.content[0] as { type: string; text: string }).text)
+      .toContain('module "data/manuals" is inert — the harness already screened it as containing no code')
+    // The whole batch was refused before any cell was cleared.
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
   })
 
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {

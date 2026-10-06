@@ -1,9 +1,12 @@
 /**
  * Verdict classification over executed PoC runs. The proof-of-effect
  * contract is mechanical: a run passes only when the process exits zero AND
- * its stdout prints `HARD-PASS <claimHash>` for the finding's claim. All
- * runs passing confirms, all failing refutes, a split verdict is flaky and
- * never counts.
+ * its stdout prints `HARD-PASS <claimHash>` for the finding's claim AND the
+ * stdout carries content beyond the marker (the echo trap). The specificity
+ * check adds the benign arm: the same PoC re-run with a benign payload must
+ * fail, because a proof that passes regardless of input proves nothing about
+ * the input. All exploit runs passing confirms, all failing refutes, a split
+ * verdict is flaky and never counts.
  * @module
  */
 
@@ -43,8 +46,10 @@ function isEchoOnly(run: PoCRunRecord, claimHash: string): boolean {
 }
 
 /**
- * Classify the executed runs into the durable verdict record.
- * @param request - the finding id, executed runs, hashes, and CVSS recompute facts.
+ * Classify the executed runs into the durable verdict record. The benign arm
+ * short-circuits: a PoC that satisfies the contract with a benign payload is
+ * refuted by the specificity check before the exploit arm runs at all.
+ * @param request - the finding id, executed runs, hashes, CVSS recompute facts, and the benign arm's outcome.
  * @returns the durable verdict payload ready to record.
  */
 export function classifyRuns(request: {
@@ -54,8 +59,22 @@ export function classifyRuns(request: {
   readonly cvssComputed: number
   readonly cvssMatch: boolean
   readonly fingerprint: string
+  readonly benignArm?: HardFindingVerdictData['benignArm']
 }): HardFindingVerdictData {
   const { runs, claimHash, id } = request
+  if (request.benignArm === 'passed') {
+    return {
+      id,
+      verdict: 'refuted',
+      runs: 0,
+      cvssComputed: request.cvssComputed,
+      cvssMatch: request.cvssMatch,
+      reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
+      fingerprint: request.fingerprint,
+      benignArm: 'passed',
+    }
+  }
+  const benign = request.benignArm === undefined ? {} : { benignArm: request.benignArm }
   if (runs.length === 0) {
     return {
       id,
@@ -65,6 +84,7 @@ export function classifyRuns(request: {
       cvssMatch: request.cvssMatch,
       reason: 'no runs were executed',
       fingerprint: request.fingerprint,
+      ...benign,
     }
   }
   const satisfied = runs.map(run => runSatisfied(run, claimHash))
@@ -105,5 +125,6 @@ export function classifyRuns(request: {
     cvssMatch: request.cvssMatch,
     reason,
     fingerprint: request.fingerprint,
+    ...benign,
   }
 }

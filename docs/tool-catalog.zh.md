@@ -1504,7 +1504,11 @@ Submit one vulnerability finding for harness verification. The harness executes 
     },
     "poc_path": {
       "type": "string",
-      "description": "Repository-relative path of the PoC script. It must print HARD-PASS sha256-of-claim on stdout and exit zero when the claim holds."
+      "description": "Target-repository-relative path of the PoC script. It must take the exploit input as $1, print HARD-PASS sha256-of-claim on stdout with content beyond it, and exit zero only when the payload causes the effect."
+    },
+    "payload": {
+      "type": "string",
+      "description": "The exploit input the PoC takes as its first argument. The harness re-runs the same PoC with a benign payload and requires it to fail (the specificity check)."
     },
     "hypothesis_id": {
       "type": "string",
@@ -1518,7 +1522,8 @@ Submit one vulnerability finding for harness verification. The harness executes 
     "claim",
     "cvss_vector",
     "cvss_score",
-    "poc_path"
+    "poc_path",
+    "payload"
   ]
 }
 ```

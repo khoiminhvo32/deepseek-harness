@@ -1,4 +1,4 @@
-/** Deterministic keyless hard-harness adapter: stop-gate steer, two refuted fabrications (dead PoC + echo trap), model-written proof, cross-checked coverage. */
+/** Deterministic keyless hard-harness adapter: stop-gate steer, three refuted fabrications (dead PoC + echo trap + payload-agnostic proof), model-written proof over $1, cross-checked coverage. */
 
 import { createHash } from 'node:crypto'
 import { ToolCallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -16,9 +16,14 @@ const ECHO_POC_B64 = Buffer.from(`#!/bin/sh\necho "HARD-PASS ${CLAIM_HASH}"\n`).
 // matches; only the proofless PoC distinguishes it.
 const PROOF_POC_B64 = Buffer.from(
   '#!/bin/sh\nset -e\ncd "$(dirname "$0")/../.."\n'
-  + `node -e "const {buildReport}=require('./src/reports.js'); buildReport('x; touch poc/F-2/pwned.txt')"\n`
+  + 'node -e "const {buildReport}=require(\'./src/reports.js\'); buildReport(process.argv[1])" "$1"\n'
   + 'test -f poc/F-2/pwned.txt\n'
   + `echo "exploited: pwned.txt created"\necho "HARD-PASS ${CLAIM_HASH}"\n`,
+).toString('base64')
+// The payload-agnostic PoC prints filler output plus the marker regardless of
+// $1, so the echo trap passes — only the benign arm catches it.
+const GENERIC_POC_B64 = Buffer.from(
+  `#!/bin/sh\necho "exploit succeeded"\necho "HARD-PASS ${CLAIM_HASH}"\n`,
 ).toString('base64')
 
 let nextCall = 0
@@ -96,17 +101,18 @@ function writePoc(path, b64) {
   return { name: 'bash', args: { command: `mkdir -p "$(dirname "${path}")" && printf '%s' '${b64}' | base64 -d > '${path}' && chmod +x '${path}'`, description: `Write the PoC script ${path}` } }
 }
 
-function submitFinding(id, title, claim) {
+function submitFinding(id, title, claim, payload, component = 'src/reports.js') {
   return {
     name: 'hard_submit_finding',
     args: {
       title,
       bug_class: 'cmdi',
-      component: 'src/reports.js',
+      component,
       claim,
       cvss_vector: VECTOR,
       cvss_score: 9.3,
       poc_path: `poc/${id}/poc.sh`,
+      payload,
     },
   }
 }
@@ -122,14 +128,19 @@ function script(messages) {
   }
   // 2. Fabrication one: write a PoC that dies, then submit it for refutation.
   if (!seen.includes('poc/F-1/poc.sh')) return toolChunks([writePoc('poc/F-1/poc.sh', FAILING_POC_B64)])
-  if (!seen.includes('"id":"F-1"')) return toolChunks([submitFinding('F-1', 'Fake command injection', 'The reports module spawns commands from user input.')])
+  if (!seen.includes('"id":"F-1"')) return toolChunks([submitFinding('F-1', 'Fake command injection', 'The reports module spawns commands from user input.', 'x')])
   // 3. Fabrication two: the echo trap — the same confirmed claim, but a PoC
   // whose stdout is only the marker, so the hash matches and the proof is empty.
   if (!seen.includes('poc/F-2/poc.sh')) return toolChunks([writePoc('poc/F-2/poc.sh', ECHO_POC_B64)])
-  if (!seen.includes('"id":"F-2"')) return toolChunks([submitFinding('F-2', 'Echo-only proof', CONFIRMED_CLAIM)])
-  // 4. The real proof: a model-written PoC that exploits the planted bug.
+  if (!seen.includes('"id":"F-2"')) return toolChunks([submitFinding('F-2', 'Echo-only proof', CONFIRMED_CLAIM, 'x')])
+  // 4. The real proof: a model-written PoC that exploits the planted bug
+  // through the $1 payload the harness passes.
   if (!seen.includes('poc/F-3/poc.sh')) return toolChunks([writePoc('poc/F-3/poc.sh', PROOF_POC_B64)])
-  if (!seen.includes('"id":"F-3"')) return toolChunks([submitFinding('F-3', 'Command injection in buildReport', CONFIRMED_CLAIM)])
+  if (!seen.includes('"id":"F-3"')) return toolChunks([submitFinding('F-3', 'Command injection in buildReport', CONFIRMED_CLAIM, 'x; touch poc/F-2/pwned.txt')])
+  // 4b. The payload-agnostic trap: filler output plus the marker for ANY $1 —
+  // the echo trap alone cannot catch this; only the benign arm does.
+  if (!seen.includes('poc/F-4/poc.sh')) return toolChunks([writePoc('poc/F-4/poc.sh', GENERIC_POC_B64)])
+  if (!seen.includes('"id":"F-4"')) return toolChunks([submitFinding('F-4', 'Payload-agnostic proof', CONFIRMED_CLAIM, 'x', 'src/session.js')])
   // 5. Coverage: clear the cell naming a sink the grep will not find, so the
   // deterministic cross-check reopens it; then re-mark with the real sinks.
   if (!seen.includes('reopenedSinks')) {

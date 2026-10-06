@@ -202,6 +202,10 @@ export class HardLedger extends Service {
     this.assertText('claim', request.claim)
     this.assertText('component', request.component)
     this.assertText('bugClass', request.bugClass)
+    if (request.payload === undefined || request.payload.trim().length === 0) {
+      throw new HarnessError('payload must be a non-empty string', 'HARD_LEDGER_PAYLOAD_REQUIRED')
+    }
+    this.assertText('payload', request.payload)
     if (!request.cvssVector.startsWith('CVSS:4.0/')) {
       throw new HarnessError('cvssVector must start with CVSS:4.0/', 'HARD_LEDGER_INVALID_VECTOR')
     }
@@ -383,12 +387,19 @@ export class HardLedger extends Service {
    * @returns one record per proposal in id order.
    */
   findings(agent: Agent): readonly HardLedgerFindingEntry[] {
-    return this.state(agent.session).findings.map(entry => ({
-      proposed: this.brandedProposal(entry.proposed),
-      ...entry.verdict === undefined
-        ? {}
-        : { verdict: { ...entry.verdict, id: brandString<HardFindingId>(entry.verdict.id) } },
-    }))
+    return this.state(agent.session).findings.map((entry) => {
+      const { proposed, verdict } = entry
+      if (verdict === undefined) return { proposed: this.brandedProposal(proposed) }
+      const { id, benignArm, ...rest } = verdict
+      return {
+        proposed: this.brandedProposal(proposed),
+        verdict: {
+          ...rest,
+          id: brandString<HardFindingId>(id),
+          ...benignArm === undefined ? {} : { benignArm },
+        },
+      }
+    })
   }
 
   /**
@@ -407,15 +418,17 @@ export class HardLedger extends Service {
 
   /** Restore the branded id view over one persisted proposal record. */
   private brandedProposal(
-    proposed: Omit<HardFindingProposedData, 'id' | 'hypothesisId'> & {
+    proposed: Omit<HardFindingProposedData, 'id' | 'hypothesisId' | 'payload'> & {
       id: string
+      payload?: string | undefined
       hypothesisId?: string | undefined
     },
   ): HardFindingProposedData {
-    const { id, hypothesisId, ...rest } = proposed
+    const { id, payload, hypothesisId, ...rest } = proposed
     return {
       ...rest,
       id: brandString<HardFindingId>(id),
+      ...payload === undefined ? {} : { payload },
       ...hypothesisId === undefined ? {} : { hypothesisId: brandString<HardHypothesisId>(hypothesisId) },
     }
   }

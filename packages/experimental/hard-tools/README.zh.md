@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-tools` 注册 hard harness 的五个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量与 PoC 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后跨多个模块批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程；空扫描必须引用可验证的证明——已反驳的假设或模型已清除的单元格——由台账在记录时校验。
+`dsh-experimental-hard-tools` 注册 hard harness 的五个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量、PoC 以 `$1` 接收的利用 payload 与 PoC 路径提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后跨多个模块批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程；空扫描必须引用可验证的证明——已反驳的假设或模型已清除的单元格——由台账在记录时校验。
 
 ## 目录
 
@@ -43,7 +43,7 @@ kind: "package-reference"
 
 ### Design
 
-- **提交时验证。** `hard_submit_finding` 对 claim（PoC 必须打印的标记）与根因（去重键）做哈希，通过台账提出，然后等待 `hardVerifier.verify` 再作答；模型看到的是执行后的结论，而不是假设。
+- **提交时验证。** `hard_submit_finding` 对 claim（PoC 必须打印的标记）与根因（去重键）做哈希，通过台账提出，然后等待 `hardVerifier.verify` 再作答；模型看到的是执行后的结论，而不是假设。工具描述传授 specificity 契约：从 `$1` 读取 payload、绝不硬编码，因为 harness 会用良性载荷重跑 PoC 并要求其失败。
 - **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。
 
 ### Source map

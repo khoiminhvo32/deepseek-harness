@@ -1460,7 +1460,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_submit_finding`
 
-Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself; a finding only counts as confirmed when every run exits zero and prints the exact line HARD-PASS claim-hash on stdout. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.
+Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself, passing the payload as the PoC's first argument ($1); read the payload from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is re-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints the exact line HARD-PASS claim-hash on stdout with content beyond it, and the benign run failed. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.
 
 ```json
 {
@@ -1496,7 +1496,11 @@ Submit one vulnerability finding for harness verification. The harness executes 
     },
     "poc_path": {
       "type": "string",
-      "description": "Repository-relative path of the PoC script. It must print HARD-PASS sha256-of-claim on stdout and exit zero when the claim holds."
+      "description": "Target-repository-relative path of the PoC script. It must take the exploit input as $1, print HARD-PASS sha256-of-claim on stdout with content beyond it, and exit zero only when the payload causes the effect."
+    },
+    "payload": {
+      "type": "string",
+      "description": "The exploit input the PoC takes as its first argument. The harness re-runs the same PoC with a benign payload and requires it to fail (the specificity check)."
     },
     "hypothesis_id": {
       "type": "string",
@@ -1510,7 +1514,8 @@ Submit one vulnerability finding for harness verification. The harness executes 
     "claim",
     "cvss_vector",
     "cvss_score",
-    "poc_path"
+    "poc_path",
+    "payload"
   ]
 }
 ```

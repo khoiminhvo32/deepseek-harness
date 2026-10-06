@@ -44,6 +44,7 @@ const proposedSchema = zod.object({
   bugClass: zod.string().min(1),
   component: zod.string().min(1),
   claim: zod.string().min(1),
+  payload: zod.string().min(1).optional(),
   cvssVector: zod.string().min(1),
   cvssClaimed: zod.number(),
   pocPath: zod.string().min(1),
@@ -60,6 +61,7 @@ const verdictSchema = zod.object({
   cvssMatch: zod.boolean(),
   reason: zod.string().min(1),
   fingerprint: zod.string().regex(/^[0-9a-f]{64}$/u),
+  benignArm: zod.enum(['passed', 'failed']).optional(),
 })
 
 const hypothesisSchema = zod.object({

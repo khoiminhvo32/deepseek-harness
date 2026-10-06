@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and route completion through the goal tools. Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, screens out modules whose every file carries a non-executable extension, and appends the `hard/mission/armed` session event once. It arms fresh root agents on `startup` only; resumed, cleared, compacted, and child agents keep their own goal state.
+`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and route completion through the goal tools; every PoC must fail under a benign payload (the specificity check). Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, screens out modules whose every file carries a non-executable extension, and appends the `hard/mission/armed` session event once; only fresh root agents arm on `startup`.
 
 ## Table of Contents
 

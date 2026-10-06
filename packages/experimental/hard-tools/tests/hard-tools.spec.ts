@@ -65,11 +65,15 @@ function stubAgent(rawId: string): StubAgent {
 interface ScriptedRun {
   readonly exitCode: number | null
   readonly stdoutText: string
+  readonly stderrText?: string
+  readonly timedOut?: boolean
 }
 
-/** A shell service on the `shell` key replaying one scripted outcome forever. */
+/** A shell service on the `shell` key cycling a script of outcomes in call order. */
 class SingleRunShell extends Service {
-  constructor(ctx: Context, private readonly scripted: ScriptedRun) {
+  private readonly calls: { command: string; timeoutMs?: number }[] = []
+
+  constructor(ctx: Context, private readonly script: readonly ScriptedRun[]) {
     super(ctx, 'shell')
   }
 
@@ -79,21 +83,29 @@ class SingleRunShell extends Service {
 
   async execute(spec: { command: string; timeoutMs?: number }) {
     void spec
+    this.calls.push({ command: spec.command, ...spec.timeoutMs === undefined ? {} : { timeoutMs: spec.timeoutMs } })
+    const scripted = this.script[(this.calls.length - 1) % this.script.length] as ScriptedRun
     return {
       result: () => Promise.resolve({
-        exitCode: this.scripted.exitCode,
+        exitCode: scripted.exitCode,
         signal: null,
-        timedOut: false,
+        timedOut: scripted.timedOut ?? false,
         aborted: false,
         timeoutMs: spec.timeoutMs === undefined ? 0 : spec.timeoutMs,
-        stdout: { text: this.scripted.stdoutText, truncated: false },
-        stderr: { text: '', truncated: false },
+        stdout: { text: scripted.stdoutText, truncated: false },
+        stderr: { text: scripted.stderrText ?? '', truncated: false },
       }),
     }
   }
 }
 
-async function harness(scripted: ScriptedRun, verifyConfig: VerifierConfig = { runs: 1 }) {
+/** The two outcomes one honest submit takes: the benign arm fails, the exploit arm satisfies. */
+const SUBMIT_SCRIPT = (pass: string): ScriptedRun[] => [
+  { exitCode: 1, stdoutText: '', stderrText: '' },
+  { exitCode: 0, stdoutText: pass },
+]
+
+async function harness(scripted: ScriptedRun | readonly ScriptedRun[], verifyConfig: VerifierConfig = { runs: 1 }) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -101,7 +113,7 @@ async function harness(scripted: ScriptedRun, verifyConfig: VerifierConfig = { r
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(HardLedger, {})
-  new SingleRunShell(ctx, scripted)
+  new SingleRunShell(ctx, Array.isArray(scripted) ? scripted : [scripted])
   await ctx.plugin(HardVerifier, verifyConfig)
   const fiber = await ctx.plugin(hardTools, {})
   const root = stubAgent(`hard-tools-root-${Math.random()}`)
@@ -133,7 +145,7 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 
 describe('hard tools registration', () => {
   it('registers the five tools and disposes them with the fiber', async () => {
-    const { ctx, fiber } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, fiber } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules']
       .map(name => ctx.tools.get(name)?.name)).toHaveLength(5)
     await fiber.dispose()
@@ -152,9 +164,9 @@ describe('hard tools registration', () => {
 
 describe('hard tools agentless and presentation', () => {
   it('rejects every tool without a live agent', async () => {
-    const { ctx } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     for (const [name, args] of [
-      ['hard_submit_finding', { title: 'x', bug_class: 'sqli', component: 'c', claim: 'x', cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p' }],
+      ['hard_submit_finding', { title: 'x', bug_class: 'sqli', component: 'c', claim: 'x', cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p', payload: "x' OR 1=1 --" }],
       ['hard_update_hypothesis', { statement: 'x', status: 'proposed' }],
       ['hard_mark_coverage', { module: 'm', bug_class: 'sqli', verdict: 'suspicious', declared_sinks: [] }],
       ['hard_sweep_summary', { phase: 'A', cells_touched: 1, new_findings: 1 }],
@@ -167,10 +179,10 @@ describe('hard tools agentless and presentation', () => {
   })
 
   it('renders generic presentation for each tool', async () => {
-    const { ctx } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     expect(ctx.tools.get('hard_submit_finding')?.presentCall?.({
       title: 'x', bug_class: 'sqli', component: 'src/auth', symbol: 'login()', claim: 'x',
-      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p',
+      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p', payload: "x' OR 1=1 --",
     })).toMatchObject({ card: 'generic', title: 'Submit finding: src/auth' })
     expect(ctx.tools.get('hard_update_hypothesis')?.presentCall?.({ statement: 'x', status: 'proposed' }))
       .toMatchObject({ title: 'Hypothesis proposed: proposed' })
@@ -185,7 +197,7 @@ describe('hard tools agentless and presentation', () => {
 
 describe('hard_submit_finding', () => {
   it('submits, verifies, and returns a confirmed verdict with the recomputed score', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const result = await execute(ctx, 'hard_submit_finding', {
       title: 'SQL injection in login lookup',
       bug_class: 'sqli',
@@ -195,6 +207,7 @@ describe('hard_submit_finding', () => {
       cvss_vector: VECTOR,
       cvss_score: 9.3,
       poc_path: 'poc/poc.sh',
+      payload: "x' OR 1=1 --",
     }, root.agent)
     const value = resultJson(result)
     expect((value.finding as Record<string, unknown>)['id']).toBe('F-1')
@@ -204,12 +217,24 @@ describe('hard_submit_finding', () => {
     expect(ctx.hardLedger.findings(root.agent)).toHaveLength(1)
   })
 
+  it('refutes a payload-agnostic PoC through the benign arm and names the specificity check', async () => {
+    const { ctx, root } = await harness([{ exitCode: 0, stdoutText: PASS_OUTPUT }])
+    const result = resultJson(await execute(ctx, 'hard_submit_finding', {
+      title: 'x', bug_class: 'sqli', component: 'src/auth/login.ts', claim: CLAIM,
+      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: "x' OR 1=1 --",
+    }, root.agent))
+    expect((result.verdict as Record<string, unknown>)).toMatchObject({
+      verdict: 'refuted', runs: 0, reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
+    })
+    expect(ctx.hardLedger.findings(root.agent)[0]?.verdict?.benignArm).toBe('passed')
+  })
+
   it('surfaces the duplicate root-cause rejection as a tool error', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const args = {
       title: 'SQL injection in login lookup',
       bug_class: 'sqli', component: 'src/auth/login.ts', symbol: 'login()',
-      claim: CLAIM, cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh',
+      claim: CLAIM, cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: "x' OR 1=1 --",
     }
     await execute(ctx, 'hard_submit_finding', args, root.agent)
     const second = await execute(ctx, 'hard_submit_finding', args, root.agent)
@@ -218,10 +243,10 @@ describe('hard_submit_finding', () => {
   })
 
   it('rejects a finding that cites an unknown hypothesis', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const result = await execute(ctx, 'hard_submit_finding', {
       title: 'x', bug_class: 'sqli', component: 'src/auth/login.ts', claim: CLAIM,
-      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', hypothesis_id: 'H-9',
+      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: "x' OR 1=1 --", hypothesis_id: 'H-9',
     }, root.agent)
     expect(result.isError).toBe(true)
   })
@@ -229,7 +254,7 @@ describe('hard_submit_finding', () => {
 
 describe('hard submit with hypothesis linkage', () => {
   it('links a finding to an existing hypothesis and omits the symbol', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const proposed = resultJson(await execute(ctx, 'hard_update_hypothesis', {
       statement: 'The refresh endpoint accepts a replayed token in its grace window.',
       status: 'proposed',
@@ -237,7 +262,7 @@ describe('hard submit with hypothesis linkage', () => {
     const id = (proposed.hypothesis as Record<string, unknown>)['id']
     const result = await execute(ctx, 'hard_submit_finding', {
       title: 'OAuth state confusion', bug_class: 'oauth-bypass', component: 'src/oauth', claim: CLAIM,
-      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', hypothesis_id: id,
+      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: 'replay:token-9', hypothesis_id: id,
     }, root.agent)
     const value = resultJson(result)
     expect((value.finding as Record<string, unknown>)['id']).toBe('F-1')
@@ -245,7 +270,7 @@ describe('hard submit with hypothesis linkage', () => {
   })
 
   it('records a phase B sweep', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const value = resultJson(await execute(ctx, 'hard_sweep_summary', {
       phase: 'B', cells_touched: 2, new_findings: 1,
     }, root.agent))
@@ -256,7 +281,7 @@ describe('hard submit with hypothesis linkage', () => {
 
 describe('hard_update_hypothesis and methodology tools', () => {
   it('proposes then transitions a hypothesis by id', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const proposed = resultJson(await execute(ctx, 'hard_update_hypothesis', {
       statement: 'The refresh endpoint accepts a replayed token in its grace window.',
       status: 'proposed',
@@ -279,7 +304,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
   })
 
   it('records coverage cells and requires sinks for cleared', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const missing = await execute(ctx, 'hard_mark_coverage', {
       module: 'src/db', bug_class: 'sqli', verdict: 'cleared', declared_sinks: [],
     }, root.agent)
@@ -408,20 +433,20 @@ describe('hard_update_hypothesis and methodology tools', () => {
   })
 
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const omitted = resultJson(await execute(ctx, 'hard_mark_coverage', {
       module: 'src/auth', bug_class: 'authn', verdict: 'suspicious',
     }, root.agent))
     expect(omitted.coverage).toMatchObject({ module: 'src/auth', verdict: 'suspicious' })
     const blank = await execute(ctx, 'hard_submit_finding', {
       title: 'x', bug_class: 'sqli', component: 'c', claim: CLAIM,
-      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', hypothesis_id: ' ',
+      cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: 'x', hypothesis_id: ' ',
     }, root.agent)
     expect(blank.isError).toBe(true)
   })
 
   it('requires empty-sweep proof when a sweep finds nothing', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const empty = await execute(ctx, 'hard_sweep_summary', {
       phase: 'A', cells_touched: 3, new_findings: 0,
     }, root.agent)
@@ -466,7 +491,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
   })
 
   it('cites a cleared cell as an empty-sweep proof and refuses a harness-screened one', async () => {
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     ctx.hardLedger.markCoverage(root.agent, {
       module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/exec.ts:1 system()'],
     })

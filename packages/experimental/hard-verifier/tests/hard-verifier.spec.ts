@@ -147,15 +147,20 @@ function findingRequest(claim: string) {
     cvssVector: VECTOR,
     cvssClaimed: 9.3,
     pocPath: 'poc/F-1/poc.sh',
+    payload: 'x; touch poc/pwned.txt',
     claimHash: claimHash(claim),
     fingerprint: rootFingerprint({ bugClass: 'sqli', component: 'src/auth/login.ts', symbol: 'login()' }),
   }
 }
 
+/** The benign run the verifier executes first; a real PoC fails it. */
+const benignFail = { exitCode: 1, stdoutText: '', stderrText: '' }
+
 describe('hard verifier execution', () => {
   it('confirms when every run exits zero and prints the claim marker, and records the verdict', async () => {
     const claim = 'The username parameter reaches concatenation in the login query.'
     const { ctx, root, shell } = await harness([
+      benignFail,
       { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}\n` },
       { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
       { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
@@ -165,11 +170,15 @@ describe('hard verifier execution', () => {
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
     expect(verdict.verdict).toBe('confirmed')
     expect(verdict.runs).toBe(3)
+    expect(verdict.benignArm).toBe('failed')
     expect(verdict.cvssComputed).toBe(9.3)
     expect(verdict.cvssMatch).toBe(true)
-    expect(shell.runs[0]?.command).toBe("bash 'poc/F-1/poc.sh'")
+    // The benign arm runs first, once, with the deterministic benign payload;
+    // the exploit arm re-runs the same PoC with the model's payload.
+    expect(shell.runs[0]?.command).toBe(`bash 'poc/F-1/poc.sh' 'hard-benign-${claimHash(claim).slice(0, 8)}'`)
     expect(shell.runs[0]?.timeoutMs).toBe(30000)
     expect(shell.runs[0]?.workdir).toBeUndefined()
+    expect(shell.runs[1]?.command).toBe("bash 'poc/F-1/poc.sh' 'x; touch poc/pwned.txt'")
     const folded = ctx.hardLedger.findings(root.agent)
     expect(folded[0]?.verdict?.verdict).toBe('confirmed')
     expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
@@ -179,6 +188,7 @@ describe('hard verifier execution', () => {
   it('refutes when no run satisfies the contract and surfaces the failure tail', async () => {
     const claim = 'A failed claim.'
     const { ctx, root } = await harness([
+      benignFail,
       { exitCode: 1, stdoutText: '', stderrText: 'AssertionError: expected 403' },
     ])
     const request = findingRequest(claim)
@@ -193,6 +203,7 @@ describe('hard verifier execution', () => {
   it('refutes a timed-out run and flags a split verdict flaky', async () => {
     const claim = 'A flaky claim.'
     const { ctx, root } = await harness([
+      benignFail,
       { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` },
       { exitCode: null, stdoutText: '', timedOut: true },
     ], { runs: 2 })
@@ -203,7 +214,7 @@ describe('hard verifier execution', () => {
     expect(verdict.reason).toContain('of 2 runs')
 
     const timeoutClaim = 'A slow claim.'
-    const { root: root2 } = await harness([{ exitCode: null, stdoutText: '', timedOut: true }])
+    const { root: root2 } = await harness([benignFail, { exitCode: null, stdoutText: '', timedOut: true }])
     const request2 = findingRequest(timeoutClaim)
     const id2 = ctx.hardLedger.proposeFinding(root2.agent, request2)
     const verdict2 = await ctx.hardVerifier.verify(root2.agent, { ...request2, id: id2 })
@@ -213,7 +224,7 @@ describe('hard verifier execution', () => {
 
   it('flags a claimed score that does not match the recomputation', async () => {
     const claim = 'An overclaimed score.'
-    const { ctx, root } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
+    const { ctx, root } = await harness([benignFail, { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
     const request = { ...findingRequest(claim), cvssClaimed: 10 }
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
@@ -223,7 +234,7 @@ describe('hard verifier execution', () => {
 
   it('passes the configured workdir through to the shell request', async () => {
     const claim = 'The workdir claim.'
-    const { ctx, shell } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }], {
+    const { ctx, shell } = await harness([benignFail, { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }], {
       runs: 1, timeoutSeconds: 30, pocWorkdir: '/tmp/hard-target',
     })
     const request = findingRequest(claim)
@@ -234,7 +245,7 @@ describe('hard verifier execution', () => {
 
   it('rejects a duplicate proposal of a confirmed root cause without executing anything', async () => {
     const claim = 'The duplicate claim.'
-    const { ctx, root, shell } = await harness([{ exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
+    const { ctx, root, shell } = await harness([benignFail, { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }])
     const request = findingRequest(claim)
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     await ctx.hardVerifier.verify(root.agent, { ...request, id })
@@ -243,6 +254,52 @@ describe('hard verifier execution', () => {
     await expect(ctx.hardVerifier.verify(root.agent, { ...request, id: secondId }))
       .rejects.toThrow('a confirmed finding with the same root cause already exists (F-1)')
     expect(shell.runs.length).toBe(runsBefore)
+  })
+
+  it('refutes early when the benign arm satisfies the contract', async () => {
+    const claim = 'A payload-agnostic claim.'
+    const { ctx, root, shell } = await harness([
+      { exitCode: 0, stdoutText: `exploit succeeded\nHARD-PASS ${claimHash(claim)}\n` },
+    ], { runs: 3 })
+    const request = findingRequest(claim)
+    const id = ctx.hardLedger.proposeFinding(root.agent, request)
+    const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
+    expect(verdict.verdict).toBe('refuted')
+    expect(verdict.reason).toBe('the proof passes with a benign payload, so it does not depend on the exploit input')
+    expect(verdict.benignArm).toBe('passed')
+    expect(verdict.runs).toBe(0)
+    // Short circuit: the exploit arm never ran.
+    expect(shell.runs).toHaveLength(1)
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
+  })
+
+  it('runs the PoC from the pinned target repository once a matrix is armed', async () => {
+    const claim = 'The pinned workdir claim.'
+    const { ctx, root, shell } = await harness([benignFail, { exitCode: 0, stdoutText: `exploit output\nHARD-PASS ${claimHash(claim)}` }], {
+      runs: 1,
+    })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+      modules: ['src'], bugClasses: ['cmdi'],
+    })
+    const request = findingRequest(claim)
+    const id = ctx.hardLedger.proposeFinding(root.agent, request)
+    await ctx.hardVerifier.verify(root.agent, { ...request, id })
+    expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
+    expect(shell.runs[1]?.workdir).toBe('/tmp/hard-target')
+  })
+
+  it('requires the payload for the specificity check', async () => {
+    const claim = 'The payloadless claim.'
+    const { ctx, root, shell } = await harness([])
+    // The ledger refuses a payloadless proposal; a hand-built one tests the verifier's own guard.
+    const { payload: _dropped, ...payloadless } = findingRequest(claim)
+    void _dropped
+    expect(() => ctx.hardLedger.proposeFinding(root.agent, payloadless))
+      .toThrow('payload must be a non-empty string')
+    const failure = await ctx.hardVerifier.verify(root.agent, { ...payloadless, id: 'F-9' as never }).catch((error: unknown) => error)
+    expect((failure as { code?: string }).code).toBe('HARD_VERIFIER_PAYLOAD_REQUIRED')
+    expect(shell.runs).toHaveLength(0)
   })
 
   it('rejects an unparsable vector with a stable code', async () => {

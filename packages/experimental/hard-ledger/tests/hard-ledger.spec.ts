@@ -72,6 +72,7 @@ function findingRequest() {
     cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N',
     cvssClaimed: 9.3,
     pocPath: 'poc/F-1/poc.sh',
+    payload: "x' OR 1=1 --",
     claimHash: CLAIM_HASH,
     fingerprint: FINGERPRINT,
   }
@@ -108,6 +109,12 @@ describe('hard ledger findings', () => {
       .toThrow('cvssVector must start with CVSS:4.0/')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), cvssClaimed: 11 }))
       .toThrow('cvssClaimed must be a number between 0 and 10')
+    expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), payload: ' ' }))
+      .toThrow('payload must be a non-empty string')
+    const { payload: _dropped, ...payloadless } = findingRequest()
+    void _dropped
+    expect(() => ctx.hardLedger.proposeFinding(root.agent, payloadless))
+      .toThrow('payload must be a non-empty string')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), claimHash: 'nothex' }))
       .toThrow('claimHash must be 64 lowercase hex characters')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), fingerprint: 'C'.repeat(64) }))

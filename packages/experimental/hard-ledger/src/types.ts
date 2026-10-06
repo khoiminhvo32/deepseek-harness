@@ -50,8 +50,19 @@ export interface HardFindingProposedData {
   readonly claimHash: string
   /** Root-cause dedup key over component, symbol, and bug class. */
   readonly fingerprint: string
+  /**
+   * The exploit input the PoC takes as its first argument. The verifier
+   * re-runs the same PoC with a benign payload and requires it to fail, so a
+   * proof that passes regardless of input proves nothing about the input
+   * (the specificity check). Optional so older logs read back unchanged; new
+   * submissions through the tool always carry it.
+   */
+  readonly payload?: string
   readonly hypothesisId?: HardHypothesisId
 }
+
+/** The outcome of the verifier's benign-payload arm of one PoC. */
+export type HardBenignArmResult = 'passed' | 'failed'
 
 /** One verifier-decided outcome, appended after the PoC runs settle. */
 export interface HardFindingVerdictData {
@@ -66,6 +77,13 @@ export interface HardFindingVerdictData {
   /** Concrete failure or confirmation story, bounded length. */
   readonly reason: string
   readonly fingerprint: string
+  /**
+   * How the benign-payload arm settled. Absent on older logs, which never ran
+   * the control: `passed` means the same PoC satisfied the contract with a
+   * benign input (the proof is not payload-specific), `failed` means the
+   * control ran and the proof depended on the exploit input.
+   */
+  readonly benignArm?: HardBenignArmResult
 }
 
 /** One hypothesis state transition, appended by the hypothesis tool. */

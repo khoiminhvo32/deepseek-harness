@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-tools` registers the five model-facing tools of the hard harness: `hard_submit_finding` submits a claim with its CVSS 4.0 vector and PoC and returns the verifier's executed verdict; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_mark_coverage` records systematic-pass cells; `hard_clear_modules` batch-clears one class across several modules behind a harness-verified absence grep; `hard_sweep_summary` records completed passes; an empty sweep must cite a verifiable proof reference — a refuted hypothesis or a model-cleared cell — which the ledger checks at record time.
+`dsh-experimental-hard-tools` registers the five model-facing tools of the hard harness: `hard_submit_finding` submits a claim with its CVSS 4.0 vector, the exploit payload the PoC takes as `$1`, and the PoC path, and returns the verifier's executed verdict; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_mark_coverage` records systematic-pass cells; `hard_clear_modules` batch-clears one class across several modules behind a harness-verified absence grep; `hard_sweep_summary` records completed passes; an empty sweep must cite a verifiable proof reference — a refuted hypothesis or a model-cleared cell — which the ledger checks at record time.
 
 ## Table of Contents
 
@@ -43,7 +43,7 @@ All five tools require a live agent and return compact JSON. Submit results carr
 
 ### Design
 
-- **Verification at submission.** `hard_submit_finding` hashes the claim (the marker the PoC must print) and the root cause (the dedup key), proposes through the ledger, then awaits `hardVerifier.verify` before answering; the model sees the executed outcome, not an assumption.
+- **Verification at submission.** `hard_submit_finding` hashes the claim (the marker the PoC must print) and the root cause (the dedup key), proposes through the ledger, then awaits `hardVerifier.verify` before answering; the model sees the executed outcome, not an assumption. The tool description teaches the specificity contract: read the payload from `$1`, never hardcode it, because the harness re-runs the PoC with a benign payload and requires it to fail.
 - **Lifecycle in the ledger.** Hypothesis transitions, coverage cells, and sweeps are ledger appends with fail-loud validation; the tools add only the hypothesis-membership check for `hypothesis_id`.
 
 ### Source map

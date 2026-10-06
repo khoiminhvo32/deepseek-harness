@@ -1355,8 +1355,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>',
-        description: 'Verify one proposed finding: reject duplicates, recompute CVSS, execute the configured number of PoC runs through the shell seam, classify, and append the durable verdict.',
-        parameters: [{ name: 'agent', description: 'the live agent whose ledger receives the verdict.' }, { name: 'proposed', description: 'the proposal record to verify.' }],
+        description: 'Verify one proposed finding: reject duplicates, recompute CVSS, then run the proof through the shell seam in two arms and append the durable verdict. The benign arm runs the PoC once with a benign payload derived from the claim hash and must FAIL — a proof that passes regardless of input proves nothing about the input (the specificity check). Only then does the exploit arm run the configured number of times with the model\'s payload. The PoC executes from the pinned target repository the armed matrix records (matching the model-relative `pocPath` and coverage modules); `pocWorkdir` is the explicit override and no matrix keeps the legacy shell cwd.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger receives the verdict.' }, { name: 'proposed', description: 'the proposal record to verify; its `payload` is the exploit input.' }],
         returns: 'the appended verdict record.',
       },
       {
@@ -5519,6 +5519,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GrantRecord {\n    readonly kind: \'grant\';\n    readonly payload: unknown;\n}',
   },
   {
+    name: 'HardBenignArmResult',
+    declaration: 'export type HardBenignArmResult = \'passed\' | \'failed\';',
+  },
+  {
     name: 'HardCoverageCellData',
     declaration: 'export interface HardCoverageCellData {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly verdict: HardCoverageVerdict;\n    readonly declaredSinks: readonly string[];\n    readonly source?: HardCoverageSource;\n}',
   },
@@ -5544,11 +5548,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardFindingProposedData',
-    declaration: 'export interface HardFindingProposedData {\n    readonly id: HardFindingId;\n    readonly title: string;\n    readonly bugClass: string;\n    readonly component: string;\n    readonly claim: string;\n    readonly cvssVector: string;\n    readonly cvssClaimed: number;\n    readonly pocPath: string;\n    readonly claimHash: string;\n    readonly fingerprint: string;\n    readonly hypothesisId?: HardHypothesisId;\n}',
+    declaration: 'export interface HardFindingProposedData {\n    readonly id: HardFindingId;\n    readonly title: string;\n    readonly bugClass: string;\n    readonly component: string;\n    readonly claim: string;\n    readonly cvssVector: string;\n    readonly cvssClaimed: number;\n    readonly pocPath: string;\n    readonly claimHash: string;\n    readonly fingerprint: string;\n    readonly payload?: string;\n    readonly hypothesisId?: HardHypothesisId;\n}',
   },
   {
     name: 'HardFindingVerdictData',
-    declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n}',
+    declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n    readonly benignArm?: HardBenignArmResult;\n}',
   },
   {
     name: 'HardHypothesisId',

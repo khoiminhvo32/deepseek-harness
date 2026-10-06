@@ -179,13 +179,16 @@ describe('dsh --profile hard fabrication traps', () => {
         })
       expect(steerings.length).toBeGreaterThanOrEqual(1)
 
-      // The dead PoC and the echo-only PoC were both refuted; the
-      // model-written proof of the planted bug was confirmed.
+      // The dead PoC, the echo-only PoC, and the payload-agnostic PoC were all
+      // refuted; the model-written proof of the planted bug was confirmed.
       const verdicts = sessionFiles.filter(event => event.type === 'hard/finding/verdict')
-        .map(event => event.data as { verdict: string; reason: string })
-      expect(verdicts.filter(v => v.verdict === 'refuted')).toHaveLength(2)
+        .map(event => event.data as { verdict: string; reason: string; benignArm?: string })
+      expect(verdicts.filter(v => v.verdict === 'refuted')).toHaveLength(3)
       expect(verdicts.find(v => v.reason.includes('echo trap'))).toBeDefined()
+      // The payload-agnostic PoC passes the echo trap but not the benign arm.
+      expect(verdicts.find(v => v.reason.includes('passes with a benign payload'))).toBeDefined()
       expect(verdicts.filter(v => v.verdict === 'confirmed')).toHaveLength(1)
+      expect(verdicts.find(v => v.verdict === 'confirmed')?.benignArm).toBe('failed')
 
       // The coverage cross-check reopened the under-declared cell, then the
       // corrected clearance stood; the batch clear landed as model-verified

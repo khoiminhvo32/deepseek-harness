@@ -1,0 +1,275 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/finding/proposed",
+      "kind": "event",
+      "event": "hard/finding/proposed",
+      "surface": false,
+      "digest": "a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "bugClass",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "claim",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "claimHash",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "component",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cvssClaimed",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "cvssVector",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "hypothesisId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "payload",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "pocPath",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "title",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/finding/proposed"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/finding/verdict",
+      "kind": "event",
+      "event": "hard/finding/verdict",
+      "surface": false,
+      "digest": "0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "benignArm",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "cvssComputed",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "cvssMatch",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "runs",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "verdict",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "passed"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "confirmed"
+          },
+          {
+            "kind": "literal",
+            "value": "flaky"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/finding/verdict"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

@@ -2,7 +2,7 @@
 
 [English](hard-harness.md) | 中文
 
-Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands and owns completion: it runs the ledger's completion assessment on every `update_goal action complete` attempt, denies early attempts with the exact remaining work, and records each decision as a `hard/gate/decision` event, the [standby](../../packages/experimental/hard-standby/README.zh.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.zh.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.zh.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.zh.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
+Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam — benign arm first, exploit arm second, so the proof must depend on the payload — and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands and owns completion: it runs the ledger's completion assessment on every `update_goal action complete` attempt, denies early attempts with the exact remaining work, and records each decision as a `hard/gate/decision` event, the [standby](../../packages/experimental/hard-standby/README.zh.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.zh.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.zh.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.zh.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
 
 ## Running the profile
 
@@ -209,11 +209,18 @@ The hard-harness verifier on the `hardVerifier` key: rejects duplicates, execute
 
 ```ts cordis-catalog
 /**
- * Verify one proposed finding: reject duplicates, recompute CVSS, execute
- * the configured number of PoC runs through the shell seam, classify, and
- * append the durable verdict.
+ * Verify one proposed finding: reject duplicates, recompute CVSS, then run
+ * the proof through the shell seam in two arms and append the durable
+ * verdict. The benign arm runs the PoC once with a benign payload derived
+ * from the claim hash and must FAIL — a proof that passes regardless of
+ * input proves nothing about the input (the specificity check). Only then
+ * does the exploit arm run the configured number of times with the model's
+ * payload. The PoC executes from the pinned target repository the armed
+ * matrix records (matching the model-relative `pocPath` and coverage
+ * modules); `pocWorkdir` is the explicit override and no matrix keeps the
+ * legacy shell cwd.
  * @param agent - the live agent whose ledger receives the verdict.
- * @param proposed - the proposal record to verify.
+ * @param proposed - the proposal record to verify; its `payload` is the exploit input.
  * @returns the appended verdict record.
  */
 async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>

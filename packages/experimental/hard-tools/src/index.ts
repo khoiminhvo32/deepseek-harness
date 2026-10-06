@@ -27,9 +27,13 @@ export const Config: z<Config> = z.object({})
 const HYPOTHESIS_STATUSES: readonly HardHypothesisStatus[] = ['proposed', 'testing', 'confirmed', 'refuted', 'deferred']
 
 const SUBMIT_DESCRIPTION = 'Submit one vulnerability finding for harness verification. The harness executes '
-  + 'the proof of concept itself; a finding only counts as confirmed when every run exits zero and prints '
-  + 'the exact line HARD-PASS claim-hash on stdout. Include a CVSS:4.0 vector and the score you believe '
-  + 'it computes; the harness recomputes the score and records any mismatch.'
+  + 'the proof of concept itself, passing the payload as the PoC\'s first argument ($1); read the payload '
+  + 'from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is '
+  + 're-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload '
+  + 'actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints '
+  + 'the exact line HARD-PASS claim-hash on stdout with content beyond it, and the benign run failed. '
+  + 'Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and '
+  + 'records any mismatch.'
 
 const HYPOTHESIS_DESCRIPTION = 'Propose a new hypothesis, or move an existing one through its lifecycle: '
   + 'proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; '
@@ -88,8 +92,14 @@ export function apply(ctx: Context, _config: Config): void {
       cvss_score: { type: 'number', required: true, description: 'The score you believe the vector computes.' },
       poc_path: {
         type: 'string', required: true,
-        description: 'Repository-relative path of the PoC script. It must print HARD-PASS sha256-of-claim '
-          + 'on stdout and exit zero when the claim holds.',
+        description: 'Target-repository-relative path of the PoC script. It must take the exploit input as $1, '
+          + 'print HARD-PASS sha256-of-claim on stdout with content beyond it, and exit zero only when the '
+          + 'payload causes the effect.',
+      },
+      payload: {
+        type: 'string', required: true,
+        description: 'The exploit input the PoC takes as its first argument. The harness re-runs the same PoC '
+          + 'with a benign payload and requires it to fail (the specificity check).',
       },
       hypothesis_id: { type: 'string', description: 'H-n id this finding confirms, when it tests a hypothesis.' },
     },
@@ -134,6 +144,7 @@ export function apply(ctx: Context, _config: Config): void {
         bugClass: args.bug_class,
         component: args.component,
         claim: args.claim,
+        payload: args.payload,
         cvssVector: args.cvss_vector,
         cvssClaimed: args.cvss_score,
         pocPath: args.poc_path,

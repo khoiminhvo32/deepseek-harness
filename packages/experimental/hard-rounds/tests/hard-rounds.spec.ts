@@ -94,6 +94,7 @@ function findingRequest() {
     cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N',
     cvssClaimed: 9.3,
     pocPath: 'poc/F-1/poc.sh',
+    payload: "x' OR 1=1 --",
     claimHash: CLAIM_HASH,
     fingerprint: FINGERPRINT,
   }

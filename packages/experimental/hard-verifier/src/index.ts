@@ -24,7 +24,7 @@ import { SINK_PATTERNS } from './sink-patterns.ts'
  * individual model read.
  */
 export const ABSENCE_SINK_CLASSES: ReadonlySet<string> = new Set(['authz', 'authn-bypass', 'login-bypass'])
-import { classifyRuns } from './verdict.ts'
+import { classifyRuns, runSatisfied } from './verdict.ts'
 import type { PoCRunRecord } from './verdict.ts'
 // Loads the declaration-merged `shell` Context key this service executes through.
 import type {} from '@deepseek-ai/dsh-shell'
@@ -212,11 +212,18 @@ export class HardVerifier extends Service {
   }
 
   /**
-   * Verify one proposed finding: reject duplicates, recompute CVSS, execute
-   * the configured number of PoC runs through the shell seam, classify, and
-   * append the durable verdict.
+   * Verify one proposed finding: reject duplicates, recompute CVSS, then run
+   * the proof through the shell seam in two arms and append the durable
+   * verdict. The benign arm runs the PoC once with a benign payload derived
+   * from the claim hash and must FAIL — a proof that passes regardless of
+   * input proves nothing about the input (the specificity check). Only then
+   * does the exploit arm run the configured number of times with the model's
+   * payload. The PoC executes from the pinned target repository the armed
+   * matrix records (matching the model-relative `pocPath` and coverage
+   * modules); `pocWorkdir` is the explicit override and no matrix keeps the
+   * legacy shell cwd.
    * @param agent - the live agent whose ledger receives the verdict.
-   * @param proposed - the proposal record to verify.
+   * @param proposed - the proposal record to verify; its `payload` is the exploit input.
    * @returns the appended verdict record.
    */
   async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData> {
@@ -231,26 +238,58 @@ export class HardVerifier extends Service {
         )
       }
     }
+    if (proposed.payload === undefined || proposed.payload.trim().length === 0) {
+      throw new HarnessError(
+        `${proposed.id}: the exploit payload is required for the specificity check`,
+        'HARD_VERIFIER_PAYLOAD_REQUIRED',
+      )
+    }
 
     const { computed, match } = recomputeCvss(proposed)
-    const command = `bash ${shellQuote(proposed.pocPath)}`
-    const runs: PoCRunRecord[] = []
-    for (let index = 0; index < config.runs; index += 1) {
+    const matrix = ledger.coverageMatrix(agent)
+    const workdir = config.pocWorkdir ?? matrix?.targetRepo
+    const command = (payload: string): string => `bash ${shellQuote(proposed.pocPath)} ${shellQuote(payload)}`
+    const runOnce = async (payload: string): Promise<PoCRunRecord> => {
       const spec = this.ctx.shell.resolve({
-        command,
+        command: command(payload),
         timeoutMs: config.timeoutSeconds * 1000,
         stdoutMaxBytes: config.stdoutMaxBytes,
-        ...config.pocWorkdir === undefined ? {} : { workdir: config.pocWorkdir },
+        ...workdir === undefined ? {} : { workdir },
       })
       const execution = await this.ctx.shell.execute(spec)
       const result = await execution.result()
-      runs.push({
+      return {
         exitCode: result.exitCode,
         timedOut: result.timedOut,
         aborted: result.aborted,
         stdoutText: result.stdout.text,
         stderrTail: result.stderr.text.slice(-400),
+      }
+    }
+
+    // The benign arm runs FIRST and ONCE: it settles on the clean tree — a
+    // PoC that leaves artifacts (a touched file) would let the later exploit
+    // arm see the earlier arm's state — and one run is enough because the
+    // benign payload is derived from the claim hash, not chosen at random,
+    // so the control is deterministic and the snapshot reproducible.
+    const benignRun = await runOnce(`hard-benign-${proposed.claimHash.slice(0, 8)}`)
+    if (runSatisfied(benignRun, proposed.claimHash)) {
+      const verdict = classifyRuns({
+        id: proposed.id,
+        runs: [],
+        claimHash: proposed.claimHash,
+        cvssComputed: computed,
+        cvssMatch: match,
+        fingerprint: proposed.fingerprint,
+        benignArm: 'passed',
       })
+      ledger.recordVerdict(agent, verdict)
+      return verdict
+    }
+
+    const runs: PoCRunRecord[] = []
+    for (let index = 0; index < config.runs; index += 1) {
+      runs.push(await runOnce(proposed.payload))
     }
 
     const verdict = classifyRuns({
@@ -260,6 +299,7 @@ export class HardVerifier extends Service {
       cvssComputed: computed,
       cvssMatch: match,
       fingerprint: proposed.fingerprint,
+      benignArm: 'failed',
     })
     ledger.recordVerdict(agent, verdict)
     return verdict

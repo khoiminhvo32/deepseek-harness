@@ -287,6 +287,8 @@ function missionContract(resolved: ResolvedConfig): string {
     + 'Propose completion with update_goal action complete once the objective is genuinely achieved; '
     + 'the harness, not you, certifies it — an early attempt is denied with the exact remaining work, '
     + 'and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. '
+    + 'Every PoC takes its exploit input as $1 and must fail when the harness re-runs it with a benign '
+    + 'payload: the proof must depend on the payload (the specificity check). '
     + 'Ending a turn does not end the mission.'
 }
 

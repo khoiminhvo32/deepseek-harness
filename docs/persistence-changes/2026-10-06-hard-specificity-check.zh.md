@@ -44,9 +44,9 @@ changes:
 <a id="verification"></a>
 ## 验证
 
-确认后 pnpm run verify-persistence-changes 通过。hard-verifier 套件驱动双臂执行的各结论分支与提前停止，hard-tools 套件通过工具 schema 携带 payload 提交发现，keyless recorded-session 快照端到端回放四条提案发现——三条被反驳（死 PoC、回声陷阱、载荷无关证明）与一条确认。
+确认后 pnpm run verify-persistence-changes 通过。hard-verifier 套件驱动双臂执行的各结论分支与提前停止，hard-tools 套件通过工具 schema 携带 payload 提交发现，keyless recorded-session 快照端到端回放四条提案发现——三条被反驳（一个死 PoC 与两个载荷无关证明）与一条确认。
 
 <a id="dev-note"></a>
 ## 开发备注
 
-新字段仅在类型层面为旧日志可选；`proposeFinding` 与 `verify` 在运行时拒绝缺失 payload 的提案，因此只有本次更改之前写入的日志才会缺少它们。
+新字段仅在类型层面为旧日志可选；服务输入类型 `HardFindingRequest` 在编译期要求 payload，因此只有本次更改之前写入的日志才会缺少它。

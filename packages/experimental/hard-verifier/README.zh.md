@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-verifier` 通过 shell seam 执行 finding 的概念验证，并机械地判定结论。证明分两臂运行：良性臂用由 claim 哈希派生的良性载荷重跑一次 PoC 并要求其失败——无论输入如何都通过的证明对输入什么都没证明（specificity check）——只有之后攻击臂才用模型提供的 payload 运行 PoC，一次运行仅在退出码为零、在 stdout 打印 `HARD-PASS <claim 的 sha256>` 且带标记之外的内容时才算满足契约。全部攻击运行通过即确认，全部失败即反驳，任何分裂都是 flaky 且永不计入。引擎使用逐字引自 FIRST 参考计算器的数据与逻辑，从 CVSS 4.0 向量重算所声称的分数。
+`dsh-experimental-hard-verifier` 通过 shell seam 执行 finding 的概念验证，并机械地判定结论。证明分两臂运行：良性臂用由 claim 哈希派生的良性载荷重跑一次 PoC 并要求其失败——无论输入如何都通过的证明对输入什么都没证明（specificity check）——只有之后攻击臂才用模型提供的 payload 运行 PoC，一次运行仅在退出码为零且在 stdout 打印 `HARD-PASS <claim 的 sha256>` 时才算满足契约。全部攻击运行通过即确认，全部失败即反驳，任何分裂都是 flaky 且永不计入。引擎使用逐字引自 FIRST 参考计算器的数据与逻辑，从 CVSS 4.0 向量重算所声称的分数。
 
 ## 目录
 
@@ -46,7 +46,7 @@ kind: "package-reference"
 
 ### Design
 
-- **证明必须依赖 payload。** 验证通过 shell seam 运行 PoC 并施加配置的超时；接受要求与 claim 文本绑定的确定性 `HARD-PASS <claimHash>` 标记、标记之外的内容（回声陷阱）、以及失败的良性臂（specificity check）。对任何输入都打印填充加标记的 PoC 会被以非载荷特定为由反驳。
+- **证明必须依赖 payload。** 验证通过 shell seam 运行 PoC 并施加配置的超时；接受要求与 claim 文本绑定的确定性 `HARD-PASS <claimHash>` 标记以及失败的良性臂（specificity check）。标记之外不要求任何 stdout 形状——效果不上 stdout 的静默漏洞利用同样确认；而对任何输入都打印填充加标记的 PoC 会被以非载荷特定为由反驳。
 - **与参考一致的 CVSS。** `src/cvss4-lookup.ts` 逐字引入 FIRST 计算器的 macrovector 分数、组合最大值与严重度深度（BSD-2-Clause）；`src/cvss4.ts` 一一对应地移植其评分算法。穷举套件对全部 270 个 macrovector 的最高严重度向量评分，结果与查找值完全一致，任何与 FIRST 的漂移都会响亮失败。
 - **确定性去重。** `rootFingerprint` 对归一化的 bug 类别、组件与所在符号做哈希；`claimHash` 对 claim 文本做哈希，正是 PoC 必须打印的内容。
 - **持久结论。** 每次验证都通过台账追加 `hard/finding/verdict` 记录，包括重算分数以及模型声称的分数是否匹配。

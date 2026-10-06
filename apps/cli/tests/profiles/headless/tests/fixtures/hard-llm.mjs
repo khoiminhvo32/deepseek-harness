@@ -1,4 +1,4 @@
-/** Deterministic keyless hard-harness adapter: stop-gate steer, three refuted fabrications (dead PoC + echo trap + payload-agnostic proof), model-written proof over $1, cross-checked coverage. */
+/** Deterministic keyless hard-harness adapter: stop-gate steer, three refuted fabrications (dead PoC + two payload-agnostic proofs), model-written proof over $1, cross-checked coverage. */
 
 import { createHash } from 'node:crypto'
 import { ToolCallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -12,8 +12,8 @@ const VECTOR = 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N'
 /** Model-written PoC payloads, base64 so one bash line writes each file. */
 const FAILING_POC_B64 = Buffer.from('#!/bin/sh\nexit 1\n').toString('base64')
 const ECHO_POC_B64 = Buffer.from(`#!/bin/sh\necho "HARD-PASS ${CLAIM_HASH}"\n`).toString('base64')
-// The echo fabrication reuses the confirmed claim verbatim, so its marker hash
-// matches; only the proofless PoC distinguishes it.
+// The marker-only fabrication reuses the confirmed claim verbatim, so its
+// marker hash matches; ignoring $1 is what the benign arm catches.
 const PROOF_POC_B64 = Buffer.from(
   '#!/bin/sh\nset -e\ncd "$(dirname "$0")/../.."\n'
   + 'node -e "const {buildReport}=require(\'./src/reports.js\'); buildReport(process.argv[1])" "$1"\n'
@@ -21,7 +21,7 @@ const PROOF_POC_B64 = Buffer.from(
   + `echo "exploited: pwned.txt created"\necho "HARD-PASS ${CLAIM_HASH}"\n`,
 ).toString('base64')
 // The payload-agnostic PoC prints filler output plus the marker regardless of
-// $1, so the echo trap passes — only the benign arm catches it.
+// $1 — the benign arm refutes it.
 const GENERIC_POC_B64 = Buffer.from(
   `#!/bin/sh\necho "exploit succeeded"\necho "HARD-PASS ${CLAIM_HASH}"\n`,
 ).toString('base64')
@@ -129,8 +129,8 @@ function script(messages) {
   // 2. Fabrication one: write a PoC that dies, then submit it for refutation.
   if (!seen.includes('poc/F-1/poc.sh')) return toolChunks([writePoc('poc/F-1/poc.sh', FAILING_POC_B64)])
   if (!seen.includes('"id":"F-1"')) return toolChunks([submitFinding('F-1', 'Fake command injection', 'The reports module spawns commands from user input.', 'x')])
-  // 3. Fabrication two: the echo trap — the same confirmed claim, but a PoC
-  // whose stdout is only the marker, so the hash matches and the proof is empty.
+  // 3. Fabrication two: a marker-only PoC for the same confirmed claim — it
+  // ignores $1, so the benign arm refutes it.
   if (!seen.includes('poc/F-2/poc.sh')) return toolChunks([writePoc('poc/F-2/poc.sh', ECHO_POC_B64)])
   if (!seen.includes('"id":"F-2"')) return toolChunks([submitFinding('F-2', 'Echo-only proof', CONFIRMED_CLAIM, 'x')])
   // 4. The real proof: a model-written PoC that exploits the planted bug
@@ -138,7 +138,7 @@ function script(messages) {
   if (!seen.includes('poc/F-3/poc.sh')) return toolChunks([writePoc('poc/F-3/poc.sh', PROOF_POC_B64)])
   if (!seen.includes('"id":"F-3"')) return toolChunks([submitFinding('F-3', 'Command injection in buildReport', CONFIRMED_CLAIM, 'x; touch poc/F-2/pwned.txt')])
   // 4b. The payload-agnostic trap: filler output plus the marker for ANY $1 —
-  // the echo trap alone cannot catch this; only the benign arm does.
+  // the specificity check refutes it.
   if (!seen.includes('poc/F-4/poc.sh')) return toolChunks([writePoc('poc/F-4/poc.sh', GENERIC_POC_B64)])
   if (!seen.includes('"id":"F-4"')) return toolChunks([submitFinding('F-4', 'Payload-agnostic proof', CONFIRMED_CLAIM, 'x', 'src/session.js')])
   // 5. Coverage: clear the cell naming a sink the grep will not find, so the

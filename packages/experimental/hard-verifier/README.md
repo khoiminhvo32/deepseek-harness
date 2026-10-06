@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-verifier` executes a finding's proof through the shell seam and decides the verdict. The proof runs in two arms: the benign arm re-runs the PoC once with a benign payload and must fail (the specificity check — a proof that passes regardless of input proves nothing about the input); then the exploit arm runs the model's payload, where a run passes only at exit zero with `HARD-PASS <sha256 of claim>` plus content beyond it. All exploit runs passing confirms, all failing refutes, any split is flaky and never counts. The claimed CVSS 4.0 score is recomputed with vendored FIRST logic.
+`dsh-experimental-hard-verifier` executes a finding's proof through the shell seam and decides the verdict. The proof runs in two arms: the benign arm re-runs the PoC once with a benign payload and must fail (the specificity check — a proof that passes regardless of input proves nothing about the input); then the exploit arm runs the model's payload, where a run passes only at exit zero with `HARD-PASS <sha256 of claim>`. All exploit runs passing confirms, all failing refutes, any split is flaky and never counts. The claimed CVSS 4.0 score is recomputed with vendored FIRST logic.
 
 ## Table of Contents
 
@@ -46,7 +46,7 @@ Mount the plugin beside the hard ledger; the tools call `ctx.hardVerifier.verify
 
 ### Design
 
-- **The proof must depend on the payload.** Verification runs the PoC through the shell seam with the configured timeout; acceptance requires the deterministic `HARD-PASS <claimHash>` marker bound to the claim text, content beyond the marker (the echo trap), and a failing benign arm (the specificity check). A PoC that prints filler plus the marker for any input is refuted as not payload-specific.
+- **The proof must depend on the payload.** Verification runs the PoC through the shell seam with the configured timeout; acceptance requires the deterministic `HARD-PASS <claimHash>` marker bound to the claim text and a failing benign arm (the specificity check). No stdout shape is demanded beyond the marker — a silent exploit whose effect stays off stdout confirms — while a PoC that prints filler plus the marker for any input is refuted as not payload-specific.
 - **Reference-identical CVSS.** `src/cvss4-lookup.ts` vendors the FIRST calculator's macrovector scores, composed maxima, and severity depths verbatim (BSD-2-Clause); `src/cvss4.ts` ports its scoring algorithm one-to-one. The exhaustive suite scores all 270 macrovectors' highest-severity vectors exactly at their lookup values, so drift from FIRST fails loudly.
 - **Deterministic dedup.** `rootFingerprint` hashes normalized bug class, component, and containing symbol; `claimHash` hashes the claim text and is what the PoC must print.
 - **Durable verdicts.** Every verification appends a `hard/finding/verdict` record through the ledger, including the recomputed score and whether the model's claimed score matched.

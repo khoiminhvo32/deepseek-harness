@@ -44,9 +44,9 @@ Purely additive: one optional property on each of two existing event bodies. The
 <a id="verification"></a>
 ## Verification
 
-pnpm run verify-persistence-changes passes after the acknowledgement. The hard-verifier suite drives both verdict branches of the two-arm execution and the early stop, the hard-tools suite submits findings with payloads through the tool schema, and the keyless recorded-session snapshot replays four proposed findings — three refuted (dead PoC, echo trap, payload-agnostic proof) and one confirmed — end to end.
+pnpm run verify-persistence-changes passes after the acknowledgement. The hard-verifier suite drives both verdict branches of the two-arm execution and the early stop, the hard-tools suite submits findings with payloads through the tool schema, and the keyless recorded-session snapshot replays four proposed findings — three refuted (a dead PoC and two payload-agnostic proofs) and one confirmed — end to end.
 
 <a id="dev-note"></a>
 ## Dev Note
 
-The new fields are optional at the type level only for older logs; `proposeFinding` and `verify` reject payloadless proposals at runtime, so only logs written before this change can lack them.
+The new fields are optional at the type level only for older logs; the service input type `HardFindingRequest` requires the payload at compile time, so only logs written before this change can lack it.

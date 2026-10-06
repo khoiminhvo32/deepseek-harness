@@ -1,6 +1,6 @@
-/** Keyless end-to-end hard-profile run: stop-gate steering, refuted fabrications
- * including the echo trap, a model-written proof, the coverage cross-check, and
- * the armed target matrix. */
+/** Keyless end-to-end hard-profile run: stop-gate steering, refuted payload-agnostic
+ * fabrications, a model-written proof, the coverage cross-check, and the armed target
+ * matrix. */
 
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
@@ -179,14 +179,15 @@ describe('dsh --profile hard fabrication traps', () => {
         })
       expect(steerings.length).toBeGreaterThanOrEqual(1)
 
-      // The dead PoC, the echo-only PoC, and the payload-agnostic PoC were all
-      // refuted; the model-written proof of the planted bug was confirmed.
+      // The dead PoC and both payload-agnostic PoCs — marker-only and filler —
+      // were refuted; the model-written proof of the planted bug was confirmed.
       const verdicts = sessionFiles.filter(event => event.type === 'hard/finding/verdict')
         .map(event => event.data as { verdict: string; reason: string; benignArm?: string })
       expect(verdicts.filter(v => v.verdict === 'refuted')).toHaveLength(3)
-      expect(verdicts.find(v => v.reason.includes('echo trap'))).toBeDefined()
-      // The payload-agnostic PoC passes the echo trap but not the benign arm.
-      expect(verdicts.find(v => v.reason.includes('passes with a benign payload'))).toBeDefined()
+      // The specificity check catches both payload-agnostic proofs: the same PoC
+      // satisfies the contract with a benign payload, so the proof does not
+      // depend on the exploit input.
+      expect(verdicts.filter(v => v.reason.includes('passes with a benign payload'))).toHaveLength(2)
       expect(verdicts.filter(v => v.verdict === 'confirmed')).toHaveLength(1)
       expect(verdicts.find(v => v.verdict === 'confirmed')?.benignArm).toBe('failed')
 

@@ -31,7 +31,7 @@ const SUBMIT_DESCRIPTION = 'Submit one vulnerability finding for harness verific
   + 'from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is '
   + 're-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload '
   + 'actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints '
-  + 'the exact line HARD-PASS claim-hash on stdout with content beyond it, and the benign run failed. '
+  + 'the exact line HARD-PASS claim-hash on stdout, and the benign run failed. '
   + 'Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and '
   + 'records any mismatch.'
 
@@ -93,8 +93,7 @@ export function apply(ctx: Context, _config: Config): void {
       poc_path: {
         type: 'string', required: true,
         description: 'Target-repository-relative path of the PoC script. It must take the exploit input as $1, '
-          + 'print HARD-PASS sha256-of-claim on stdout with content beyond it, and exit zero only when the '
-          + 'payload causes the effect.',
+          + 'print HARD-PASS sha256-of-claim on stdout, and exit zero only when the payload causes the effect.',
       },
       payload: {
         type: 'string', required: true,

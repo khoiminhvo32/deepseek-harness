@@ -1,12 +1,12 @@
 /**
  * Verdict classification over executed PoC runs. The proof-of-effect
  * contract is mechanical: a run passes only when the process exits zero AND
- * its stdout prints `HARD-PASS <claimHash>` for the finding's claim AND the
- * stdout carries content beyond the marker (the echo trap). The specificity
- * check adds the benign arm: the same PoC re-run with a benign payload must
- * fail, because a proof that passes regardless of input proves nothing about
- * the input. All exploit runs passing confirms, all failing refutes, a split
- * verdict is flaky and never counts.
+ * its stdout prints `HARD-PASS <claimHash>` for the finding's claim. Payload
+ * dependence is proven separately by the specificity check: the same PoC
+ * re-run with a benign payload must fail, because a proof that passes
+ * regardless of input proves nothing about the input. All exploit runs
+ * passing confirms, all failing refutes, a split verdict is flaky and never
+ * counts.
  * @module
  */
 
@@ -25,24 +25,14 @@ export interface PoCRunRecord {
  * Whether one run satisfied the proof-of-effect contract.
  * @param run - the executed run's reduced facts.
  * @param claimHash - the expected `HARD-PASS` marker hash.
- * @returns true only for a zero-exit run that printed the marker AND produced
- * observable output beyond the marker itself: a stdout that is nothing but the
- * `HARD-PASS` line proves the echo, not the vulnerability, so it never
- * satisfies the contract (the echo trap).
+ * @returns true only for a zero-exit run that printed the marker. Output
+ * beyond the marker is deliberately not required: payload dependence is
+ * proven by the benign arm, not by stdout shape, and a silent exploit — one
+ * whose effect leaves stdout untouched — is real.
  */
 export function runSatisfied(run: PoCRunRecord, claimHash: string): boolean {
   if (run.exitCode !== 0 || run.timedOut || run.aborted) return false
-  const marker = `HARD-PASS ${claimHash}`
-  if (!run.stdoutText.includes(marker)) return false
-  return run.stdoutText.replaceAll(marker, '').trim().length > 0
-}
-
-/** Whether a run printed the claim marker but nothing else (the echo trap). */
-function isEchoOnly(run: PoCRunRecord, claimHash: string): boolean {
-  const marker = `HARD-PASS ${claimHash}`
-  return run.exitCode === 0 && !run.timedOut && !run.aborted
-    && run.stdoutText.includes(marker)
-    && run.stdoutText.replaceAll(marker, '').trim().length === 0
+  return run.stdoutText.includes(`HARD-PASS ${claimHash}`)
 }
 
 /**
@@ -102,8 +92,6 @@ export function classifyRuns(request: {
     /* v8 ignore next -- defensive: guarded above, a non-empty run list always has a first run */
     if (first === undefined) {
       reason = 'no runs were executed'
-    } else if (isEchoOnly(first, claimHash)) {
-      reason = 'the PoC printed only the claim marker without observable effect (echo trap)'
     } else if (first.timedOut) {
       reason = 'the PoC hit the verifier timeout without printing the claim marker'
     } else if (first.aborted) {

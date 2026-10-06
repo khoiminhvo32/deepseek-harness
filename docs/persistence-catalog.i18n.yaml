@@ -1152,8 +1152,8 @@
   en: c315ea493032f390
   zh: c8755305baf047b1
 /session-persistence-event-catalog/resolved-persistence-types/hardcoveragecelldata:
-  en: a8f2fcefccde5392
-  zh: 64a9916a71666e35
+  en: b78a95b0a8b17186
+  zh: a85910ecaeb18bca
 /session-persistence-event-catalog/resolved-persistence-types/hardcoverageverdict:
   en: 459d178f9776fab5
   zh: 9944ee45b09bf048
@@ -1161,20 +1161,20 @@
   en: 5f4a9a2b515b2a92
   zh: 17aef3537d4f2fa5
 /session-persistence-event-catalog/resolved-persistence-types/hardfindingverdictdata:
-  en: cf04f70a49f247fb
-  zh: 5cbe227e55a69db2
+  en: 6bf10b34153764ca
+  zh: 20fb2b88a6b4c16f
 /session-persistence-event-catalog/resolved-persistence-types/hardgatedecisiondata:
-  en: 9383edd8f561332c
-  zh: 271a8b6a7ae7d1d4
+  en: c66b0ce2ca844c05
+  zh: 4585fc07290eeb17
 /session-persistence-event-catalog/resolved-persistence-types/hardhypothesisstatedata:
-  en: f46e34a4e121e4cf
-  zh: 18c7d42e941e60af
+  en: 452a590ded99ec5b
+  zh: e332b53ff283a4c1
 /session-persistence-event-catalog/resolved-persistence-types/hardhypothesisstatus:
   en: 1ed054d34c1a463b
   zh: 0eb62984b2d7651a
 /session-persistence-event-catalog/resolved-persistence-types/hardmissionarmeddata:
-  en: eba097a13dc54183
-  zh: 8deced1c9699257e
+  en: ecf523c2783cd94d
+  zh: 859325a9c872aad7
 /session-persistence-event-catalog/resolved-persistence-types/hardroundenddata:
   en: bcedcb63c1b3a2da
   zh: cc22e5f5dcc69352
@@ -1194,8 +1194,8 @@
   en: 192ee264e81c0fca
   zh: bebd9e6c9b3f266c
 /session-persistence-event-catalog/resolved-persistence-types/hardsweepsummarydata:
-  en: 8ee564a01efa498f
-  zh: 439c6a34a5de55e2
+  en: 8323d3b645111fd3
+  zh: 7582153d9d362ebb
 /session-persistence-event-catalog/resolved-persistence-types/hardverdict:
   en: 1f3125f826fcd84c
   zh: 17250bfc7800af48
@@ -1557,8 +1557,8 @@
   en: 37b15b3f9d32b9b4
   zh: aaeac30823508256
 /session-persistence-event-catalog/resolved-persistence-types/bysource-total-verdicted:
-  en: 663d96129fd52925
-  zh: 229b7e77cff0c45c
+  en: 98372a2cd9518a5c
+  zh: 8143786afd1f77e9
 /session-persistence-event-catalog/resolved-persistence-types/callid-files-turn:
   en: 5f4d3f66ed86a14d
   zh: 7c729360fa1279e6
@@ -1605,8 +1605,8 @@
   en: b7c3ec1cc9ba09ad
   zh: 409033c12898f8cb
 /session-persistence-event-catalog/resolved-persistence-types/confirmed-flaky-pending-refuted:
-  en: 0a06b7984b70411c
-  zh: 346946722d566540
+  en: 0abc9d6d51b8c33a
+  zh: 93474f4345ac0d48
 /session-persistence-event-catalog/resolved-persistence-types/decision-durationms-exitcode-handlerid:
   en: ed8ca43bb7622393
   zh: 697e1ccbe9439aa9
@@ -1644,8 +1644,8 @@
   en: 24b255fad71fa21c
   zh: 9cedbd538af06ef2
 /session-persistence-event-catalog/resolved-persistence-types/harness-model-modelverified:
-  en: eeea0cbd82c1366f
-  zh: 4f0bcbbd07d91c6b
+  en: e6c9666911e0d10f
+  zh: f8e7ed170de4d865
 /session-persistence-event-catalog/resolved-persistence-types/header-reason-startsseries:
   en: edc4f60aa67aecd1
   zh: 4eb69d5098c1a856
@@ -1683,8 +1683,8 @@
   en: 80fbfa82f97978bb
   zh: 93bc3518ec21088d
 /session-persistence-event-catalog/resolved-persistence-types/kind-cell:
-  en: 1e76a88957d68647
-  zh: 8d1fe6fc89d4d380
+  en: 7b513d81b8e5bafc
+  zh: 6521c66e93e479ea
 /session-persistence-event-catalog/resolved-persistence-types/kind-completed:
   en: 2f3ffb879c568b64
   zh: ffc7d0f2b64494fc
@@ -1851,8 +1851,8 @@
   en: e7f20ecc0764b343
   zh: b04eb75ebba8836d
 /session-persistence-event-catalog/resolved-persistence-types/kind-hypothesis:
-  en: 2692c0526f7affdd
-  zh: 00c0e82858c91103
+  en: 534c8b3f5e989d24
+  zh: a92d970c5f3fbe2b
 /session-persistence-event-catalog/resolved-persistence-types/kind-interrupted:
   en: 9e87f168b322c617
   zh: bf81e0aa69f46c08
@@ -2118,8 +2118,8 @@
   en: 11a2342abb706737
   zh: 3be74af3ca92e524
 /session-persistence-event-catalog/resolved-persistence-types/open-resolved:
-  en: cd32a3a32f197549
-  zh: 294f6ec912d787dd
+  en: cd5a07d2f203bfd6
+  zh: 5538ef7aea5b9381
 /session-persistence-event-catalog/resolved-persistence-types/policy-source:
   en: 00f1d435f82d2753
   zh: c2ab108ad2748a6c

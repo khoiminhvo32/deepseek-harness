@@ -3968,7 +3968,7 @@ Sources: [`packages/goal/goal/src/domain.ts:24`](../packages/goal/goal/src/domai
 
 SHA-256: `6fd58116eb9dc3c4c704feafb504265f803fd06e05f2471aefa7d819f9f39629`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:99`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:111`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4033,7 +4033,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:35`](../packages/exper
 
 SHA-256: `b6e58fecefff234788cfc7e89a71a5234ca78ea320e413a3f5127ccf7bfe162c`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:68`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:80`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4056,7 +4056,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:68`](../packages/exper
 
 SHA-256: `e3af231d0f30380df036b4fb3ce465b1c27d669c037267fcc8d90b6016129a70`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:141`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:153`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4078,7 +4078,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:141`](../packages/expe
 
 SHA-256: `7954cecbb131efd177055dd9c49fc9012ad7f5857d4a08ebe072593ff5a70b98`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:90`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:102`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4117,7 +4117,7 @@ One of:
 
 SHA-256: `2d0d5873592384184c2fd2d456596c7eba2d3662decf424f21c999aa1d20ab05`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:171`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:183`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4246,7 +4246,7 @@ Sources: [`packages/experimental/hard-standby/src/domain.ts:25`](../packages/exp
 
 SHA-256: `2983c2eee94f8b64b2d61fa34e2fc39da5b073d19ec3372b95aa065ad3e8b0f2`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:124`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:136`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6434,7 +6434,7 @@ Sources: [`packages/core/session/src/types.ts:361`](../packages/core/session/src
 
 SHA-256: `34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:146`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:158`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6676,7 +6676,7 @@ Sources: [`packages/compaction/compaction/src/types.ts:24`](../packages/compacti
 
 SHA-256: `96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:157`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:169`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6869,7 +6869,7 @@ Sources: [`packages/llm/llm/src/types.ts:161`](../packages/llm/llm/src/types.ts)
 
 SHA-256: `ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:149`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:161`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7050,7 +7050,7 @@ Sources: [`packages/core/session/src/types.ts:206`](../packages/core/session/src
 
 SHA-256: `7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:121`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:133`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7683,7 +7683,7 @@ SHA-256: `88841202942c7683b3b7e5ea6a796047ec326b6701ac23e58cc236d85613b9fa`
 
 SHA-256: `71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:120`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:132`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -8717,7 +8717,7 @@ Sources: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/
 
 SHA-256: `34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:151`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:163`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|

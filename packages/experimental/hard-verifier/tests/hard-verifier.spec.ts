@@ -301,7 +301,7 @@ describe('hard verifier execution', () => {
 })
 
 describe('hard verifier verdict units', () => {
-  it('classifies empty run lists and aborted runs through the pure classifier', async () => {
+  it('classifies empty run lists, aborted runs, and silent proofs through the pure classifier', async () => {
     const { classifyRuns, claimHash, rootFingerprint } = await import('@deepseek-ai/dsh-experimental-hard-verifier')
     const claim = 'The units claim.'
     const hash = claimHash(claim)
@@ -311,13 +311,15 @@ describe('hard verifier verdict units', () => {
     })
     expect(empty.verdict).toBe('refuted')
     expect(empty.reason).toBe('no runs were executed')
-    const echo = classifyRuns({
+    // A marker-only stdout is a silent proof, not a refutation: output shape
+    // carries no payload-dependence evidence, the benign arm does.
+    const silent = classifyRuns({
       id: brandString<HardFindingId>('F-1'),
       runs: [{ exitCode: 0, timedOut: false, aborted: false, stdoutText: `HARD-PASS ${hash}\n`, stderrTail: '' }],
       claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
     })
-    expect(echo.verdict).toBe('refuted')
-    expect(echo.reason).toContain('echo trap')
+    expect(silent.verdict).toBe('confirmed')
+    expect(silent.reason).toBe('1 run exited zero and printed the claim marker')
     const aborted = classifyRuns({
       id: brandString<HardFindingId>('F-1'),
       runs: [{ exitCode: null, timedOut: false, aborted: true, stdoutText: '', stderrTail: '' }],

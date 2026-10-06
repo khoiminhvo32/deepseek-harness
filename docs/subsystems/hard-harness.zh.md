@@ -139,14 +139,15 @@ armedGoalId(agent: Agent): string | undefined
  * Whether the harness certifies the mission complete. Every condition reads
  * ledger state; none counts findings (a finding quota would pressure
  * fabrication — a clean repository must complete). The conditions: no open
- * work, the trailing sweep window all empty-verified, and at least one
- * model-audited coverage cell or resolved hypothesis so a fully
- * harness-screened repository reads as "nothing audited yet", not "done".
+ * work, the trailing sweep window all empty-verified (the threshold is this
+ * service's `emptySweepsToFinish` config, so every consumer reads one
+ * answer), and at least one model-audited coverage cell or resolved
+ * hypothesis so a fully harness-screened repository reads as "nothing
+ * audited yet", not "done".
  * @param agent - the live agent whose ledger state is read.
- * @param emptySweepsToFinish - trailing empty-verified sweeps required; `0` drops that condition.
  * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
  */
-completionAssessment(agent: Agent, emptySweepsToFinish: number): { complete: boolean blockers: readonly string[] }
+completionAssessment(agent: Agent): { complete: boolean blockers: readonly string[] }
 
 /**
  * The coverage matrix folded from the mission arming record.

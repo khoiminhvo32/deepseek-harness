@@ -76,7 +76,7 @@ function recordingAgent(rawId: string, ctx: Context) {
   return { ...base, steered }
 }
 
-async function harness(config: hardStopgate.Config = {}, options: { tools?: boolean } = {}) {
+async function harness(config: hardStopgate.Config = {}, options: { tools?: boolean; ledger?: { emptySweepsToFinish?: number } } = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -91,7 +91,7 @@ async function harness(config: hardStopgate.Config = {}, options: { tools?: bool
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(toolGoal, {})
   }
-  await ctx.plugin(HardLedger, {})
+  await ctx.plugin(HardLedger, options.ledger ?? {})
   const fiber = await ctx.plugin(hardStopgate, config)
   const root = recordingAgent(`hard-stopgate-root-${Math.random()}`, ctx)
   await ctx.agents.register(root.agent)
@@ -297,7 +297,7 @@ describe('hard stopgate completion gate', () => {
   })
 
   it('allows complete once the ledger certifies, and records the allow', async () => {
-    const { ctx, root } = await harness({ emptySweepsToFinish: 1 }, { tools: true })
+    const { ctx, root } = await harness({}, { tools: true, ledger: { emptySweepsToFinish: 1 } })
     armGoal(ctx, root.agent, 'find bugs')
     ctx.hardLedger.markCoverage(root.agent, {
       module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/exec.ts:1 system()'],
@@ -327,7 +327,7 @@ describe('hard stopgate completion gate', () => {
   })
 
   it('denies again when the gate still blocks after a first attempt', async () => {
-    const { ctx, root } = await harness({ emptySweepsToFinish: 1 }, { tools: true })
+    const { ctx, root } = await harness({}, { tools: true, ledger: { emptySweepsToFinish: 1 } })
     armGoal(ctx, root.agent, 'find bugs')
     ctx.hardLedger.markCoverage(root.agent, {
       module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/exec.ts:1 system()'],
@@ -400,15 +400,16 @@ describe('hard stopgate config and namespace', () => {
       .toThrow('maxSteersPerTurn must be a positive safe integer')
   })
 
-  it('rejects an out-of-range empty-sweep requirement', async () => {
+  it('reads the empty-sweep threshold from the ledger, not the gate', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(GoalService)
+    await expect(ctx.plugin(HardLedger, { emptySweepsToFinish: 17 }))
+      .rejects.toThrow('expected number <= 16 but got 17')
     await ctx.plugin(HardLedger, {})
-    expect(() => { hardStopgate.apply(ctx, { emptySweepsToFinish: 17 }) })
-      .toThrow('emptySweepsToFinish must be a safe integer from 0 through 16')
+    expect(() => { hardStopgate.apply(ctx, {}) }).not.toThrow()
   })
 
   it('uses the default budget on direct apply', async () => {

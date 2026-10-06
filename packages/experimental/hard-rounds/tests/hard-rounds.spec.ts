@@ -150,7 +150,7 @@ describe('hard rounds accounting', () => {
   })
 
   it('names the gate blockers once no open work stands, instead of ordering work that no longer exists', async () => {
-    const { ctx, root } = await harness({ emptySweepsToFinish: 2 })
+    const { ctx, root } = await harness()
     const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
     // The inert screen pre-verdicts the only cell, so openWork is empty while
     // the gate still owes the trailing sweeps and the model-audit floor.

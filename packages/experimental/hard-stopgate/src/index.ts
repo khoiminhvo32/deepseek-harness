@@ -46,9 +46,6 @@ export const inject = ['goals', 'sessionProjections', 'hardLedger']
 /** Default per-turn forced-continuation budget. */
 export const DEFAULT_MAX_STEERS_PER_TURN = 16
 
-/** Default number of trailing sweeps that must be empty-verified before completion certifies. */
-export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
-
 /** Stop-gate plugin config. */
 export interface Config {
   /**
@@ -57,17 +54,11 @@ export interface Config {
    * the model cannot or will not advance the goal.
    */
   maxSteersPerTurn?: number
-  /**
-   * Trailing sweep summaries that must be empty-verified before the
-   * completion gate certifies the mission done; `0` drops the condition.
-   */
-  emptySweepsToFinish?: number
 }
 
 /** Schemastery config for the stop gate. */
 export const Config: z<Config> = z.object({
   maxSteersPerTurn: z.number().step(1).min(1).default(DEFAULT_MAX_STEERS_PER_TURN),
-  emptySweepsToFinish: z.number().step(1).min(0).max(16).default(DEFAULT_EMPTY_SWEEPS_TO_FINISH),
 })
 
 /**
@@ -155,10 +146,6 @@ export function apply(ctx: Context, config: Config): void {
   if (!Number.isSafeInteger(maxSteersPerTurn) || maxSteersPerTurn < 1) {
     throw new TypeError('maxSteersPerTurn must be a positive safe integer')
   }
-  const emptySweepsToFinish = config.emptySweepsToFinish ?? DEFAULT_EMPTY_SWEEPS_TO_FINISH
-  if (!Number.isSafeInteger(emptySweepsToFinish) || emptySweepsToFinish < 0 || emptySweepsToFinish > 16) {
-    throw new TypeError('emptySweepsToFinish must be a safe integer from 0 through 16')
-  }
   /** Forced continuations per agent, reset when the turn number advances. */
   const steers = new Map<Agent['id'], { turn: number; count: number }>()
   ctx.effect(() => () => { steers.clear() }, 'hard-stopgate: clear steer counters')
@@ -176,7 +163,7 @@ export function apply(ctx: Context, config: Config): void {
     if (armedGoalId === undefined) return next()
     const goal = ctx.goals.get(agent)
     if (goal?.id !== armedGoalId) return next()
-    const assessment = ctx.hardLedger.completionAssessment(agent, emptySweepsToFinish)
+    const assessment = ctx.hardLedger.completionAssessment(agent)
     agent.session.append('hard/gate/decision', gateDecision(ctx, agent, assessment))
     if (assessment.complete) return next()
     return { kind: 'deny', reason: completionDenial(assessment.blockers) }

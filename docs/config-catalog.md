@@ -1047,6 +1047,14 @@ export interface Config {
    * false-negative rate.
    */
   screenSpotCheckPercent?: number
+  /**
+   * Trailing empty-verified sweeps the completion assessment requires; `0`
+   * drops that condition. The assessment is a ledger judgment and every
+   * consumer of it (the stop gate's veto, the rounds context) injects this
+   * service, so the threshold lives here — one answer for all readers, and
+   * no way for two plugins' separate configs to drift apart.
+   */
+  emptySweepsToFinish?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
@@ -1103,7 +1111,7 @@ export interface TargetConfig {
 ## `@deepseek-ai/dsh-experimental-hard-rounds`
 
 - `inject`: `agents` · `goals` · `hardLedger` · `sessionProjections`
-- `source`: [`packages/experimental/hard-rounds/src/index.ts:53`](../packages/experimental/hard-rounds/src/index.ts)
+- `source`: [`packages/experimental/hard-rounds/src/index.ts:50`](../packages/experimental/hard-rounds/src/index.ts)
 
 ```ts config-catalog
 /** Rounds module config. */
@@ -1120,14 +1128,6 @@ export interface Config {
    * config, but divergent values produce divergent cadence.
    */
   deepReadEveryN?: number
-  /**
-   * Trailing empty-verified sweeps the completion gate requires, used only to
-   * render the gate's remaining blockers in the round context. Keep it equal
-   * to the stopgate's `emptySweepsToFinish`; the two values are separate on
-   * purpose so the context can render without reading plugin config, but
-   * divergent values name divergent remaining work.
-   */
-  emptySweepsToFinish?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-rounds -->
@@ -1168,7 +1168,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-stopgate`
 
 - `inject`: `goals` · `sessionProjections` · `hardLedger`
-- `source`: [`packages/experimental/hard-stopgate/src/index.ts:53`](../packages/experimental/hard-stopgate/src/index.ts)
+- `source`: [`packages/experimental/hard-stopgate/src/index.ts:50`](../packages/experimental/hard-stopgate/src/index.ts)
 
 ```ts config-catalog
 /** Stop-gate plugin config. */
@@ -1179,11 +1179,6 @@ export interface Config {
    * the model cannot or will not advance the goal.
    */
   maxSteersPerTurn?: number
-  /**
-   * Trailing sweep summaries that must be empty-verified before the
-   * completion gate certifies the mission done; `0` drops the condition.
-   */
-  emptySweepsToFinish?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-stopgate -->

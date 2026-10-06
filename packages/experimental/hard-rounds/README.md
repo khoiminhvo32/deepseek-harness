@@ -35,10 +35,9 @@ Mount the plugin beside the goal service, the hard ledger, and `@deepseek-ai/dsh
   config:
     stepsPerRound: 200
     deepReadEveryN: 3
-    emptySweepsToFinish: 2
 ```
 
-`deepReadEveryN` rotates the methodology pass: one Phase B deep-reading round after every `deepReadEveryN` Phase A rounds. Keep it equal to the mission's `deepReadEveryN`; the two values are separate so the driver can rotate without reading another plugin's config, but divergent values produce divergent cadence. `emptySweepsToFinish` renders the completion gate's remaining blockers once no open work stands; keep it equal to the stopgate's `emptySweepsToFinish` for the same reason. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-rounds) is the exhaustive source for every accepted field.
+`deepReadEveryN` rotates the methodology pass: one Phase B deep-reading round after every `deepReadEveryN` Phase A rounds. Keep it equal to the mission's `deepReadEveryN`; the two values are separate so the driver can rotate without reading another plugin's config, but divergent values produce divergent cadence. The completion gate's remaining blockers once no open work stands come from the hard ledger's `emptySweepsToFinish` config, so the context and the gate can never disagree. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-rounds) is the exhaustive source for every accepted field.
 
 -----
 

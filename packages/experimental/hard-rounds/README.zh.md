@@ -35,10 +35,9 @@ kind: "package-reference"
   config:
     stepsPerRound: 200
     deepReadEveryN: 3
-    emptySweepsToFinish: 2
 ```
 
-`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。`emptySweepsToFinish` 在没有未完成工作时渲染完成门的剩余阻塞项；出于同样原因，保持它与 stopgate 的 `emptySweepsToFinish` 相等。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
+`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。在没有未完成工作时，完成门的剩余阻塞项来自 hard 台账的 `emptySweepsToFinish` 配置，因此上下文与门不可能各执一词。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
 
 -----
 

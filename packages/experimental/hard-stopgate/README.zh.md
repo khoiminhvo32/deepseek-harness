@@ -31,10 +31,9 @@ kind: "package-reference"
   name: '@deepseek-ai/dsh-experimental-hard-stopgate'
   config:
     maxSteersPerTurn: 16
-    emptySweepsToFinish: 2
 ```
 
-`maxSteersPerTurn` 必须是正安全整数；`emptySweepsToFinish` 必须是 0 到 16 的安全整数，`0` 表示取消末尾空扫描条件。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-stopgate)是全部受支持字段的唯一权威来源。
+`maxSteersPerTurn` 必须是正安全整数。评估读取的末尾空扫描阈值位于 hard 台账的 `emptySweepsToFinish`，因此停止门、round 上下文与任何其他消费方都从同一配置取值。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-stopgate)是全部受支持字段的唯一权威来源。
 
 -----
 

@@ -1311,9 +1311,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the armed goal id, or `undefined` without an attributed arming record.',
       },
       {
-        signature: 'completionAssessment(agent: Agent, emptySweepsToFinish: number): { complete: boolean blockers: readonly string[] }',
-        description: 'Whether the harness certifies the mission complete. Every condition reads ledger state; none counts findings (a finding quota would pressure fabrication — a clean repository must complete). The conditions: no open work, the trailing sweep window all empty-verified, and at least one model-audited coverage cell or resolved hypothesis so a fully harness-screened repository reads as "nothing audited yet", not "done".',
-        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }, { name: 'emptySweepsToFinish', description: 'trailing empty-verified sweeps required; `0` drops that condition.' }],
+        signature: 'completionAssessment(agent: Agent): { complete: boolean blockers: readonly string[] }',
+        description: 'Whether the harness certifies the mission complete. Every condition reads ledger state; none counts findings (a finding quota would pressure fabrication — a clean repository must complete). The conditions: no open work, the trailing sweep window all empty-verified (the threshold is this service\'s `emptySweepsToFinish` config, so every consumer reads one answer), and at least one model-audited coverage cell or resolved hypothesis so a fully harness-screened repository reads as "nothing audited yet", not "done".',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the verdict plus the bounded blockers, phrased to serve directly as the denial reason.',
       },
       {

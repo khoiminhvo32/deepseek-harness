@@ -46,9 +46,6 @@ export const DEFAULT_STEPS_PER_ROUND = 200
 /** Default number of systematic passes between deep-reading passes. */
 export const DEFAULT_DEEP_READ_EVERY_N = 3
 
-/** Default number of trailing sweeps the completion gate requires. */
-export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
-
 /** Rounds module config. */
 export interface Config {
   /**
@@ -63,28 +60,18 @@ export interface Config {
    * config, but divergent values produce divergent cadence.
    */
   deepReadEveryN?: number
-  /**
-   * Trailing empty-verified sweeps the completion gate requires, used only to
-   * render the gate's remaining blockers in the round context. Keep it equal
-   * to the stopgate's `emptySweepsToFinish`; the two values are separate on
-   * purpose so the context can render without reading plugin config, but
-   * divergent values name divergent remaining work.
-   */
-  emptySweepsToFinish?: number
 }
 
 /** Schemastery config for the rounds module. */
 export const Config: z<Config> = z.object({
   stepsPerRound: z.number().step(1).min(1).default(DEFAULT_STEPS_PER_ROUND),
   deepReadEveryN: z.number().step(1).min(1).default(DEFAULT_DEEP_READ_EVERY_N),
-  emptySweepsToFinish: z.number().step(1).min(0).max(16).default(DEFAULT_EMPTY_SWEEPS_TO_FINISH),
 })
 
 /** Fully materialized rounds inputs. */
 interface ResolvedConfig {
   readonly stepsPerRound: number
   readonly deepReadEveryN: number
-  readonly emptySweepsToFinish: number
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -97,11 +84,7 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(deepReadEveryN) || deepReadEveryN < 1) {
     throw new TypeError('deepReadEveryN must be a positive safe integer')
   }
-  const emptySweepsToFinish = config.emptySweepsToFinish ?? DEFAULT_EMPTY_SWEEPS_TO_FINISH
-  if (!Number.isSafeInteger(emptySweepsToFinish) || emptySweepsToFinish < 0 || emptySweepsToFinish > 16) {
-    throw new TypeError('emptySweepsToFinish must be a safe integer from 0 through 16')
-  }
-  return { stepsPerRound, deepReadEveryN, emptySweepsToFinish }
+  return { stepsPerRound, deepReadEveryN }
 }
 
 /** The methodology pass of one round: one deep-reading pass after every N systematic passes.
@@ -187,7 +170,7 @@ export function apply(ctx: Context, config: Config): void {
       const matrix = ctx.hardLedger.coverageMatrix(agent)
       const coverage = matrix === undefined ? undefined : ctx.hardLedger.coverageProgress(agent)
       const gateBlockers = openWork.length === 0
-        ? ctx.hardLedger.completionAssessment(agent, resolved.emptySweepsToFinish).blockers
+        ? ctx.hardLedger.completionAssessment(agent).blockers
         : []
       rounds.set(session, {
         round,

@@ -52,7 +52,7 @@ function stubAgent(rawId: string): StubAgent {
   return { agent, session, inbox, setStatus(value) { status = value } }
 }
 
-async function harness(config: { screenSpotCheckPercent?: number } = {}) {
+async function harness(config: { screenSpotCheckPercent?: number; emptySweepsToFinish?: number } = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -363,53 +363,59 @@ describe('hard ledger projection units', () => {
     }
 
     it('blocks on open work and the trailing empty sweeps, then certifies with enough of both', async () => {
-      const { ctx, root } = await harness()
+      const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
       armAndCover(ctx, root.agent, false)
       // Unverdicted matrix cells are the open work.
-      const uncovered = ctx.hardLedger.completionAssessment(root.agent, 0)
+      const uncovered = ctx.hardLedger.completionAssessment(root.agent)
       expect(uncovered.complete).toBe(false)
       expect(uncovered.blockers[0]).toContain('4 coverage cell(s) have no verdict yet')
 
       armAndCover(ctx, root.agent, true)
-      // Verdicts without a source read as model, so the audit floor is satisfied;
-      // only the trailing-sweep condition stands.
-      const oneSweep = ctx.hardLedger.completionAssessment(root.agent, 2)
-      expect(oneSweep.complete).toBe(false)
-      expect(oneSweep.blockers).toEqual(['0 of 2 final sweeps are empty-verified'])
+      // With the sweep condition off, verdicts without a source read as model,
+      // so the audit floor is satisfied and nothing else stands.
+      expect(ctx.hardLedger.completionAssessment(root.agent)).toEqual({ complete: true, blockers: [] })
 
-      ctx.hardLedger.recordSweep(root.agent, {
+      const gated = await harness()
+      armAndCover(gated.ctx, gated.root.agent, true)
+      // Verdicts without a source read as model, so the audit floor is satisfied;
+      // only the trailing-sweep condition stands at the ledger's configured 2.
+      const noSweeps = gated.ctx.hardLedger.completionAssessment(gated.root.agent)
+      expect(noSweeps.complete).toBe(false)
+      expect(noSweeps.blockers).toEqual(['0 of 2 final sweeps are empty-verified'])
+
+      gated.ctx.hardLedger.recordSweep(gated.root.agent, {
         phase: 'A', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' },
       })
-      const twoSweeps = ctx.hardLedger.completionAssessment(root.agent, 2)
-      expect(twoSweeps.complete).toBe(false)
-      expect(twoSweeps.blockers).toEqual(['1 of 2 final sweeps are empty-verified'])
+      const oneSweep = gated.ctx.hardLedger.completionAssessment(gated.root.agent)
+      expect(oneSweep.complete).toBe(false)
+      expect(oneSweep.blockers).toEqual(['1 of 2 final sweeps are empty-verified'])
 
-      ctx.hardLedger.recordSweep(root.agent, {
+      gated.ctx.hardLedger.recordSweep(gated.root.agent, {
         phase: 'B', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'cmdi' },
       })
-      expect(ctx.hardLedger.completionAssessment(root.agent, 2)).toEqual({ complete: true, blockers: [] })
+      expect(gated.ctx.hardLedger.completionAssessment(gated.root.agent)).toEqual({ complete: true, blockers: [] })
     })
 
     it('treats a harness-screened repository as unaudited even when every cell is verdicted', async () => {
-      const { ctx, root } = await harness()
+      const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
       ctx.hardLedger.recordMissionArmed(root.agent, {
         objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
         modules: ['notes'], bugClasses: ['cmdi'], inertModules: ['notes'],
       })
       // The screen pre-verdicts the only cell, so no open work stands and the sweep
       // condition is off — the model-audit floor is the single blocker.
-      const floored = ctx.hardLedger.completionAssessment(root.agent, 0)
+      const floored = ctx.hardLedger.completionAssessment(root.agent)
       expect(floored.complete).toBe(false)
       expect(floored.blockers).toEqual(['no model-audited coverage cell or resolved hypothesis exists yet'])
       const id = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'the parser accepts raw bytes', status: 'proposed' })
       ctx.hardLedger.writeHypothesis(root.agent, {
         id, statement: 'the parser accepts raw bytes', status: 'refuted', reason: 'the parser rejects them',
       })
-      expect(ctx.hardLedger.completionAssessment(root.agent, 0)).toEqual({ complete: true, blockers: [] })
+      expect(ctx.hardLedger.completionAssessment(root.agent)).toEqual({ complete: true, blockers: [] })
     })
 
     it('lists bounded open-work blockers with the remainder summary', async () => {
-      const { ctx, root } = await harness()
+      const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
       ctx.hardLedger.recordMissionArmed(root.agent, {
         objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
         modules: ['src'], bugClasses: ['cmdi'],
@@ -418,7 +424,7 @@ describe('hard ledger projection units', () => {
         ctx.hardLedger.writeHypothesis(root.agent, { statement: `hypothesis ${index}`, status: 'proposed' })
       }
       ctx.hardLedger.proposeFinding(root.agent, findingRequest())
-      const assessment = ctx.hardLedger.completionAssessment(root.agent, 0)
+      const assessment = ctx.hardLedger.completionAssessment(root.agent)
       expect(assessment.complete).toBe(false)
       // Open work lists findings first, then hypotheses, then coverage: 12 items
       // here, so the bound keeps 8, summarizes 4, and the audit floor trails last.
@@ -438,7 +444,7 @@ describe('hard ledger projection units', () => {
         phase: 'A', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' },
       })
       expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
-      const assessment = ctx.hardLedger.completionAssessment(root.agent, 2)
+      const assessment = ctx.hardLedger.completionAssessment(root.agent)
       expect(assessment.complete).toBe(false)
       expect(assessment.blockers).toContain('1 of 2 final sweeps are empty-verified')
     })

@@ -68,19 +68,32 @@ export interface Config {
    * false-negative rate.
    */
   screenSpotCheckPercent?: number
+  /**
+   * Trailing empty-verified sweeps the completion assessment requires; `0`
+   * drops that condition. The assessment is a ledger judgment and every
+   * consumer of it (the stop gate's veto, the rounds context) injects this
+   * service, so the threshold lives here — one answer for all readers, and
+   * no way for two plugins' separate configs to drift apart.
+   */
+  emptySweepsToFinish?: number
 }
 
 /** Default share of screened cells the openWork re-read sends back. */
 export const DEFAULT_SCREEN_SPOT_CHECK_PERCENT = 5
 
+/** Default number of trailing sweeps the completion assessment requires. */
+export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
+
 /** Schemastery config for the ledger service. */
 export const Config: z<Config> = z.object({
   screenSpotCheckPercent: z.number().step(1).min(0).max(100).default(DEFAULT_SCREEN_SPOT_CHECK_PERCENT),
+  emptySweepsToFinish: z.number().step(1).min(0).max(16).default(DEFAULT_EMPTY_SWEEPS_TO_FINISH),
 })
 
 /** Fully materialized ledger settings. */
 interface ResolvedConfig {
   readonly screenSpotCheckPercent: number
+  readonly emptySweepsToFinish: number
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -89,7 +102,11 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(screenSpotCheckPercent) || screenSpotCheckPercent < 0 || screenSpotCheckPercent > 100) {
     throw new TypeError('screenSpotCheckPercent must be a safe integer from 0 through 100')
   }
-  return { screenSpotCheckPercent }
+  const emptySweepsToFinish = config.emptySweepsToFinish ?? DEFAULT_EMPTY_SWEEPS_TO_FINISH
+  if (!Number.isSafeInteger(emptySweepsToFinish) || emptySweepsToFinish < 0 || emptySweepsToFinish > 16) {
+    throw new TypeError('emptySweepsToFinish must be a safe integer from 0 through 16')
+  }
+  return { screenSpotCheckPercent, emptySweepsToFinish }
 }
 
 /** Maximum characters retained for bounded reason and statement text. */
@@ -457,14 +474,15 @@ export class HardLedger extends Service {
    * Whether the harness certifies the mission complete. Every condition reads
    * ledger state; none counts findings (a finding quota would pressure
    * fabrication — a clean repository must complete). The conditions: no open
-   * work, the trailing sweep window all empty-verified, and at least one
-   * model-audited coverage cell or resolved hypothesis so a fully
-   * harness-screened repository reads as "nothing audited yet", not "done".
+   * work, the trailing sweep window all empty-verified (the threshold is this
+   * service's `emptySweepsToFinish` config, so every consumer reads one
+   * answer), and at least one model-audited coverage cell or resolved
+   * hypothesis so a fully harness-screened repository reads as "nothing
+   * audited yet", not "done".
    * @param agent - the live agent whose ledger state is read.
-   * @param emptySweepsToFinish - trailing empty-verified sweeps required; `0` drops that condition.
    * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
    */
-  completionAssessment(agent: Agent, emptySweepsToFinish: number): {
+  completionAssessment(agent: Agent): {
     complete: boolean
     blockers: readonly string[]
   } {
@@ -474,6 +492,7 @@ export class HardLedger extends Service {
       blockers.push(...work.slice(0, HARD_BLOCKER_LIMIT))
       if (work.length > HARD_BLOCKER_LIMIT) blockers.push(`…and ${work.length - HARD_BLOCKER_LIMIT} more open item(s)`)
     }
+    const emptySweepsToFinish = this.resolved.emptySweepsToFinish
     if (emptySweepsToFinish > 0) {
       const trailing = this.emptySweepRun(agent)
       if (trailing < emptySweepsToFinish) {

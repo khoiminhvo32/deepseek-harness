@@ -31,10 +31,9 @@ Mount the plugin beside the goal service and the hard ledger when turns under a 
   name: '@deepseek-ai/dsh-experimental-hard-stopgate'
   config:
     maxSteersPerTurn: 16
-    emptySweepsToFinish: 2
 ```
 
-`maxSteersPerTurn` must be a positive safe integer; `emptySweepsToFinish` must be a safe integer from 0 through 16 and `0` drops the trailing-sweep condition. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-stopgate) is the exhaustive source for every accepted field.
+`maxSteersPerTurn` must be a positive safe integer. The trailing-sweep threshold the assessment reads is the hard ledger's `emptySweepsToFinish`, so the gate, the round context, and any other consumer answer from one config. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-stopgate) is the exhaustive source for every accepted field.
 
 -----
 

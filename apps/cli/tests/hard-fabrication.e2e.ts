@@ -102,9 +102,9 @@ describe('dsh --profile hard fabrication traps', () => {
       // coverageSpotCheckPercent: 100 makes the deterministic cross-check run
       // for every cleared cell instead of its default 20 percent sample; the
       // ledger screen spot-check is off (0) so the batch-cleared cell is not
-      // sent back for a re-read. The completion gate requires one trailing
-      // empty-verified sweep, and the two-class matrix keeps the fixture's
-      // work surface exact.
+      // sent back for a re-read, and the ledger's completion assessment
+      // requires one trailing empty-verified sweep. The two-class matrix
+      // keeps the fixture's work surface exact.
       await writeFile(join(profileDir, 'cordis.patch.yml'), [
         '- id: hard-mission',
         '  config:',
@@ -118,8 +118,6 @@ describe('dsh --profile hard fabrication traps', () => {
         '- id: hard-ledger',
         '  config:',
         '    screenSpotCheckPercent: 0',
-        '- id: hard-stopgate',
-        '  config:',
         '    emptySweepsToFinish: 1',
         '- id: llm-deepseek',
         '  disabled: true',

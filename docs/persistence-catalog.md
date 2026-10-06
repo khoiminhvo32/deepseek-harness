@@ -41,7 +41,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:goal/change` | event | `763c8a20af487263a0080548274f7437ef4a86e0ba8769127d1ced10a72c664d` | [`{ type: "goal/change" }`](#persistence-type-sha256-763c8a20af487263a0080548274f7437ef4a86e0ba8769127d1ced10a72c664d) |
 | `event:hard/coverage/cell` | event | `c1f5a2e424cdeeee133c7b4d2f5599d1c13ab0290e07cb92619fc5c923b55502` | [`{ type: "hard/coverage/cell" }`](#persistence-type-sha256-c1f5a2e424cdeeee133c7b4d2f5599d1c13ab0290e07cb92619fc5c923b55502) |
 | `event:hard/finding/proposed` | event | `a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0` | [`{ type: "hard/finding/proposed" }`](#persistence-type-sha256-a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0) |
-| `event:hard/finding/verdict` | event | `0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f` | [`{ type: "hard/finding/verdict" }`](#persistence-type-sha256-0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f) |
+| `event:hard/finding/verdict` | event | `f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185` | [`{ type: "hard/finding/verdict" }`](#persistence-type-sha256-f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185) |
 | `event:hard/gate/decision` | event | `11dde453fdedbc2b3f5d81c0872f8212ee4c6ef4ad3b5ff3d78b5c6f211204f1` | [`{ type: "hard/gate/decision" }`](#persistence-type-sha256-11dde453fdedbc2b3f5d81c0872f8212ee4c6ef4ad3b5ff3d78b5c6f211204f1) |
 | `event:hard/hypothesis/state` | event | `b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1` | [`{ type: "hard/hypothesis/state" }`](#persistence-type-sha256-b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1) |
 | `event:hard/mission/armed` | event | `5691d737530f411af6eb333e9f8a92d2a13a605dc501603e33e1e9d6654b120f` | [`{ type: "hard/mission/armed" }`](#persistence-type-sha256-5691d737530f411af6eb333e9f8a92d2a13a605dc501603e33e1e9d6654b120f) |
@@ -49,6 +49,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:hard/round/start` | event | `ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c` | [`{ type: "hard/round/start" }`](#persistence-type-sha256-ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c) |
 | `event:hard/standby/scheduled` | event | `7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f` | [`{ type: "hard/standby/scheduled" }`](#persistence-type-sha256-7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f) |
 | `event:hard/standby/woke` | event | `a180010d63e5be8421eefcf892a98765b38ebc3471a14d1e41b02d502b377343` | [`{ type: "hard/standby/woke" }`](#persistence-type-sha256-a180010d63e5be8421eefcf892a98765b38ebc3471a14d1e41b02d502b377343) |
+| `event:hard/step-cap/reached` | event | `c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e` | [`{ type: "hard/step-cap/reached" }`](#persistence-type-sha256-c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e) |
 | `event:hard/sweep/summary` | event | `53eefd2160b1a8732740741877d174a72ed34016e7a2641be5fe424ccd55e75a` | [`{ type: "hard/sweep/summary" }`](#persistence-type-sha256-53eefd2160b1a8732740741877d174a72ed34016e7a2641be5fe424ccd55e75a) |
 | `event:hook/invoked` | event | `8a6e1ec9e8db346b0e02f027db73c07a94f067a26d40c1aef1abd09c47ce7ba0` | [`{ type: "hook/invoked" }`](#persistence-type-sha256-8a6e1ec9e8db346b0e02f027db73c07a94f067a26d40c1aef1abd09c47ce7ba0) |
 | `event:hook/result` | event | `e75916628f3f10c2d50658bd143052a46285fbf1a9a700ba54947614603d26b4` | [`{ type: "hook/result" }`](#persistence-type-sha256-e75916628f3f10c2d50658bd143052a46285fbf1a9a700ba54947614603d26b4) |
@@ -654,7 +655,7 @@ Source: [`packages/experimental/hard-ledger/src/domain.ts:26`](../packages/exper
 'hard/round/end': HardRoundEndData
 ```
 
-Source: [`packages/experimental/hard-rounds/src/domain.ts:41`](../packages/experimental/hard-rounds/src/domain.ts)
+Source: [`packages/experimental/hard-rounds/src/domain.ts:53`](../packages/experimental/hard-rounds/src/domain.ts)
 
 <a id="hardroundstart--log-only"></a>
 
@@ -668,7 +669,7 @@ Source: [`packages/experimental/hard-rounds/src/domain.ts:41`](../packages/exper
 'hard/round/start': HardRoundStartData
 ```
 
-Source: [`packages/experimental/hard-rounds/src/domain.ts:39`](../packages/experimental/hard-rounds/src/domain.ts)
+Source: [`packages/experimental/hard-rounds/src/domain.ts:51`](../packages/experimental/hard-rounds/src/domain.ts)
 
 <a id="hardstandbyscheduled--log-only"></a>
 
@@ -694,6 +695,20 @@ Source: [`packages/experimental/hard-standby/src/domain.ts:40`](../packages/expe
 ```
 
 Source: [`packages/experimental/hard-standby/src/domain.ts:42`](../packages/experimental/hard-standby/src/domain.ts)
+
+<a id="hardstep-capreached--log-only"></a>
+
+#### `hard/step-cap/reached` — log-only
+
+```ts persistence-catalog
+/**
+ * One turn stopped at the per-turn step cap, appended in both round and
+ * roundless turns; the cost cap's durable record.
+ */
+'hard/step-cap/reached': HardStepCapReachedData
+```
+
+Source: [`packages/experimental/hard-rounds/src/domain.ts:58`](../packages/experimental/hard-rounds/src/domain.ts)
 
 <a id="hardsweepsummary--log-only"></a>
 
@@ -1615,6 +1630,14 @@ SHA-256: `17aae616ef020b8b9f011ec398ec935450fb06d3e2a0722c456f63aeaf5ff728`
 
 `"at"`
 
+<a id="persistence-type-sha256-ddde3951effac3f1279db92473ad07b66f7b73af33d49d9b11b2332a96a15f23"></a>
+
+### `"benign-arm-passed"`
+
+SHA-256: `ddde3951effac3f1279db92473ad07b66f7b73af33d49d9b11b2332a96a15f23`
+
+`"benign-arm-passed"`
+
 <a id="persistence-type-sha256-1e346446e183ee76f48d7994c97ecb302bddc682abb60b8a10ea0bb26223a69c"></a>
 
 ### `"block"`
@@ -1886,6 +1909,14 @@ SHA-256: `e7e8f1318170b8284f16ab45a557afd4675c96071c0f2a456636481dab20b427`
 SHA-256: `1a2718b00937b236a0d0910ef5dab2f9f8b65e4bde410cc21f15fbbf29f584d3`
 
 `"deliverables/presented"`
+
+<a id="persistence-type-sha256-9d8281418de947dafc36e32829d4f300860e86ee68b837fc66f0e70dd2d2c193"></a>
+
+### `"demonstrated"`
+
+SHA-256: `9d8281418de947dafc36e32829d4f300860e86ee68b837fc66f0e70dd2d2c193`
+
+`"demonstrated"`
 
 <a id="persistence-type-sha256-98889a31bae45e480319de503f425e1c6332764ab34b7e8de4efacd44ac974bf"></a>
 
@@ -2175,6 +2206,14 @@ SHA-256: `f3dcdc9d865d02413f20aac28f87a7199d95f303a813c71680f705713efae397`
 
 `"hard/standby/woke"`
 
+<a id="persistence-type-sha256-836955f379f5067f3e966c74529151c3d03ae6ef6568af970c00fc2035b95286"></a>
+
+### `"hard/step-cap/reached"`
+
+SHA-256: `836955f379f5067f3e966c74529151c3d03ae6ef6568af970c00fc2035b95286`
+
+`"hard/step-cap/reached"`
+
 <a id="persistence-type-sha256-3fd1b0237a3bbc5673a10337fd16f5b73c9be34dcceb9b7f4b0fa37f952e2675"></a>
 
 ### `"hard/sweep/summary"`
@@ -2437,6 +2476,30 @@ SHA-256: `62ecb62dc0fe1b5e70217f8a80c39256a40ee3a1917be14e5ca899d20c35f7fd`
 
 `"next-turn"`
 
+<a id="persistence-type-sha256-a8bf4d2f155a1195b840b8dd7f5617f94acbe893e5d4f5057655d393b8c94cb7"></a>
+
+### `"no-marker"`
+
+SHA-256: `a8bf4d2f155a1195b840b8dd7f5617f94acbe893e5d4f5057655d393b8c94cb7`
+
+`"no-marker"`
+
+<a id="persistence-type-sha256-429de84933daaa452ad7ad93fe4497b7bee996587ea796c131512fb33fa4c721"></a>
+
+### `"no-runs"`
+
+SHA-256: `429de84933daaa452ad7ad93fe4497b7bee996587ea796c131512fb33fa4c721`
+
+`"no-runs"`
+
+<a id="persistence-type-sha256-c3d2b6836425f0612bee1146b75591cced24384877f88a0c55696dba37832020"></a>
+
+### `"nonzero-exit"`
+
+SHA-256: `c3d2b6836425f0612bee1146b75591cced24384877f88a0c55696dba37832020`
+
+`"nonzero-exit"`
+
 <a id="persistence-type-sha256-3bc287e765d58dc3a22672a0495a6cfd561220dd38fbaecef80aa95b96caed79"></a>
 
 ### `"normal"`
@@ -2564,6 +2627,14 @@ SHA-256: `0341d4c3dfcd53253cdc1e789d9130d3cd848b6f8b0706bf92f313a68b39ff23`
 SHA-256: `2d2e6cc1e4c544c2a4cb8215f80730da76ca530c48712939e459c22de930d64d`
 
 `"proposed"`
+
+<a id="persistence-type-sha256-5fd2be2af24959f972d843b36b18d325a013f916de4c45e3e0d13d8262c732de"></a>
+
+### `"proven"`
+
+SHA-256: `5fd2be2af24959f972d843b36b18d325a013f916de4c45e3e0d13d8262c732de`
+
+`"proven"`
 
 <a id="persistence-type-sha256-e31572180d6b28b73f073ad30ae19d5d82982d3daf984723984e23da1e7c459a"></a>
 
@@ -3052,6 +3123,14 @@ SHA-256: `5abab3a27fd2736660ecddd94b28d6bbf114986dd894880153bd1be3ccacb563`
 SHA-256: `8067b0d232c350f189738e60ee3c9939d46ca3b32b45db5525237b077893f649`
 
 `"time-context"`
+
+<a id="persistence-type-sha256-2d431b50b572702b7c17e6dfb5c235f9cb1677a264eaccb154be8e80e383018f"></a>
+
+### `"timeout"`
+
+SHA-256: `2d431b50b572702b7c17e6dfb5c235f9cb1677a264eaccb154be8e80e383018f`
+
+`"timeout"`
 
 <a id="persistence-type-sha256-78a9be340090b735a39980e7222ce730c972fbcf1de7c9e0aef2125884b7caee"></a>
 
@@ -3968,7 +4047,7 @@ Sources: [`packages/goal/goal/src/domain.ts:24`](../packages/goal/goal/src/domai
 
 SHA-256: `6fd58116eb9dc3c4c704feafb504265f803fd06e05f2471aefa7d819f9f39629`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:111`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:144`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4023,7 +4102,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:35`](../packages/exper
 | `pocPath` | required | `string` |
 | `title` | required | `string` |
 
-<a id="persistence-type-sha256-b6e58fecefff234788cfc7e89a71a5234ca78ea320e413a3f5127ccf7bfe162c"></a>
+<a id="persistence-type-sha256-278a9d13f1e027e0e6244da388d964edeeb946ac815387dfa36748c09282d6af"></a>
 
 <a id="persistence-type-hardfindingverdictdata"></a>
 
@@ -4031,15 +4110,17 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:35`](../packages/exper
 
 ### `HardFindingVerdictData`
 
-SHA-256: `b6e58fecefff234788cfc7e89a71a5234ca78ea320e413a3f5127ccf7bfe162c`
+SHA-256: `278a9d13f1e027e0e6244da388d964edeeb946ac815387dfa36748c09282d6af`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:80`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:98`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
 | `benignArm` | optional | [`union (2 variants)`](#persistence-type-sha256-46da8e9d57fd5526420b53f5da29b089e6a9a932819fcf704cb9c7f5fe3b6597) |
+| `cause` | optional | [`union (6 variants)`](#persistence-type-sha256-3402b187440d15e285e9dcef87f0724212d0cef3333704ffb20fa88fc3c1dd89) |
 | `cvssComputed` | required | `number` |
 | `cvssMatch` | required | `boolean` |
+| `evidence` | optional | [`union (2 variants)`](#persistence-type-sha256-4c8cb1ab970aa5d3374652d86061e93c02a4e0b189a93ccd692a45328cb83385) |
 | `fingerprint` | required | `string` |
 | `id` | required | `string` |
 | `reason` | required | `string` |
@@ -4056,7 +4137,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:80`](../packages/exper
 
 SHA-256: `e3af231d0f30380df036b4fb3ce465b1c27d669c037267fcc8d90b6016129a70`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:153`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:186`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4078,7 +4159,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:153`](../packages/expe
 
 SHA-256: `7954cecbb131efd177055dd9c49fc9012ad7f5857d4a08ebe072593ff5a70b98`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:102`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:135`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4117,7 +4198,7 @@ One of:
 
 SHA-256: `2d0d5873592384184c2fd2d456596c7eba2d3662decf424f21c999aa1d20ab05`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:183`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:216`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4236,6 +4317,25 @@ Sources: [`packages/experimental/hard-standby/src/domain.ts:25`](../packages/exp
 | `delivered` | required | `boolean` |
 | `skip` | optional | `string` |
 
+<a id="persistence-type-sha256-ef9e06e2b7c45cc87ff02598392814e2bdf8b4ff2fbb961c61cd5ea43a1a42d5"></a>
+
+<a id="persistence-type-hardstepcapreacheddata"></a>
+
+<a id="persistence-type-packagesexperimentalhard-roundssrcdomaintshardstepcapreacheddata"></a>
+
+### `HardStepCapReachedData`
+
+SHA-256: `ef9e06e2b7c45cc87ff02598392814e2bdf8b4ff2fbb961c61cd5ea43a1a42d5`
+
+Sources: [`packages/experimental/hard-rounds/src/domain.ts:34`](../packages/experimental/hard-rounds/src/domain.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `limit` | required | `number` |
+| `round` | optional | `number` |
+| `steps` | required | `number` |
+| `turn` | required | `number` |
+
 <a id="persistence-type-sha256-2983c2eee94f8b64b2d61fa34e2fc39da5b073d19ec3372b95aa065ad3e8b0f2"></a>
 
 <a id="persistence-type-hardsweepsummarydata"></a>
@@ -4246,7 +4346,7 @@ Sources: [`packages/experimental/hard-standby/src/domain.ts:25`](../packages/exp
 
 SHA-256: `2983c2eee94f8b64b2d61fa34e2fc39da5b073d19ec3372b95aa065ad3e8b0f2`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:136`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:169`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6231,6 +6331,17 @@ One of:
 - `"failed"`
 - `"passed"`
 
+<a id="persistence-type-sha256-4c8cb1ab970aa5d3374652d86061e93c02a4e0b189a93ccd692a45328cb83385"></a>
+
+### `union (2 variants)`
+
+SHA-256: `4c8cb1ab970aa5d3374652d86061e93c02a4e0b189a93ccd692a45328cb83385`
+
+One of:
+
+- `"demonstrated"`
+- `"proven"`
+
 <a id="persistence-type-sha256-50cf02d875f8a1f1411f4a6fbcffab9120ccef5f74a47331fbf29480e5f68f48"></a>
 
 ### `union (2 variants)`
@@ -6313,6 +6424,21 @@ One of:
 - `"completed"`
 - `"in_progress"`
 - `"pending"`
+
+<a id="persistence-type-sha256-3402b187440d15e285e9dcef87f0724212d0cef3333704ffb20fa88fc3c1dd89"></a>
+
+### `union (6 variants)`
+
+SHA-256: `3402b187440d15e285e9dcef87f0724212d0cef3333704ffb20fa88fc3c1dd89`
+
+One of:
+
+- `"aborted"`
+- `"benign-arm-passed"`
+- `"no-marker"`
+- `"no-runs"`
+- `"nonzero-exit"`
+- `"timeout"`
 
 <a id="persistence-type-sha256-62e6a429ff3f390a46ac39fb468692032f42936ca0db19b53454184189401379"></a>
 
@@ -6434,7 +6560,7 @@ Sources: [`packages/core/session/src/types.ts:361`](../packages/core/session/src
 
 SHA-256: `34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:158`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:191`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6676,7 +6802,7 @@ Sources: [`packages/compaction/compaction/src/types.ts:24`](../packages/compacti
 
 SHA-256: `96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:169`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:202`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6869,7 +6995,7 @@ Sources: [`packages/llm/llm/src/types.ts:161`](../packages/llm/llm/src/types.ts)
 
 SHA-256: `ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:161`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:194`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7050,7 +7176,7 @@ Sources: [`packages/core/session/src/types.ts:206`](../packages/core/session/src
 
 SHA-256: `7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:133`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:166`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7683,7 +7809,7 @@ SHA-256: `88841202942c7683b3b7e5ea6a796047ec326b6701ac23e58cc236d85613b9fa`
 
 SHA-256: `71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:132`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:165`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -8717,7 +8843,7 @@ Sources: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/
 
 SHA-256: `34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:163`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:196`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -9275,17 +9401,17 @@ SHA-256: `a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0`
 | `time` | required | `number` |
 | `type` | required | `"hard/finding/proposed"` |
 
-<a id="persistence-type-sha256-0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f"></a>
+<a id="persistence-type-sha256-f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185"></a>
 
 <a id="persistence-type-eventhardfindingverdict"></a>
 
 ### `{ type: "hard/finding/verdict" }`
 
-SHA-256: `0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f`
+SHA-256: `f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185`
 
 | Property | Presence | Type |
 |---|---|---|
-| `data` | required | [`HardFindingVerdictData`](#persistence-type-sha256-b6e58fecefff234788cfc7e89a71a5234ca78ea320e413a3f5127ccf7bfe162c) |
+| `data` | required | [`HardFindingVerdictData`](#persistence-type-sha256-278a9d13f1e027e0e6244da388d964edeeb946ac815387dfa36748c09282d6af) |
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
 | `time` | required | `number` |
@@ -9402,6 +9528,22 @@ SHA-256: `a180010d63e5be8421eefcf892a98765b38ebc3471a14d1e41b02d502b377343`
 | `seq` | required | `number` |
 | `time` | required | `number` |
 | `type` | required | `"hard/standby/woke"` |
+
+<a id="persistence-type-sha256-c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e"></a>
+
+<a id="persistence-type-eventhardstep-capreached"></a>
+
+### `{ type: "hard/step-cap/reached" }`
+
+SHA-256: `c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e`
+
+| Property | Presence | Type |
+|---|---|---|
+| `data` | required | [`HardStepCapReachedData`](#persistence-type-sha256-ef9e06e2b7c45cc87ff02598392814e2bdf8b4ff2fbb961c61cd5ea43a1a42d5) |
+| `ignorable` | optional | `true` |
+| `seq` | required | `number` |
+| `time` | required | `number` |
+| `type` | required | `"hard/step-cap/reached"` |
 
 <a id="persistence-type-sha256-53eefd2160b1a8732740741877d174a72ed34016e7a2641be5fe424ccd55e75a"></a>
 

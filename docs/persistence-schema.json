@@ -11306,7 +11306,7 @@
       "kind": "event",
       "event": "hard/finding/verdict",
       "surface": false,
-      "digest": "0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f",
+      "digest": "f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185",
       "schema": {
         "root": 0,
         "nodes": [
@@ -11320,22 +11320,22 @@
               },
               {
                 "name": "ignorable",
-                "type": 12,
+                "type": 22,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 5,
+                "type": 12,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 5,
+                "type": 12,
                 "optional": false
               },
               {
                 "name": "type",
-                "type": 13,
+                "type": 23,
                 "optional": false
               }
             ],
@@ -11350,38 +11350,48 @@
                 "optional": true
               },
               {
-                "name": "cvssComputed",
+                "name": "cause",
                 "type": 5,
+                "optional": true
+              },
+              {
+                "name": "cvssComputed",
+                "type": 12,
                 "optional": false
               },
               {
                 "name": "cvssMatch",
-                "type": 6,
+                "type": 13,
                 "optional": false
               },
               {
+                "name": "evidence",
+                "type": 14,
+                "optional": true
+              },
+              {
                 "name": "fingerprint",
-                "type": 7,
+                "type": 17,
                 "optional": false
               },
               {
                 "name": "id",
-                "type": 7,
+                "type": 17,
                 "optional": false
               },
               {
                 "name": "reason",
-                "type": 7,
+                "type": 17,
                 "optional": false
               },
               {
                 "name": "runs",
-                "type": 5,
+                "type": 12,
                 "optional": false
               },
               {
                 "name": "verdict",
-                "type": 8,
+                "type": 18,
                 "optional": false
               }
             ],
@@ -11403,6 +11413,41 @@
             "value": "passed"
           },
           {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "aborted"
+          },
+          {
+            "kind": "literal",
+            "value": "benign-arm-passed"
+          },
+          {
+            "kind": "literal",
+            "value": "no-marker"
+          },
+          {
+            "kind": "literal",
+            "value": "no-runs"
+          },
+          {
+            "kind": "literal",
+            "value": "nonzero-exit"
+          },
+          {
+            "kind": "literal",
+            "value": "timeout"
+          },
+          {
             "kind": "primitive",
             "type": "number"
           },
@@ -11411,15 +11456,30 @@
             "type": "boolean"
           },
           {
+            "kind": "union",
+            "types": [
+              15,
+              16
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "demonstrated"
+          },
+          {
+            "kind": "literal",
+            "value": "proven"
+          },
+          {
             "kind": "primitive",
             "type": "string"
           },
           {
             "kind": "union",
             "types": [
-              9,
-              10,
-              11
+              19,
+              20,
+              21
             ]
           },
           {
@@ -12229,6 +12289,87 @@
           {
             "kind": "literal",
             "value": "hard/standby/woke"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/step-cap/reached",
+      "kind": "event",
+      "event": "hard/step-cap/reached",
+      "surface": false,
+      "digest": "c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "limit",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "round",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "steps",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "turn",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/step-cap/reached"
           }
         ]
       }
@@ -25296,11 +25437,6 @@
       "sources": []
     },
     {
-      "digest": "0827984ae17179d37b7bb163f0f9e5bfbd979128c9a2fd705dc2046e5548e45f",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "082fb16637839a507b836396df35d7cbb09c5c6ec2a8aba3758421fc3734efcc",
       "names": [],
       "sources": []
@@ -25920,6 +26056,15 @@
       "sources": []
     },
     {
+      "digest": "278a9d13f1e027e0e6244da388d964edeeb946ac815387dfa36748c09282d6af",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFindingVerdictData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:98"
+      ]
+    },
+    {
       "digest": "287211846beea1eccb5f9acee00d20388a38fcb2e95858fa2332d6f58529379a",
       "names": [],
       "sources": [
@@ -25947,7 +26092,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:136"
+        "packages/experimental/hard-ledger/src/types.ts:169"
       ]
     },
     {
@@ -25993,7 +26138,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:183"
+        "packages/experimental/hard-ledger/src/types.ts:216"
       ]
     },
     {
@@ -26005,6 +26150,11 @@
     },
     {
       "digest": "2d2e6cc1e4c544c2a4cb8215f80730da76ca530c48712939e459c22de930d64d",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "2d431b50b572702b7c17e6dfb5c235f9cb1677a264eaccb154be8e80e383018f",
       "names": [],
       "sources": []
     },
@@ -26124,10 +26274,15 @@
       ]
     },
     {
+      "digest": "3402b187440d15e285e9dcef87f0724212d0cef3333704ffb20fa88fc3c1dd89",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:163"
+        "packages/experimental/hard-ledger/src/types.ts:196"
       ]
     },
     {
@@ -26139,7 +26294,7 @@
       "digest": "34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:158"
+        "packages/experimental/hard-ledger/src/types.ts:191"
       ]
     },
     {
@@ -26345,6 +26500,11 @@
       "sources": []
     },
     {
+      "digest": "429de84933daaa452ad7ad93fe4497b7bee996587ea796c131512fb33fa4c721",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "42b97a928ec52947f60a746c70bf933b731e1204fb4b657b9c24d84fe5c224e8",
       "names": [],
       "sources": []
@@ -26501,6 +26661,11 @@
       "sources": [
         "packages/core/session/src/types.ts:193"
       ]
+    },
+    {
+      "digest": "4c8cb1ab970aa5d3374652d86061e93c02a4e0b189a93ccd692a45328cb83385",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "4cd48f3e5108bd6ebedf7301c3638839b8b2b9db8dbd493974177fbdeb91a01b",
@@ -26893,6 +27058,11 @@
       ]
     },
     {
+      "digest": "5fd2be2af24959f972d843b36b18d325a013f916de4c45e3e0d13d8262c732de",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "6085488d223aeffdef51d7ae17655fc26ab22ee13cbed82a50e62e2b6fb5b918",
       "names": [],
       "sources": []
@@ -27168,7 +27338,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:111"
+        "packages/experimental/hard-ledger/src/types.ts:144"
       ]
     },
     {
@@ -27206,7 +27376,7 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:132"
+        "packages/experimental/hard-ledger/src/types.ts:165"
       ]
     },
     {
@@ -27279,7 +27449,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:102"
+        "packages/experimental/hard-ledger/src/types.ts:135"
       ]
     },
     {
@@ -27300,7 +27470,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:133"
+        "packages/experimental/hard-ledger/src/types.ts:166"
       ]
     },
     {
@@ -27476,6 +27646,11 @@
     },
     {
       "digest": "8338ee303e2bd448e9e6144069942f63e3cfd5868962bddc9347d7009e8919d6",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "836955f379f5067f3e966c74529151c3d03ae6ef6568af970c00fc2035b95286",
       "names": [],
       "sources": []
     },
@@ -27767,7 +27942,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:169"
+        "packages/experimental/hard-ledger/src/types.ts:202"
       ]
     },
     {
@@ -27887,6 +28062,11 @@
     },
     {
       "digest": "9d80129e13edfb6feb03ed327e6085c6ef60b97ad074244b2f5fd4667424a6a4",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "9d8281418de947dafc36e32829d4f300860e86ee68b837fc66f0e70dd2d2c193",
       "names": [],
       "sources": []
     },
@@ -28083,6 +28263,11 @@
     },
     {
       "digest": "a8a2b9011fc067862df7ce40748868467e5778283d7ac193c13f77684a914c57",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "a8bf4d2f155a1195b840b8dd7f5617f94acbe893e5d4f5057655d393b8c94cb7",
       "names": [],
       "sources": []
     },
@@ -28387,15 +28572,6 @@
       "sources": []
     },
     {
-      "digest": "b6e58fecefff234788cfc7e89a71a5234ca78ea320e413a3f5127ccf7bfe162c",
-      "names": [
-        "packages/experimental/hard-ledger/src/types.ts#HardFindingVerdictData"
-      ],
-      "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:80"
-      ]
-    },
-    {
       "digest": "b6ef9c6210be8350cd465f485cf520031fffa6bf3809c61a1e713e834c5982d0",
       "names": [],
       "sources": [
@@ -28586,6 +28762,11 @@
       "sources": []
     },
     {
+      "digest": "c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "c2deb7c9183735d4e0fffddf5c623f4e34daa1c8e96b111982e957dfcbbcf896",
       "names": [
         "packages/workflow/workflow/src/types.ts#WorkflowAgentOutcome"
@@ -28596,6 +28777,11 @@
     },
     {
       "digest": "c3b216bdc952bcb207c43a5eddc7e5f87292e2e8be5a4f4c6f32c4037d2f06ba",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "c3d2b6836425f0612bee1146b75591cced24384877f88a0c55696dba37832020",
       "names": [],
       "sources": []
     },
@@ -28876,6 +29062,11 @@
       "sources": []
     },
     {
+      "digest": "ddde3951effac3f1279db92473ad07b66f7b73af33d49d9b11b2332a96a15f23",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "de25352d2dc4196309bd84b5bac6319f6d5c898ea0e82bb5ae66c5738d0d426f",
       "names": [],
       "sources": []
@@ -28955,7 +29146,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:153"
+        "packages/experimental/hard-ledger/src/types.ts:186"
       ]
     },
     {
@@ -29110,7 +29301,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:161"
+        "packages/experimental/hard-ledger/src/types.ts:194"
       ]
     },
     {
@@ -29156,6 +29347,15 @@
       "digest": "ef4f00923b9edbae15c7ef05320280bf61147ca17146cf59690359bfd5e5da45",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "ef9e06e2b7c45cc87ff02598392814e2bdf8b4ff2fbb961c61cd5ea43a1a42d5",
+      "names": [
+        "packages/experimental/hard-rounds/src/domain.ts#HardStepCapReachedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-rounds/src/domain.ts:34"
+      ]
     },
     {
       "digest": "f04257bba4544f54965441f372d9939bf843023df3754d2af9c1e00732eaff0f",
@@ -29309,6 +29509,11 @@
     },
     {
       "digest": "f789af5ab844827eb5a4f357c0afae1eeed108c6c22d8ca1a56e586b349a7c85",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185",
       "names": [],
       "sources": []
     },

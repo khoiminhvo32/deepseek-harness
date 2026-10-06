@@ -195,7 +195,7 @@ describe('hard verifier execution', () => {
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
     expect(verdict.verdict).toBe('refuted')
-    expect(verdict.reason).toContain('exit code 1')
+    expect(verdict.cause).toBe('nonzero-exit')
     expect(verdict.reason).toContain('AssertionError')
     expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
   })
@@ -211,7 +211,7 @@ describe('hard verifier execution', () => {
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
     expect(verdict.verdict).toBe('flaky')
-    expect(verdict.reason).toContain('of 2 runs')
+    expect(verdict.cause).toBeUndefined()
 
     const timeoutClaim = 'A slow claim.'
     const { root: root2 } = await harness([benignFail, { exitCode: null, stdoutText: '', timedOut: true }])
@@ -219,7 +219,7 @@ describe('hard verifier execution', () => {
     const id2 = ctx.hardLedger.proposeFinding(root2.agent, request2)
     const verdict2 = await ctx.hardVerifier.verify(root2.agent, { ...request2, id: id2 })
     expect(verdict2.verdict).toBe('refuted')
-    expect(verdict2.reason).toContain('timeout')
+    expect(verdict2.cause).toBe('timeout')
   })
 
   it('flags a claimed score that does not match the recomputation', async () => {
@@ -265,6 +265,7 @@ describe('hard verifier execution', () => {
     const id = ctx.hardLedger.proposeFinding(root.agent, request)
     const verdict = await ctx.hardVerifier.verify(root.agent, { ...request, id })
     expect(verdict.verdict).toBe('refuted')
+    expect(verdict.cause).toBe('benign-arm-passed')
     expect(verdict.reason).toBe('the proof passes with a benign payload, so it does not depend on the exploit input')
     expect(verdict.benignArm).toBe('passed')
     expect(verdict.runs).toBe(0)
@@ -301,7 +302,7 @@ describe('hard verifier execution', () => {
 })
 
 describe('hard verifier verdict units', () => {
-  it('classifies empty run lists, aborted runs, and silent proofs through the pure classifier', async () => {
+  it('classifies run outcomes into causes through the pure classifier', async () => {
     const { classifyRuns, claimHash, rootFingerprint } = await import('@deepseek-ai/dsh-experimental-hard-verifier')
     const claim = 'The units claim.'
     const hash = claimHash(claim)
@@ -310,7 +311,7 @@ describe('hard verifier verdict units', () => {
       id: brandString<HardFindingId>('F-1'), runs: [], claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
     })
     expect(empty.verdict).toBe('refuted')
-    expect(empty.reason).toBe('no runs were executed')
+    expect(empty.cause).toBe('no-runs')
     // A marker-only stdout is a silent proof, not a refutation: output shape
     // carries no payload-dependence evidence, the benign arm does.
     const silent = classifyRuns({
@@ -319,13 +320,22 @@ describe('hard verifier verdict units', () => {
       claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
     })
     expect(silent.verdict).toBe('confirmed')
-    expect(silent.reason).toBe('1 run exited zero and printed the claim marker')
+    expect(silent.cause).toBeUndefined()
+    const noMarker = classifyRuns({
+      id: brandString<HardFindingId>('F-1'),
+      runs: [{ exitCode: 0, timedOut: false, aborted: false, stdoutText: 'nothing happened', stderrTail: 'swallowed' }],
+      claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
+    })
+    expect(noMarker.verdict).toBe('refuted')
+    expect(noMarker.cause).toBe('no-marker')
+    expect(noMarker.reason).toContain('swallowed')
     const aborted = classifyRuns({
       id: brandString<HardFindingId>('F-1'),
       runs: [{ exitCode: null, timedOut: false, aborted: true, stdoutText: '', stderrTail: '' }],
       claimHash: hash, cvssComputed: 5, cvssMatch: true, fingerprint,
     })
     expect(aborted.reason).toBe('the PoC was aborted before settling')
+    expect(aborted.cause).toBe('aborted')
   })
 })
 

@@ -16,7 +16,11 @@ The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events an
 
 ## Proof-of-effect contract
 
-`ctx.hardVerifier.verify` runs a finding's proof of concept through the configured shell, `runs` times. A run satisfies the contract only when it exits zero and prints `HARD-PASS <sha256 of claim>` on stdout; all runs passing confirms, all failing refutes, any split is flaky. The claimed CVSS 4.0 score is recomputed from the vector against the vendored FIRST reference data, and a confirmed root cause rejects duplicate proposals.
+`ctx.hardVerifier.verify` runs a finding's proof of concept through the configured shell, `runs` times. A run satisfies the contract only when it exits zero and prints `HARD-PASS <sha256 of claim>` on stdout; all runs passing confirms, all failing refutes, any split is flaky. The claimed CVSS 4.0 score is recomputed from the vector against the vendored FIRST reference data, and a confirmed root cause rejects duplicate proposals. Every refuted verdict carries an aggregable `cause` (`benign-arm-passed`, `no-marker`, `nonzero-exit`, `timeout`, `aborted`, `no-runs`), and `ctx.hardLedger.refutationBreakdown` groups them into protocol failures, genuine refutations, and infrastructure; the optional `evidence` field reserves `proven` for a future differential runner, and absent reads as `demonstrated` — everything the verifier produces today is a model-written PoC through the specificity check.
+
+## Step budgets
+
+The two step limits measure different things. `hard-rounds`' `stepsPerRound` is a round's steering budget, checked in `agent/turn-stopping` — a hook that only fires when the model wants to stop — so it bounds how far the driver can push a round, never cost. `maxStepsPerTurn` is the cost cap, checked at the `agent/pre-step` boundary of every turn, whether or not a round owns it; reaching it rejects the step, the turn closes `blocked`, and the stop is recorded as a durable `hard/step-cap/reached` event naming the turn, the steps that had run, the limit, and the round when one owns the turn.
 
 ## Design rationale
 
@@ -94,6 +98,16 @@ recordSweep(agent: Agent, request: HardSweepSummaryData): void
  * @returns one record per proposal in id order.
  */
 findings(agent: Agent): readonly HardLedgerFindingEntry[]
+
+/**
+ * Decompose the refuted verdicts by cause code, so one run can say whether
+ * it failed at the protocol layer or the target layer.
+ * @param agent - the live agent whose ledger holds the findings.
+ * @returns refuted-verdict counts per cause plus the reading groups; a
+ *   refuted verdict predating the cause codes counts under `unattributed`
+ *   in `byCause` and in no group.
+ */
+refutationBreakdown(agent: Agent): { readonly byCause: Readonly<Record<string, number>> /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */ readonly protocolFailures: number /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */ readonly genuineRefutations: number /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */ readonly infrastructure: number }
 
 /**
  * Hypotheses folded to their latest state per id.

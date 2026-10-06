@@ -1281,6 +1281,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one record per proposal in id order.',
       },
       {
+        signature: 'refutationBreakdown(agent: Agent): { readonly byCause: Readonly<Record<string, number>> /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */ readonly protocolFailures: number /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */ readonly genuineRefutations: number /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */ readonly infrastructure: number }',
+        description: 'Decompose the refuted verdicts by cause code, so one run can say whether it failed at the protocol layer or the target layer.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger holds the findings.' }],
+        returns: 'refuted-verdict counts per cause plus the reading groups; a refuted verdict predating the cause codes counts under `unattributed` in `byCause` and in no group.',
+      },
+      {
         signature: 'hypotheses(agent: Agent): readonly HardHypothesisStateData[]',
         description: 'Hypotheses folded to their latest state per id.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
@@ -5543,6 +5549,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardEmptySweepProof = {\n    readonly kind: \'hypothesis\';\n    readonly hypothesisId: string;\n} | {\n    readonly kind: \'cell\';\n    readonly module: string;\n    readonly bugClass: string;\n};',
   },
   {
+    name: 'HardFindingCause',
+    declaration: 'export type HardFindingCause = \'benign-arm-passed\' | \'no-marker\' | \'nonzero-exit\' | \'timeout\' | \'aborted\' | \'no-runs\';',
+  },
+  {
+    name: 'HardFindingEvidence',
+    declaration: 'export type HardFindingEvidence = \'demonstrated\' | \'proven\';',
+  },
+  {
     name: 'HardFindingId',
     declaration: 'export type HardFindingId = Branded<\'HardFindingId\'>;',
   },
@@ -5556,7 +5570,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardFindingVerdictData',
-    declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n    readonly benignArm?: HardBenignArmResult;\n}',
+    declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n    readonly benignArm?: HardBenignArmResult;\n    readonly cause?: HardFindingCause;\n    readonly evidence?: HardFindingEvidence;\n}',
   },
   {
     name: 'HardHypothesisId',

@@ -224,9 +224,12 @@ describe('hard_submit_finding', () => {
       cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: "x' OR 1=1 --",
     }, root.agent))
     expect((result.verdict as Record<string, unknown>)).toMatchObject({
-      verdict: 'refuted', runs: 0, reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
+      verdict: 'refuted', runs: 0,
+      reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
     })
-    expect(ctx.hardLedger.findings(root.agent)[0]?.verdict?.benignArm).toBe('passed')
+    expect(ctx.hardLedger.findings(root.agent)[0]?.verdict).toMatchObject({
+      benignArm: 'passed', cause: 'benign-arm-passed',
+    })
   })
 
   it('surfaces the duplicate root-cause rejection as a tool error', async () => {

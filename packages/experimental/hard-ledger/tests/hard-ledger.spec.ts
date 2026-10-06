@@ -134,6 +134,67 @@ describe('hard ledger findings', () => {
     })
     expect(ctx.hardLedger.openWork(root.agent)).toEqual([`finding ${id} is flaky: run 2 exited 1 without printing the claim hash`])
   })
+
+  it('decomposes refuted verdicts by cause and reads legacy verdicts as unattributed', async () => {
+    const { ctx, root } = await harness()
+    const causes = ['benign-arm-passed', 'no-marker', 'nonzero-exit', 'timeout', 'no-runs'] as const
+    for (const [index, cause] of causes.entries()) {
+      const request = {
+        ...findingRequest(),
+        component: `src/auth/login${String(index)}.ts`,
+        fingerprint: `${'b'.repeat(63)}${String(index)}`,
+      }
+      const id = ctx.hardLedger.proposeFinding(root.agent, request)
+      ctx.hardLedger.recordVerdict(root.agent, {
+        id,
+        verdict: 'refuted',
+        runs: cause === 'no-runs' ? 0 : 1,
+        cvssComputed: 9.3,
+        cvssMatch: true,
+        reason: 'r',
+        fingerprint: request.fingerprint,
+        cause,
+      })
+    }
+    // A verdict recorded before the cause codes existed folds unchanged.
+    const legacyRequest = { ...findingRequest(), component: 'src/auth/legacy.ts', fingerprint: 'c'.repeat(64) }
+    const legacyId = ctx.hardLedger.proposeFinding(root.agent, legacyRequest)
+    ctx.hardLedger.recordVerdict(root.agent, {
+      id: legacyId,
+      verdict: 'refuted',
+      runs: 2,
+      cvssComputed: 9.3,
+      cvssMatch: true,
+      reason: 'r',
+      fingerprint: legacyRequest.fingerprint,
+    })
+
+    expect(ctx.hardLedger.refutationBreakdown(root.agent)).toEqual({
+      byCause: { 'benign-arm-passed': 1, 'no-marker': 1, 'nonzero-exit': 1, timeout: 1, 'no-runs': 1, unattributed: 1 },
+      protocolFailures: 2,
+      genuineRefutations: 1,
+      infrastructure: 2,
+    })
+    expect(ctx.hardLedger.findings(root.agent).at(-1)?.verdict?.cause).toBeUndefined()
+  })
+
+  it('accepts the zero-run benign refutation shape in the projection schema', async () => {
+    const { emptyHardLedgerState, hardLedgerStateSchema } = await import('@deepseek-ai/dsh-experimental-hard-ledger')
+    const state = emptyHardLedgerState()
+    const parsed = hardLedgerStateSchema.parse({
+      ...state,
+      findings: [{
+        proposed: { ...findingRequest(), id: 'F-1' },
+        verdict: {
+          id: 'F-1', verdict: 'refuted', runs: 0, cvssComputed: 9.3, cvssMatch: true,
+          reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
+          fingerprint: FINGERPRINT, benignArm: 'passed', cause: 'benign-arm-passed',
+        },
+      }],
+    })
+    expect(parsed.findings[0]?.verdict?.runs).toBe(0)
+    expect(parsed.findings[0]?.verdict?.cause).toBe('benign-arm-passed')
+  })
 })
 
 describe('hard ledger hypotheses', () => {

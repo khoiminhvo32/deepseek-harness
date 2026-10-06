@@ -76,6 +76,24 @@ export type HardFindingRequest = Omit<HardFindingProposedData, 'id' | 'payload'>
 /** The outcome of the verifier's benign-payload arm of one PoC. */
 export type HardBenignArmResult = 'passed' | 'failed'
 
+/**
+ * Why a verdict settled, as an aggregable code. Reading groups:
+ * `benign-arm-passed` and `no-marker` mean the model has not internalized the
+ * proof contract (the harness taught it poorly); `nonzero-exit` means the
+ * exploit did not happen, which a clean target also produces; `timeout`,
+ * `aborted`, and `no-runs` are infrastructure and support no conclusion.
+ */
+export type HardFindingCause =
+  | 'benign-arm-passed'
+  | 'no-marker'
+  | 'nonzero-exit'
+  | 'timeout'
+  | 'aborted'
+  | 'no-runs'
+
+/** How strong the executed proof behind a verdict is. */
+export type HardFindingEvidence = 'demonstrated' | 'proven'
+
 /** One verifier-decided outcome, appended after the PoC runs settle. */
 export interface HardFindingVerdictData {
   readonly id: HardFindingId
@@ -96,6 +114,21 @@ export interface HardFindingVerdictData {
    * control ran and the proof depended on the exploit input.
    */
   readonly benignArm?: HardBenignArmResult
+  /**
+   * Why the verdict settled, as a code the pilot can aggregate; the reading
+   * groups live on `HardFindingCause`. Absent on older logs and on
+   * `confirmed` and `flaky` verdicts.
+   */
+  readonly cause?: HardFindingCause
+  /**
+   * How strong the proof is. `demonstrated` — a model-written PoC passed the
+   * specificity check — is everything the verifier can currently produce: a
+   * model-written PoC cannot rule out a fabricator that branches on the
+   * payload. `proven` — the harness drives the target and the model supplies
+   * no executable code — is reserved for the differential runner, and no
+   * branch assigns it today. Absent reads as `demonstrated`.
+   */
+  readonly evidence?: HardFindingEvidence
 }
 
 /** One hypothesis state transition, appended by the hypothesis tool. */

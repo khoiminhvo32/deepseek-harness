@@ -46,7 +46,7 @@ kind: "package-reference"
 
 ### Design
 
-- **证明必须依赖 payload。** 验证通过 shell seam 运行 PoC 并施加配置的超时；接受要求与 claim 文本绑定的确定性 `HARD-PASS <claimHash>` 标记以及失败的良性臂（specificity check）。标记之外不要求任何 stdout 形状——效果不上 stdout 的静默漏洞利用同样确认；而对任何输入都打印填充加标记的 PoC 会被以非载荷特定为由反驳。
+- **证明必须依赖 payload。** 验证通过 shell seam 运行 PoC 并施加配置的超时；接受要求与 claim 文本绑定的确定性 `HARD-PASS <claimHash>` 标记以及失败的良性臂（specificity check）。标记之外不要求任何 stdout 形状——效果不上 stdout 的静默漏洞利用同样确认；而对任何输入都打印填充加标记的 PoC 会被以非载荷特定为由反驳。每条 refuted verdict 都指明原因——`benign-arm-passed`、`no-marker`、`nonzero-exit`、`timeout`、`aborted` 或 `no-runs`——使各次运行可聚合为协议、目标与基础设施三组失败。
 - **与参考一致的 CVSS。** `src/cvss4-lookup.ts` 逐字引入 FIRST 计算器的 macrovector 分数、组合最大值与严重度深度（BSD-2-Clause）；`src/cvss4.ts` 一一对应地移植其评分算法。穷举套件对全部 270 个 macrovector 的最高严重度向量评分，结果与查找值完全一致，任何与 FIRST 的漂移都会响亮失败。
 - **确定性去重。** `rootFingerprint` 对归一化的 bug 类别、组件与所在符号做哈希；`claimHash` 对 claim 文本做哈希，正是 PoC 必须打印的内容。
 - **持久结论。** 每次验证都通过台账追加 `hard/finding/verdict` 记录，包括重算分数以及模型声称的分数是否匹配。

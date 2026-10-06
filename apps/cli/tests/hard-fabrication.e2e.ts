@@ -182,12 +182,13 @@ describe('dsh --profile hard fabrication traps', () => {
       // The dead PoC and both payload-agnostic PoCs — marker-only and filler —
       // were refuted; the model-written proof of the planted bug was confirmed.
       const verdicts = sessionFiles.filter(event => event.type === 'hard/finding/verdict')
-        .map(event => event.data as { verdict: string; reason: string; benignArm?: string })
+        .map(event => event.data as { verdict: string; reason: string; cause?: string; benignArm?: string })
       expect(verdicts.filter(v => v.verdict === 'refuted')).toHaveLength(3)
       // The specificity check catches both payload-agnostic proofs: the same PoC
       // satisfies the contract with a benign payload, so the proof does not
-      // depend on the exploit input.
-      expect(verdicts.filter(v => v.reason.includes('passes with a benign payload'))).toHaveLength(2)
+      // depend on the exploit input. The dead PoC's exploit never happened.
+      expect(verdicts.filter(v => v.cause === 'benign-arm-passed')).toHaveLength(2)
+      expect(verdicts.find(v => v.cause === 'nonzero-exit')).toBeDefined()
       expect(verdicts.filter(v => v.verdict === 'confirmed')).toHaveLength(1)
       expect(verdicts.find(v => v.verdict === 'confirmed')?.benignArm).toBe('failed')
 

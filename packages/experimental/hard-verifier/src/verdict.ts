@@ -60,6 +60,7 @@ export function classifyRuns(request: {
       cvssComputed: request.cvssComputed,
       cvssMatch: request.cvssMatch,
       reason: 'the proof passes with a benign payload, so it does not depend on the exploit input',
+      cause: 'benign-arm-passed',
       fingerprint: request.fingerprint,
       benignArm: 'passed',
     }
@@ -73,6 +74,7 @@ export function classifyRuns(request: {
       cvssComputed: request.cvssComputed,
       cvssMatch: request.cvssMatch,
       reason: 'no runs were executed',
+      cause: 'no-runs',
       fingerprint: request.fingerprint,
       ...benign,
     }
@@ -83,6 +85,7 @@ export function classifyRuns(request: {
 
   let verdict: HardFindingVerdictData['verdict']
   let reason: string
+  let cause: HardFindingVerdictData['cause']
   if (passCount === runs.length) {
     verdict = 'confirmed'
     reason = `${runWord} exited zero and printed the claim marker`
@@ -91,14 +94,24 @@ export function classifyRuns(request: {
     const first = runs[0]
     /* v8 ignore next -- defensive: guarded above, a non-empty run list always has a first run */
     if (first === undefined) {
+      cause = 'no-runs'
       reason = 'no runs were executed'
     } else if (first.timedOut) {
+      cause = 'timeout'
       reason = 'the PoC hit the verifier timeout without printing the claim marker'
     } else if (first.aborted) {
+      cause = 'aborted'
       reason = 'the PoC was aborted before settling'
     } else {
       const tail = first.stderrTail.trim()
-      reason = `exit code ${String(first.exitCode)} without the claim marker${tail.length > 0 ? `: ${tail.slice(0, 160)}` : ''}`
+      const suffix = tail.length > 0 ? `: ${tail.slice(0, 160)}` : ''
+      if (first.exitCode !== 0) {
+        cause = 'nonzero-exit'
+        reason = `exit code ${String(first.exitCode)} without the claim marker${suffix}`
+      } else {
+        cause = 'no-marker'
+        reason = `exit code 0 without the claim marker${suffix}`
+      }
     }
   } else {
     verdict = 'flaky'
@@ -112,6 +125,7 @@ export function classifyRuns(request: {
     cvssComputed: request.cvssComputed,
     cvssMatch: request.cvssMatch,
     reason,
+    ...(cause === undefined ? {} : { cause }),
     fingerprint: request.fingerprint,
     ...benign,
   }

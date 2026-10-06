@@ -56,12 +56,15 @@ const proposedSchema = zod.object({
 const verdictSchema = zod.object({
   id: zod.string().min(1),
   verdict: zod.enum(['confirmed', 'refuted', 'flaky']),
-  runs: zod.number().int().min(1),
+  // 0 is a legal run count: a benign-arm refutation rests on no exploit run.
+  runs: zod.number().int().min(0),
   cvssComputed: zod.number().min(0).max(10),
   cvssMatch: zod.boolean(),
   reason: zod.string().min(1),
   fingerprint: zod.string().regex(/^[0-9a-f]{64}$/u),
   benignArm: zod.enum(['passed', 'failed']).optional(),
+  cause: zod.enum(['benign-arm-passed', 'no-marker', 'nonzero-exit', 'timeout', 'aborted', 'no-runs']).optional(),
+  evidence: zod.enum(['demonstrated', 'proven']).optional(),
 })
 
 const hypothesisSchema = zod.object({

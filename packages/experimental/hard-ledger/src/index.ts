@@ -37,6 +37,8 @@ export type {
   HardCoverageSource,
   HardCoverageVerdict,
   HardEmptySweepProof,
+  HardFindingCause,
+  HardFindingEvidence,
   HardFindingId,
   HardFindingProposedData,
   HardFindingRequest,
@@ -49,7 +51,7 @@ export type {
   HardSweepSummaryData,
   HardVerdict,
 } from './types.ts'
-export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition } from './projection.ts'
+export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition, hardLedgerStateSchema } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
@@ -389,16 +391,51 @@ export class HardLedger extends Service {
     return this.state(agent.session).findings.map((entry) => {
       const { proposed, verdict } = entry
       if (verdict === undefined) return { proposed: this.brandedProposal(proposed) }
-      const { id, benignArm, ...rest } = verdict
+      const { id, benignArm, cause, evidence, ...rest } = verdict
       return {
         proposed: this.brandedProposal(proposed),
         verdict: {
           ...rest,
           id: brandString<HardFindingId>(id),
           ...benignArm === undefined ? {} : { benignArm },
+          ...cause === undefined ? {} : { cause },
+          ...evidence === undefined ? {} : { evidence },
         },
       }
     })
+  }
+
+  /**
+   * Decompose the refuted verdicts by cause code, so one run can say whether
+   * it failed at the protocol layer or the target layer.
+   * @param agent - the live agent whose ledger holds the findings.
+   * @returns refuted-verdict counts per cause plus the reading groups; a
+   *   refuted verdict predating the cause codes counts under `unattributed`
+   *   in `byCause` and in no group.
+   */
+  refutationBreakdown(agent: Agent): {
+    readonly byCause: Readonly<Record<string, number>>
+    /** `benign-arm-passed` plus `no-marker`: the model has not internalized the proof contract. */
+    readonly protocolFailures: number
+    /** `nonzero-exit`: the exploit did not happen — a clean target produces these too. */
+    readonly genuineRefutations: number
+    /** `timeout` plus `aborted` plus `no-runs`: infrastructure, no conclusion available. */
+    readonly infrastructure: number
+  } {
+    const byCause: Record<string, number> = {}
+    let protocolFailures = 0
+    let genuineRefutations = 0
+    let infrastructure = 0
+    for (const entry of this.state(agent.session).findings) {
+      const verdict = entry.verdict
+      if (verdict === undefined || verdict.verdict !== 'refuted') continue
+      const cause = verdict.cause ?? 'unattributed'
+      byCause[cause] = (byCause[cause] ?? 0) + 1
+      if (cause === 'benign-arm-passed' || cause === 'no-marker') protocolFailures += 1
+      else if (cause === 'nonzero-exit') genuineRefutations += 1
+      else if (cause === 'timeout' || cause === 'aborted' || cause === 'no-runs') infrastructure += 1
+    }
+    return { byCause, protocolFailures, genuineRefutations, infrastructure }
   }
 
   /**

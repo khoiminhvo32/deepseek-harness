@@ -1,0 +1,291 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/finding/verdict",
+      "kind": "event",
+      "event": "hard/finding/verdict",
+      "surface": false,
+      "digest": "f7a6cd245cf6a3fa2484efa9bba047af12b13ab4af377d30140f48aadbc33185",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 22,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "benignArm",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "cause",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "cvssComputed",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "cvssMatch",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "evidence",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "fingerprint",
+                "type": 17,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 17,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 17,
+                "optional": false
+              },
+              {
+                "name": "runs",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "verdict",
+                "type": 18,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "passed"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "aborted"
+          },
+          {
+            "kind": "literal",
+            "value": "benign-arm-passed"
+          },
+          {
+            "kind": "literal",
+            "value": "no-marker"
+          },
+          {
+            "kind": "literal",
+            "value": "no-runs"
+          },
+          {
+            "kind": "literal",
+            "value": "nonzero-exit"
+          },
+          {
+            "kind": "literal",
+            "value": "timeout"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "union",
+            "types": [
+              15,
+              16
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "demonstrated"
+          },
+          {
+            "kind": "literal",
+            "value": "proven"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              19,
+              20,
+              21
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "confirmed"
+          },
+          {
+            "kind": "literal",
+            "value": "flaky"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/finding/verdict"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/step-cap/reached",
+      "kind": "event",
+      "event": "hard/step-cap/reached",
+      "surface": false,
+      "digest": "c26fb18293ce01561b803f4dcc29afe79ba6ba499fb4baa78ce056b5a3411a5e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "limit",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "round",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "steps",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "turn",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/step-cap/reached"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

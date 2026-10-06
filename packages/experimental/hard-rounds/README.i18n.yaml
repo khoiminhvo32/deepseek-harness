@@ -3,29 +3,29 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/hard-rounds/README.md
 /:
-  en: 150256842f23c36d
-  zh: 12bb3b88576a8a51
+  en: 2cc3c6efd7379fb0
+  zh: 117530245143a347
 /deepseek-ai-dsh-experimental-hard-rounds:
   en: 2fe2af9ed647bd1f
   zh: e484b738e8585ad1
 /deepseek-ai-dsh-experimental-hard-rounds/summary:
-  en: 99ce41bafcdce921
-  zh: 819068c2d19a6262
+  en: fa1cb3843665483d
+  zh: fcbcca8471ad5a9f
 /deepseek-ai-dsh-experimental-hard-rounds/table-of-contents:
   en: 76368b6b1da79c80
   zh: 49b8d2c4457703e6
 /deepseek-ai-dsh-experimental-hard-rounds/use-this-package:
-  en: 404e8236435fed3d
-  zh: b44c5ad7333792a6
+  en: ea8022b95ab1eecf
+  zh: 818dda7221c15fad
 /deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: 42b15ac6321706aa
 /deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation/design:
-  en: ae256fc3bed9f59c
-  zh: 6a03d54b753e3203
+  en: f7a4a6c747545532
+  zh: 390e58939bd35003
 /deepseek-ai-dsh-experimental-hard-rounds/understand-the-implementation/source-map:
-  en: 43774df95421eda7
-  zh: 4ccd92effc96e6d3
+  en: 51bd4a5ddbaae8fd
+  zh: 1f1b8abb17d492bb
 /deepseek-ai-dsh-experimental-hard-rounds/model-experience:
   en: 215e7ba838619b7b
   zh: 215e7ba838619b7b

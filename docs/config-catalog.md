@@ -1034,7 +1034,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:64`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:66`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1111,16 +1111,28 @@ export interface TargetConfig {
 ## `@deepseek-ai/dsh-experimental-hard-rounds`
 
 - `inject`: `agents` · `goals` · `hardLedger` · `sessionProjections`
-- `source`: [`packages/experimental/hard-rounds/src/index.ts:50`](../packages/experimental/hard-rounds/src/index.ts)
+- `source`: [`packages/experimental/hard-rounds/src/index.ts:55`](../packages/experimental/hard-rounds/src/index.ts)
 
 ```ts config-catalog
 /** Rounds module config. */
 export interface Config {
   /**
    * Model-step budget per round turn; the turn is cancelled at the cap so one
-   * runaway round cannot consume the whole round allowance.
+   * runaway round cannot consume the whole round allowance. Checked in
+   * `agent/turn-stopping`, which only fires when the model wants to stop, so
+   * this bounds steering — the round cannot be talked out of its budget — but
+   * never cost: a turn that never stops calling tools never reaches the check.
+   * The cost bound is `maxStepsPerTurn`.
    */
   stepsPerRound?: number
+  /**
+   * Step cap for ONE turn, whether or not that turn belongs to an admitted
+   * round. Unlike `stepsPerRound` — the round's steering budget, checked only
+   * when the turn wants to close — this cap is checked at the `agent/pre-step`
+   * boundary, so a turn that keeps calling tools without stopping is still
+   * stopped. Reaching it rejects the step and appends `hard/step-cap/reached`.
+   */
+  maxStepsPerTurn?: number
   /**
    * Systematic passes between deep-reading passes under the A/B rotation.
    * Keep it equal to the mission's `deepReadEveryN`; the two values are

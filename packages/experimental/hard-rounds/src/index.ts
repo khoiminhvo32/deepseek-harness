@@ -5,9 +5,11 @@
  * durable `hard/round/start` with the A/B rotation phase and the ledger's
  * open-work count, a model-facing round context injection naming the round,
  * the phase instruction, the open work, and — once no open work stands — the
- * completion gate's remaining blockers, per-turn step accounting against
- * `stepsPerRound` with a cancel at the cap, and a durable `hard/round/end`
- * when the round's turn closes.
+ * completion gate's remaining blockers, per-round step accounting against
+ * `stepsPerRound` with a cancel at the cap, a per-turn step cap against
+ * `maxStepsPerTurn` enforced at the `agent/pre-step` boundary for every turn
+ * whether or not a round owns it, and a durable `hard/round/end` when the
+ * round's turn closes.
  * @module @deepseek-ai/dsh-experimental-hard-rounds
  */
 
@@ -43,6 +45,9 @@ export const inject = ['agents', 'goals', 'hardLedger', 'sessionProjections']
 /** Default per-round model-step budget. */
 export const DEFAULT_STEPS_PER_ROUND = 200
 
+/** Default per-turn step cap. */
+export const DEFAULT_MAX_STEPS_PER_TURN = 200
+
 /** Default number of systematic passes between deep-reading passes. */
 export const DEFAULT_DEEP_READ_EVERY_N = 3
 
@@ -50,9 +55,21 @@ export const DEFAULT_DEEP_READ_EVERY_N = 3
 export interface Config {
   /**
    * Model-step budget per round turn; the turn is cancelled at the cap so one
-   * runaway round cannot consume the whole round allowance.
+   * runaway round cannot consume the whole round allowance. Checked in
+   * `agent/turn-stopping`, which only fires when the model wants to stop, so
+   * this bounds steering — the round cannot be talked out of its budget — but
+   * never cost: a turn that never stops calling tools never reaches the check.
+   * The cost bound is `maxStepsPerTurn`.
    */
   stepsPerRound?: number
+  /**
+   * Step cap for ONE turn, whether or not that turn belongs to an admitted
+   * round. Unlike `stepsPerRound` — the round's steering budget, checked only
+   * when the turn wants to close — this cap is checked at the `agent/pre-step`
+   * boundary, so a turn that keeps calling tools without stopping is still
+   * stopped. Reaching it rejects the step and appends `hard/step-cap/reached`.
+   */
+  maxStepsPerTurn?: number
   /**
    * Systematic passes between deep-reading passes under the A/B rotation.
    * Keep it equal to the mission's `deepReadEveryN`; the two values are
@@ -65,12 +82,14 @@ export interface Config {
 /** Schemastery config for the rounds module. */
 export const Config: z<Config> = z.object({
   stepsPerRound: z.number().step(1).min(1).default(DEFAULT_STEPS_PER_ROUND),
+  maxStepsPerTurn: z.number().step(1).min(1).max(2000).default(DEFAULT_MAX_STEPS_PER_TURN),
   deepReadEveryN: z.number().step(1).min(1).default(DEFAULT_DEEP_READ_EVERY_N),
 })
 
 /** Fully materialized rounds inputs. */
 interface ResolvedConfig {
   readonly stepsPerRound: number
+  readonly maxStepsPerTurn: number
   readonly deepReadEveryN: number
 }
 
@@ -80,11 +99,15 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(stepsPerRound) || stepsPerRound < 1) {
     throw new TypeError('stepsPerRound must be a positive safe integer')
   }
+  const maxStepsPerTurn = config.maxStepsPerTurn ?? DEFAULT_MAX_STEPS_PER_TURN
+  if (!Number.isSafeInteger(maxStepsPerTurn) || maxStepsPerTurn < 1 || maxStepsPerTurn > 2000) {
+    throw new TypeError('maxStepsPerTurn must be a safe integer between 1 and 2000')
+  }
   const deepReadEveryN = config.deepReadEveryN ?? DEFAULT_DEEP_READ_EVERY_N
   if (!Number.isSafeInteger(deepReadEveryN) || deepReadEveryN < 1) {
     throw new TypeError('deepReadEveryN must be a positive safe integer')
   }
-  return { stepsPerRound, deepReadEveryN }
+  return { stepsPerRound, maxStepsPerTurn, deepReadEveryN }
 }
 
 /** The methodology pass of one round: one deep-reading pass after every N systematic passes.
@@ -209,5 +232,20 @@ export function apply(ctx: Context, config: Config): void {
     if (state.steps < resolved.stepsPerRound) return
     state.capFired = true
     agent.cancel({ kind: 'hook', reason: `hard round ${state.round} reached its ${resolved.stepsPerRound}-step budget` })
+  })
+
+  // The loop's own step position is 1-based and per turn, so it needs no
+  // keyed counter here: trusting it cannot drift from the loop the way a
+  // private counter could.
+  ctx.on('agent/pre-step', async ({ agent, turn, step }, next) => {
+    if (step <= resolved.maxStepsPerTurn) return await next()
+    const state = rounds.get(agent.session)
+    agent.session.append('hard/step-cap/reached', {
+      turn,
+      steps: step - 1,
+      limit: resolved.maxStepsPerTurn,
+      ...(state !== undefined && state.turn === turn ? { round: state.round } : {}),
+    })
+    return { kind: 'reject' }
   })
 }

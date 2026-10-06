@@ -49,6 +49,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'hard/round/start',
   'hard/standby/scheduled',
   'hard/standby/woke',
+  'hard/step-cap/reached',
   'hard/sweep/summary',
   'hook/invoked',
   'hook/result',

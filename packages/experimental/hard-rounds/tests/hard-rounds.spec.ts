@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentStatus, Inbox, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -112,6 +112,26 @@ function probe(ctx: Context, session: Session, type: 'hard/round/start' | 'hard/
     if (probeEvent.type === type && probeEvent.data.round !== undefined) seen.push(probeEvent.data)
   })
   return () => seen
+}
+
+/** The per-turn step-cap records recorded by one session. */
+function capProbe(ctx: Context, session: Session): () => unknown[] {
+  const seen: unknown[] = []
+  ctx.on('session/event', (eventSession, event) => {
+    if (eventSession !== session) return
+    const probeEvent = event as { type: string; data?: unknown }
+    if (probeEvent.type === 'hard/step-cap/reached') seen.push(probeEvent.data)
+  })
+  return () => seen
+}
+
+/** Dispatch one proposed step through the pre-step waterfall like the agent loop does. */
+function stepAt(ctx: Context, agent: Agent, turn: number, step: number): Promise<PreStepDecision> {
+  return agentEvents(ctx, agent).waterfall(
+    'agent/pre-step',
+    { messages: [], turn, step, signal: new AbortController().signal },
+    (): Promise<PreStepDecision> => Promise.resolve<PreStepDecision>({ kind: 'enter', messages: [] }),
+  )
 }
 
 describe('hard rounds accounting', () => {
@@ -269,6 +289,8 @@ describe('hard rounds accounting', () => {
     const ctx = new Context()
     await ctx.plugin(SessionProjectionRegistry)
     expect(() => { hardRounds.apply(ctx, { stepsPerRound: 0 }) }).toThrow('stepsPerRound must be a positive safe integer')
+    expect(() => { hardRounds.apply(ctx, { maxStepsPerTurn: 0 }) }).toThrow('maxStepsPerTurn must be a safe integer between 1 and 2000')
+    expect(() => { hardRounds.apply(ctx, { maxStepsPerTurn: 2001 }) }).toThrow('maxStepsPerTurn must be a safe integer between 1 and 2000')
     expect(() => { hardRounds.apply(ctx, { deepReadEveryN: 1.5 }) }).toThrow('deepReadEveryN must be a positive safe integer')
     expect(() => { hardRounds.apply(ctx, {}) }).not.toThrow()
   })
@@ -276,5 +298,54 @@ describe('hard rounds accounting', () => {
   it('has the Loader-safe namespace export shape', () => {
     expect(hardRounds.name).toBe('hard-rounds')
     expect(hardRounds.inject).toEqual(['agents', 'goals', 'hardLedger', 'sessionProjections'])
+  })
+})
+
+describe('per-turn step cap', () => {
+  it('stops a roundless turn at the cap and records the event without a round', async () => {
+    const { ctx, root } = await harness({ maxStepsPerTurn: 3 })
+    const caps = capProbe(ctx, root.session)
+    for (const step of [1, 2, 3]) {
+      await expect(stepAt(ctx, root.agent, 1, step)).resolves.toMatchObject({ kind: 'enter' })
+    }
+    expect(caps()).toEqual([])
+    await expect(stepAt(ctx, root.agent, 1, 4)).resolves.toEqual({ kind: 'reject' })
+    expect(caps()).toEqual([{ turn: 1, steps: 3, limit: 3 }])
+  })
+
+  it('stops a round turn at the cap and names the round in the event', async () => {
+    const { ctx, root } = await harness({ maxStepsPerTurn: 2 })
+    const caps = capProbe(ctx, root.session)
+    const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
+    admitRound(root.agent, goal, 1)
+    await drain()
+    // The round's live accounting must know the turn before the cap names it.
+    root.session.append('step/start', { turn: 1, step: 1 })
+    root.session.append('step/start', { turn: 1, step: 2 })
+
+    await expect(stepAt(ctx, root.agent, 1, 3)).resolves.toEqual({ kind: 'reject' })
+    expect(caps()).toEqual([{ turn: 1, steps: 2, limit: 2, round: 1 }])
+  })
+
+  it('leaves turns below the cap untouched', async () => {
+    const { ctx, root } = await harness({ maxStepsPerTurn: 5 })
+    const caps = capProbe(ctx, root.session)
+    await expect(stepAt(ctx, root.agent, 1, 5)).resolves.toMatchObject({ kind: 'enter' })
+    await expect(stepAt(ctx, root.agent, 1, 2)).resolves.toMatchObject({ kind: 'enter' })
+    expect(caps()).toEqual([])
+  })
+
+  it('keeps the cap independent per agent', async () => {
+    const { ctx, root } = await harness({ maxStepsPerTurn: 2 })
+    const other = stubAgent(`hard-rounds-other-${Math.random()}`, ctx)
+    await ctx.agents.register(other.agent)
+    const rootCaps = capProbe(ctx, root.session)
+    const otherCaps = capProbe(ctx, other.session)
+
+    await expect(stepAt(ctx, other.agent, 1, 1)).resolves.toMatchObject({ kind: 'enter' })
+    await expect(stepAt(ctx, root.agent, 1, 3)).resolves.toEqual({ kind: 'reject' })
+    await expect(stepAt(ctx, other.agent, 1, 2)).resolves.toMatchObject({ kind: 'enter' })
+    expect(rootCaps()).toEqual([{ turn: 1, steps: 2, limit: 2 }])
+    expect(otherCaps()).toEqual([])
   })
 })

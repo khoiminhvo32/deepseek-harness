@@ -30,6 +30,18 @@ export interface HardRoundEndData {
   readonly reason: 'closed' | 'step-cap'
 }
 
+/** One turn stopped at the per-turn step cap, appended at the pre-step boundary. */
+export interface HardStepCapReachedData {
+  /** The turn that was stopped. */
+  readonly turn: number
+  /** Model steps that had run when the cap stopped the turn. */
+  readonly steps: number
+  /** The per-turn cap that was applied. */
+  readonly limit: number
+  /** The running round, absent when the turn belongs to no admitted round. */
+  readonly round?: number
+}
+
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
@@ -39,5 +51,10 @@ declare module '@deepseek-ai/dsh-session/types' {
     'hard/round/start': HardRoundStartData
     /** One closing turn of a hard round. */
     'hard/round/end': HardRoundEndData
+    /**
+     * One turn stopped at the per-turn step cap, appended in both round and
+     * roundless turns; the cost cap's durable record.
+     */
+    'hard/step-cap/reached': HardStepCapReachedData
   }
 }

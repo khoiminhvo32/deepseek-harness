@@ -732,6 +732,22 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr9-live">
+  <h2><span class="h2-index">16</span>PR9 live: negative control — proof phải phụ thuộc vào payload</h2>
+  <p class="intro">Section cập nhật realtime trong phiên PR9 (2026-10-06). Phát hiện của user: echo trap vượt được bằng một dòng thừa (echo filler + echo marker → confirmed). Nguyên nhân gốc: predicate đặt trên stdout do chính PoC in ra — PoC vừa là thí nghiệm vừa là trọng tài. Fix: arm đối chứng — PoC phải THẤT BẠI với payload lành tính. Naming discipline: gọi đúng tên specificity check, KHÔNG nói "chống fabrication" — model viết script nên rẽ nhánh được; mutation check mã target mới là cái đóng lỗ hổng bịa.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>payload khai báo</td><td><span class="chip pass">xong</span></td><td>hard_submit_finding thêm <code>payload</code> bắt buộc; SUBMIT_DESCRIPTION dạy hợp đồng \$1 + benign re-run; proposed payload optional trong type (log cũ), proposeFinding từ chối thiếu payload lúc runtime (HARD_LEDGER_PAYLOAD_REQUIRED)</td></tr>
+      <tr><td>Hai arm, harness điều khiển</td><td><span class="chip pass">xong</span></td><td>verify(): benign arm CHẠY TRƯỚC, MỘT lần, payload deterministic <code>hard-benign-&lt;hash8&gt;</code> (snapshot tái lập được — đánh đổi: model đoán được chuỗi, nhưng rẽ nhánh đằng nào cũng không chặn được); exploit arm × runs. Benign thỏa → dừng sớm, không đốt 3 lần chạy cho PoC chắc chắn bị bác. Workdir: targetRepo khi matrix armed, pocWorkdir là override tường minh</td></tr>
+      <tr><td>Bảng phán quyết + benignArm</td><td><span class="chip pass">xong</span></td><td>classifyRuns nhận benignArm: passed → refuted "the proof passes with a benign payload, so it does not depend on the exploit input"; verdict ghi <code>benignArm</code> (additive) để phân biệt "chưa chạy đối chứng" (absent = log cũ) với "đã chạy, đạt"</td></tr>
+      <tr><td>Bẫy thứ tư trong e2e</td><td><span class="chip pass">xong</span></td><td>PoC in filler + marker cho MỌI input — echo trap KHÔNG bắt được (stdout có ngoài marker); benign arm bắt, refuted đúng lý do. Fixture PoC thật đổi sang \$1 (payload "x; touch poc/F-2/pwned.txt"). Bug khi làm: F-4 dùng claim riêng → marker sai hash → refuted "exit code 0 without the claim marker" thay vì benign — phải dùng CONFIRMED_CLAIM với component khác để né duplicate fingerprint</td></tr>
+      <tr><td>Snapshot re-author</td><td><span class="chip pass">xong</span></td><td>Harvest từ e2e (DSH_HARD_E2E_KEEP), transform + seq remap, override patches at 12/16 (2 update_goal); workspace.expected cập nhật PoC F-3 \$1 + thêm F-4; replay exact</td></tr>
+      <tr><td>Gates cuối PR9</td><td><span class="chip pass">xong</span></td><td>145/145 hard specs (verifier 29, tools 20 gồm benign-refuted qua tool) + e2e 1/1 + test:snapshot trừ stagehand (env) + doc-sync 42/42 + persistence 73 roots/16 records (2 optional added, same-version) + typecheck/lint/duplication 0 + pairing 879. Commit theo subject: feat(experimental): negative control — the proof must depend on the payload</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

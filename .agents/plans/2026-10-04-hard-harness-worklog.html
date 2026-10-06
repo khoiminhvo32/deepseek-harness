@@ -748,6 +748,20 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr9-review-live">
+  <h2><span class="h2-index">17</span>PR9 review: payload là yêu cầu biên dịch + bỏ echo trap</h2>
+  <p class="intro">Review round của user trên PR9 (2026-10-06), ba phát hiện. F1: hai test đỏ hard-handoff — proposeFinding giờ đòi payload lúc runtime nhưng handoff không nằm trong danh sách kiểm của task (chỉ liệt kê verifier/tools/ledger/mission); một phần lỗi ở prompt, lần sau đưa đủ cả mười package hard-*. F2: nguyên nhân gốc của F1 — kiểu đầu vào của service dùng chung với kiểu bản ghi đã lưu, nên payload tuỳ chọn trong type nhưng bắt buộc lúc runtime; typecheck 0 lỗi trong khi test nổ. F3: echo trap bị negative control bao trùm và bác nhầm exploit thật im lặng.</p>
+  <table>
+    <thead><tr><th>Phát hiện</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>F1 — hai test đỏ hard-handoff</td><td><span class="chip pass">xong</span></td><td>findingRequest của handoff thiếu payload → proposeFinding nổ HARD_LEDGER_PAYLOAD_REQUIRED tại 2 test; các helper ledger/rounds/verifier đã có payload từ PR9. Sửa: thêm payload; bài học — kiểm thử tập trung phải phủ mọi consumer, cả mười package hard-* (bundle, deepread, standby gồm cả standby/wake spec)</td></tr>
+      <tr><td>F2 — request type tách khỏi persisted record</td><td><span class="chip pass">xong</span></td><td>Theo khuôn request/spec của dsh-shell: <code>HardFindingRequest</code> = Omit&lt;HardFindingProposedData, 'id' | 'payload'&gt; &amp; { payload: string } — proposeFinding và verify nhận kiểu đó; hai guard runtime (HARD_LEDGER_PAYLOAD_REQUIRED, HARD_VERIFIER_PAYLOAD_REQUIRED) bỏ vì thiếu payload giờ là lỗi biên dịch; hai test "requires the payload" bỏ theo; HardFindingProposedData giữ payload optional cho log cũ. Gen-cordis-catalog đòi phân loại type-link: thêm HardFindingRequest vào TYPE_LINK_EXEMPTIONS. Commit theo subject: refactor(experimental): payload là yêu cầu biên dịch — tách HardFindingRequest khỏi bản ghi đã lưu</td></tr>
+      <tr><td>F3 — bỏ echo trap</td><td><span class="chip pass">xong</span></td><td>Bảng 3 biến thể của user: bare echo và filler+echo đều REFUTED (benign arm bắt cả hai), còn exploit thật im lặng (case \$1 → touch → test → chỉ in marker) bị bác ✗ — echo trap chỉ chặn kẻ bịa lười, giá trị biên âm. Sửa: runSatisfied = exit 0 + marker; xóa isEchoOnly + reason echo; unit pin marker-only → confirmed ("silent proofs"); mô tả tool + README en/zh + persistence record bỏ "content beyond it"; bẫy marker-only trong e2e giờ bị bác qua benign arm (benignArm: passed, runs: 0); snapshot refresh bằng DSH_SNAPSHOT=refresh, replay exact; kẻ bịa rẽ nhánh theo payload là khoảng trống của mutation check — việc kế tiếp. Commit theo subject: fix(experimental): bỏ echo trap — stdout không chứng minh được phụ thuộc payload</td></tr>
+      <tr><td>Gates cuối review round</td><td><span class="chip pass">xong</span></td><td>155/155 tests cả 10 package hard-* + e2e 1/1 + test:snapshot -t hard-fabrication exact + doc-sync 42/42 + typecheck toàn repo 0 + lefthook (lint, pairing, whitespace) xanh. Zh tool-catalog sync thêm phần mô tả submit đang stale từ trước PR9</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

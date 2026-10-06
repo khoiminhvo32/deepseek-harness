@@ -289,19 +289,6 @@ describe('hard verifier execution', () => {
     expect(shell.runs[1]?.workdir).toBe('/tmp/hard-target')
   })
 
-  it('requires the payload for the specificity check', async () => {
-    const claim = 'The payloadless claim.'
-    const { ctx, root, shell } = await harness([])
-    // The ledger refuses a payloadless proposal; a hand-built one tests the verifier's own guard.
-    const { payload: _dropped, ...payloadless } = findingRequest(claim)
-    void _dropped
-    expect(() => ctx.hardLedger.proposeFinding(root.agent, payloadless))
-      .toThrow('payload must be a non-empty string')
-    const failure = await ctx.hardVerifier.verify(root.agent, { ...payloadless, id: 'F-9' as never }).catch((error: unknown) => error)
-    expect((failure as { code?: string }).code).toBe('HARD_VERIFIER_PAYLOAD_REQUIRED')
-    expect(shell.runs).toHaveLength(0)
-  })
-
   it('rejects an unparsable vector with a stable code', async () => {
     const claim = 'A bad vector.'
     const { ctx, root } = await harness([])

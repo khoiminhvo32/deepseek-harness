@@ -1248,9 +1248,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the armed payload to persist.' }],
       },
       {
-        signature: 'proposeFinding(agent: Agent, request: Omit<HardFindingProposedData, \'id\'>): HardFindingId',
+        signature: 'proposeFinding(agent: Agent, request: HardFindingRequest): HardFindingId',
         description: 'Append one validated finding-proposal record and return its id.',
-        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the validated finding fields; id assigned from the projection.' }],
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the validated finding fields with the exploit payload required; id assigned from the projection.' }],
         returns: 'the assigned finding id.',
       },
       {
@@ -1354,7 +1354,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The hard-harness verifier on the `hardVerifier` key: rejects duplicates, executes proofs of effect through the shell seam, recomputes CVSS 4.0 scores against the claimed ones, and records the durable verdict.',
     methods: [
       {
-        signature: 'async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>',
+        signature: 'async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingProposedData, \'id\'>, ): Promise<HardFindingVerdictData>',
         description: 'Verify one proposed finding: reject duplicates, recompute CVSS, then run the proof through the shell seam in two arms and append the durable verdict. The benign arm runs the PoC once with a benign payload derived from the claim hash and must FAIL — a proof that passes regardless of input proves nothing about the input (the specificity check). Only then does the exploit arm run the configured number of times with the model\'s payload. The PoC executes from the pinned target repository the armed matrix records (matching the model-relative `pocPath` and coverage modules); `pocWorkdir` is the explicit override and no matrix keeps the legacy shell cwd.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger receives the verdict.' }, { name: 'proposed', description: 'the proposal record to verify; its `payload` is the exploit input.' }],
         returns: 'the appended verdict record.',
@@ -5549,6 +5549,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardFindingProposedData',
     declaration: 'export interface HardFindingProposedData {\n    readonly id: HardFindingId;\n    readonly title: string;\n    readonly bugClass: string;\n    readonly component: string;\n    readonly claim: string;\n    readonly cvssVector: string;\n    readonly cvssClaimed: number;\n    readonly pocPath: string;\n    readonly claimHash: string;\n    readonly fingerprint: string;\n    readonly payload?: string;\n    readonly hypothesisId?: HardHypothesisId;\n}',
+  },
+  {
+    name: 'HardFindingRequest',
+    declaration: 'export type HardFindingRequest = Omit<HardFindingProposedData, \'id\' | \'payload\'> & {\n    readonly payload: string;\n};',
   },
   {
     name: 'HardFindingVerdictData',

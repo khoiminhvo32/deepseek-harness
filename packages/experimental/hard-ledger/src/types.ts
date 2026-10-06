@@ -54,11 +54,23 @@ export interface HardFindingProposedData {
    * The exploit input the PoC takes as its first argument. The verifier
    * re-runs the same PoC with a benign payload and requires it to fail, so a
    * proof that passes regardless of input proves nothing about the input
-   * (the specificity check). Optional so older logs read back unchanged; new
-   * submissions through the tool always carry it.
+   * (the specificity check). Optional only so older logs read back unchanged;
+   * the service input type `HardFindingRequest` requires it at compile time.
    */
   readonly payload?: string
   readonly hypothesisId?: HardHypothesisId
+}
+
+/**
+ * What a caller supplies to `proposeFinding`: the proposed fields without the
+ * assigned id, and with the payload required — the verifier re-runs the PoC
+ * with it (the specificity check), so a proposal without an exploit input is
+ * unverifiable. `HardFindingProposedData` keeps `payload` optional only so
+ * older persisted logs read back unchanged.
+ */
+export type HardFindingRequest = Omit<HardFindingProposedData, 'id' | 'payload'> & {
+  /** The exploit input the PoC takes as its first argument. */
+  readonly payload: string
 }
 
 /** The outcome of the verifier's benign-payload arm of one PoC. */

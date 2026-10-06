@@ -19,6 +19,7 @@ import type {
   HardEmptySweepProof,
   HardFindingId,
   HardFindingProposedData,
+  HardFindingRequest,
   HardFindingVerdictData,
   HardHypothesisId,
   HardHypothesisStateData,
@@ -38,6 +39,7 @@ export type {
   HardEmptySweepProof,
   HardFindingId,
   HardFindingProposedData,
+  HardFindingRequest,
   HardFindingVerdictData,
   HardGateDecisionData,
   HardHypothesisId,
@@ -194,17 +196,14 @@ export class HardLedger extends Service {
   /**
    * Append one validated finding-proposal record and return its id.
    * @param agent - the live agent whose session receives the record.
-   * @param request - the validated finding fields; id assigned from the projection.
+   * @param request - the validated finding fields with the exploit payload required; id assigned from the projection.
    * @returns the assigned finding id.
    */
-  proposeFinding(agent: Agent, request: Omit<HardFindingProposedData, 'id'>): HardFindingId {
+  proposeFinding(agent: Agent, request: HardFindingRequest): HardFindingId {
     this.assertText('title', request.title)
     this.assertText('claim', request.claim)
     this.assertText('component', request.component)
     this.assertText('bugClass', request.bugClass)
-    if (request.payload === undefined || request.payload.trim().length === 0) {
-      throw new HarnessError('payload must be a non-empty string', 'HARD_LEDGER_PAYLOAD_REQUIRED')
-    }
     this.assertText('payload', request.payload)
     if (!request.cvssVector.startsWith('CVSS:4.0/')) {
       throw new HarnessError('cvssVector must start with CVSS:4.0/', 'HARD_LEDGER_INVALID_VECTOR')

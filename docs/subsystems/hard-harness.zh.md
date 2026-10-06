@@ -49,10 +49,10 @@ recordMissionArmed(agent: Agent, data: HardMissionArmedData): void
 /**
  * Append one validated finding-proposal record and return its id.
  * @param agent - the live agent whose session receives the record.
- * @param request - the validated finding fields; id assigned from the projection.
+ * @param request - the validated finding fields with the exploit payload required; id assigned from the projection.
  * @returns the assigned finding id.
  */
-proposeFinding(agent: Agent, request: Omit<HardFindingProposedData, 'id'>): HardFindingId
+proposeFinding(agent: Agent, request: HardFindingRequest): HardFindingId
 
 /**
  * Append the verifier's executed outcome for one proposed finding.
@@ -223,7 +223,7 @@ The hard-harness verifier on the `hardVerifier` key: rejects duplicates, execute
  * @param proposed - the proposal record to verify; its `payload` is the exploit input.
  * @returns the appended verdict record.
  */
-async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData>
+async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingProposedData, 'id'>, ): Promise<HardFindingVerdictData>
 
 /**
  * Deterministic cross-check of one `cleared` coverage cell: re-grep the

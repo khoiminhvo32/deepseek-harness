@@ -11,7 +11,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
-import type { HardFindingProposedData, HardFindingVerdictData } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type {
+  HardFindingProposedData,
+  HardFindingRequest,
+  HardFindingVerdictData,
+} from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { cellSampledForPercent } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
 import { SINK_PATTERNS } from './sink-patterns.ts'
@@ -226,7 +230,10 @@ export class HardVerifier extends Service {
    * @param proposed - the proposal record to verify; its `payload` is the exploit input.
    * @returns the appended verdict record.
    */
-  async verify(agent: Agent, proposed: HardFindingProposedData): Promise<HardFindingVerdictData> {
+  async verify(
+    agent: Agent,
+    proposed: HardFindingRequest & Pick<HardFindingProposedData, 'id'>,
+  ): Promise<HardFindingVerdictData> {
     const config = this.resolved
     const ledger = this.ctx.hardLedger
     for (const record of ledger.findings(agent)) {
@@ -237,12 +244,6 @@ export class HardVerifier extends Service {
           'HARD_VERIFIER_DUPLICATE',
         )
       }
-    }
-    if (proposed.payload === undefined || proposed.payload.trim().length === 0) {
-      throw new HarnessError(
-        `${proposed.id}: the exploit payload is required for the specificity check`,
-        'HARD_VERIFIER_PAYLOAD_REQUIRED',
-      )
     }
 
     const { computed, match } = recomputeCvss(proposed)

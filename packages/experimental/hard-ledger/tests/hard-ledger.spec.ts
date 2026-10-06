@@ -111,10 +111,6 @@ describe('hard ledger findings', () => {
       .toThrow('cvssClaimed must be a number between 0 and 10')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), payload: ' ' }))
       .toThrow('payload must be a non-empty string')
-    const { payload: _dropped, ...payloadless } = findingRequest()
-    void _dropped
-    expect(() => ctx.hardLedger.proposeFinding(root.agent, payloadless))
-      .toThrow('payload must be a non-empty string')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), claimHash: 'nothex' }))
       .toThrow('claimHash must be 64 lowercase hex characters')
     expect(() => ctx.hardLedger.proposeFinding(root.agent, { ...findingRequest(), fingerprint: 'C'.repeat(64) }))

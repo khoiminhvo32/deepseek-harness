@@ -849,6 +849,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   CoverageAuditCell: 'coverage audit input is owned by packages/experimental/hard-verifier/README.md',
   CoverageReopenRecord: 'coverage reopen record is owned by packages/experimental/hard-verifier/README.md',
   HardFindingProposedData: 'proposal payload is owned by packages/experimental/hard-ledger/README.md',
+  HardFindingRequest: 'finding proposal input is owned by packages/experimental/hard-ledger/README.md',
   HardFindingVerdictData: 'verdict payload is owned by packages/experimental/hard-ledger/README.md',
   HardHypothesisStateData: 'hypothesis payload is owned by packages/experimental/hard-ledger/README.md',
   HardCoverageCellData: 'coverage payload is owned by packages/experimental/hard-ledger/README.md',

@@ -173,6 +173,8 @@ describe('hard verifier execution', () => {
     expect(verdict.benignArm).toBe('failed')
     expect(verdict.cvssComputed).toBe(9.3)
     expect(verdict.cvssMatch).toBe(true)
+    // Explicit so pre-control confirms (evidence absent) read as weaker.
+    expect(verdict.evidence).toBe('demonstrated')
     // The benign arm runs first, once, with the deterministic benign payload;
     // the exploit arm re-runs the same PoC with the model's payload.
     expect(shell.runs[0]?.command).toBe(`bash 'poc/F-1/poc.sh' 'hard-benign-${claimHash(claim).slice(0, 8)}'`)
@@ -321,6 +323,7 @@ describe('hard verifier verdict units', () => {
     })
     expect(silent.verdict).toBe('confirmed')
     expect(silent.cause).toBeUndefined()
+    expect(silent.evidence).toBe('demonstrated')
     const noMarker = classifyRuns({
       id: brandString<HardFindingId>('F-1'),
       runs: [{ exitCode: 0, timedOut: false, aborted: false, stdoutText: 'nothing happened', stderrTail: 'swallowed' }],

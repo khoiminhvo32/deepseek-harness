@@ -26092,7 +26092,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:169"
+        "packages/experimental/hard-ledger/src/types.ts:171"
       ]
     },
     {
@@ -26138,7 +26138,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:216"
+        "packages/experimental/hard-ledger/src/types.ts:218"
       ]
     },
     {
@@ -26282,7 +26282,7 @@
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:196"
+        "packages/experimental/hard-ledger/src/types.ts:198"
       ]
     },
     {
@@ -26294,7 +26294,7 @@
       "digest": "34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:191"
+        "packages/experimental/hard-ledger/src/types.ts:193"
       ]
     },
     {
@@ -27338,7 +27338,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:144"
+        "packages/experimental/hard-ledger/src/types.ts:146"
       ]
     },
     {
@@ -27376,7 +27376,7 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:165"
+        "packages/experimental/hard-ledger/src/types.ts:167"
       ]
     },
     {
@@ -27449,7 +27449,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:135"
+        "packages/experimental/hard-ledger/src/types.ts:137"
       ]
     },
     {
@@ -27470,7 +27470,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:166"
+        "packages/experimental/hard-ledger/src/types.ts:168"
       ]
     },
     {
@@ -27942,7 +27942,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:202"
+        "packages/experimental/hard-ledger/src/types.ts:204"
       ]
     },
     {
@@ -29146,7 +29146,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:186"
+        "packages/experimental/hard-ledger/src/types.ts:188"
       ]
     },
     {
@@ -29301,7 +29301,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:194"
+        "packages/experimental/hard-ledger/src/types.ts:196"
       ]
     },
     {

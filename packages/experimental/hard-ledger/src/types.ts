@@ -126,7 +126,9 @@ export interface HardFindingVerdictData {
    * model-written PoC cannot rule out a fabricator that branches on the
    * payload. `proven` — the harness drives the target and the model supplies
    * no executable code — is reserved for the differential runner, and no
-   * branch assigns it today. Absent reads as `demonstrated`.
+   * branch assigns it today. Every confirmed verdict carries `demonstrated`
+   * explicitly; absence marks older logs, whose confirms ran no benign arm
+   * and are therefore weaker than `demonstrated`.
    */
   readonly evidence?: HardFindingEvidence
 }

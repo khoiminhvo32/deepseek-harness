@@ -9,7 +9,7 @@ English | [中文](2026-10-06-hard-step-cap-and-verdict-cause.zh.md)
 
 ## Summary
 
-Two measured-run capabilities land additively. The hard rounds module records `hard/step-cap/reached` when a turn is stopped at the new `maxStepsPerTurn` cost cap, enforced at the `agent/pre-step` boundary for every turn whether or not a round owns it. The verdict vocabulary gains two optional properties: `cause`, the aggregable reason code every refuted branch assigns, and `evidence`, which reserves `proven` for a future differential runner while absent reads as `demonstrated`.
+Two measured-run capabilities land additively. The hard rounds module records `hard/step-cap/reached` when a turn is stopped at the new `maxStepsPerTurn` cost cap, enforced at the `agent/pre-step` boundary for every turn whether or not a round owns it. The verdict vocabulary gains two optional properties: `cause`, the aggregable reason code every refuted branch assigns, and `evidence`, which every confirmed verdict sets to `demonstrated` while `proven` stays reserved for a future differential runner.
 
 ## Table of Contents
 
@@ -39,12 +39,12 @@ changes:
 <a id="compatibility"></a>
 ## Compatibility
 
-Purely additive: one new event root and two optional properties on `hard/finding/verdict`. The surface set, envelope, and header are unchanged, every prior event reconstructs unchanged, and Session format stays 4 with no migration. Old verdicts read back without `cause` and `evidence` — exactly the absent state the fields' semantics define (no cause attribution, evidence reading as `demonstrated`); older builds that predate the vocabulary refuse the new log instead of misreading it, which is the required-on-read contract for in-repo events.
+Purely additive: one new event root and two optional properties on `hard/finding/verdict`. The surface set, envelope, and header are unchanged, every prior event reconstructs unchanged, and Session format stays 4 with no migration. Old verdicts read back without `cause` and `evidence` — no cause attribution, and a confirm from before the control ran lacks the `demonstrated` evidence every new confirm records, so old confirms read as weaker than new ones; older builds that predate the vocabulary refuse the new log instead of misreading it, which is the required-on-read contract for in-repo events.
 
 <a id="verification"></a>
 ## Verification
 
-pnpm run verify-persistence-changes passes after the acknowledgement. The hard-rounds suite drives the cap in round and roundless turns and pins per-agent separation, the hard-verifier suite asserts a cause on every refuted branch, the hard-ledger suite aggregates `refutationBreakdown` with legacy verdicts counted as `unattributed` and parses the zero-run benign refutation through the state schema, and the keyless recorded-session snapshot replays the cause-carrying verdicts end to end.
+pnpm run verify-persistence-changes passes after the acknowledgement. The hard-rounds suite drives the cap in round and roundless turns and pins per-agent separation, the hard-verifier suite asserts a cause on every refuted branch and `demonstrated` evidence on the confirmed branch, the hard-ledger suite aggregates `refutationBreakdown` with legacy verdicts counted as `unattributed` and parses the zero-run benign refutation through the state schema, and the keyless recorded-session snapshot replays the cause- and evidence-carrying verdicts end to end.
 
 <a id="dev-note"></a>
 ## Dev Note

@@ -86,9 +86,13 @@ export function classifyRuns(request: {
   let verdict: HardFindingVerdictData['verdict']
   let reason: string
   let cause: HardFindingVerdictData['cause']
+  let evidence: HardFindingVerdictData['evidence']
   if (passCount === runs.length) {
     verdict = 'confirmed'
     reason = `${runWord} exited zero and printed the claim marker`
+    // Carried explicitly so a confirm from before the benign arm existed —
+    // evidence absent — reads as weaker, not identical.
+    evidence = 'demonstrated'
   } else if (passCount === 0) {
     verdict = 'refuted'
     const first = runs[0]
@@ -126,6 +130,7 @@ export function classifyRuns(request: {
     cvssMatch: request.cvssMatch,
     reason,
     ...(cause === undefined ? {} : { cause }),
+    ...(evidence === undefined ? {} : { evidence }),
     fingerprint: request.fingerprint,
     ...benign,
   }

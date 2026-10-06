@@ -1271,7 +1271,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
-        description: 'Append one completed sweep summary.',
+        description: 'Append one completed sweep summary. An empty sweep must cite verifiable evidence the ledger can check — a refuted hypothesis, or a model-cleared cell with declared sinks; a harness-screened cell cannot prove a sweep did work. A sweep with findings carries no proof. The legacy free-text `emptyProof` is only read from older logs; new records always use `emptyProofRef`.',
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the sweep phase, counters, and conditional empty proof.' }],
       },
       {
@@ -1297,6 +1297,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Count of recorded sweeps by phase, for the rotation cadence.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }, { name: 'phase', description: 'the sweep phase to count.' }],
         returns: 'the number of summaries recorded for the phase.',
+      },
+      {
+        signature: 'emptySweepRun(agent: Agent): number',
+        description: 'Consecutive empty-verified sweep summaries ending at the latest one. Proof validity is a record-time invariant, so `newFindings === 0` is the whole predicate here.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the trailing run length, bounded by the projection\'s sweep window.',
+      },
+      {
+        signature: 'armedGoalId(agent: Agent): string | undefined',
+        description: 'The goal id the mission armed, when the arming record carries it. The completion gate only fires for this goal; records without the id predate goal attribution and never gate.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the armed goal id, or `undefined` without an attributed arming record.',
+      },
+      {
+        signature: 'completionAssessment(agent: Agent, emptySweepsToFinish: number): { complete: boolean blockers: readonly string[] }',
+        description: 'Whether the harness certifies the mission complete. Every condition reads ledger state; none counts findings (a finding quota would pressure fabrication — a clean repository must complete). The conditions: no open work, the trailing sweep window all empty-verified, and at least one model-audited coverage cell or resolved hypothesis so a fully harness-screened repository reads as "nothing audited yet", not "done".',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }, { name: 'emptySweepsToFinish', description: 'trailing empty-verified sweeps required; `0` drops that condition.' }],
+        returns: 'the verdict plus the bounded blockers, phrased to serve directly as the denial reason.',
       },
       {
         signature: 'coverageMatrix(agent: Agent): HardCoverageMatrix | undefined',
@@ -5517,6 +5535,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardCoverageVerdict = \'cleared\' | \'suspicious\' | \'uncovered\';',
   },
   {
+    name: 'HardEmptySweepProof',
+    declaration: 'export type HardEmptySweepProof = {\n    readonly kind: \'hypothesis\';\n    readonly hypothesisId: string;\n} | {\n    readonly kind: \'cell\';\n    readonly module: string;\n    readonly bugClass: string;\n};',
+  },
+  {
     name: 'HardFindingId',
     declaration: 'export type HardFindingId = Branded<\'HardFindingId\'>;',
   },
@@ -5550,11 +5572,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardMissionArmedData',
-    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n}',
+    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly goalId?: string;\n}',
   },
   {
     name: 'HardSweepSummaryData',
-    declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n}',
+    declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n    readonly emptyProofRef?: HardEmptySweepProof;\n}',
   },
   {
     name: 'HardVerdict',

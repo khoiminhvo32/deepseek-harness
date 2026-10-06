@@ -10,6 +10,7 @@ import type {
   HardCoverageCellData,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardGateDecisionData,
   HardHypothesisStateData,
   HardMissionArmedData,
   HardSweepSummaryData,
@@ -34,7 +35,16 @@ declare module '@deepseek-ai/dsh-session/types' {
     'hard/hypothesis/state': HardHypothesisStateData
     /** One coverage cell verdict for the systematic pass. */
     'hard/coverage/cell': HardCoverageCellData
-    /** One completed sweep pass summary; purely informational. */
+    /**
+     * One completed sweep pass summary; an empty sweep carries a verifiable
+     * `emptyProof` reference the ledger checked at record time.
+     */
     'hard/sweep/summary': HardSweepSummaryData
+    /**
+     * The harness's decision on one `update_goal action complete` attempt:
+     * the stop gate appends one record per attempt, in both the allow and
+     * the deny branch, so every completion stands on a recorded assessment.
+     */
+    'hard/gate/decision': HardGateDecisionData
   }
 }

@@ -21,10 +21,16 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/tools"
+    },
+    {
       "path": "../../goal/goal"
     },
     {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../hard-ledger"
     },
     {
       "path": "../hard-standby"

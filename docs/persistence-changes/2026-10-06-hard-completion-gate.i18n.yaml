@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-06-hard-completion-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-06-hard-completion-gate.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-06-hard-completion-gate:
+  en: a5ba63e76a04db38
+  zh: dcdb60b7166a99cc
+/2026-10-06-hard-completion-gate/summary:
+  en: 8aa0ad15d6f55350
+  zh: 2eea81384c8692dc
+/2026-10-06-hard-completion-gate/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-06-hard-completion-gate/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-06-hard-completion-gate/compatibility:
+  en: 3e91b50981d0f944
+  zh: 7059670d03e65a2d
+/2026-10-06-hard-completion-gate/verification:
+  en: 36fb242b59874996
+  zh: 2d72542bc47fbd96
+/2026-10-06-hard-completion-gate/dev-note:
+  en: fc1d0f53df5b2e59
+  zh: 2c15187faa02c792

@@ -110,8 +110,8 @@ function isQuotaFailure(code: string): boolean {
 function wakeOrder(providerCode: string): string {
   return `The provider quota window that stopped this session has been waited out (code ${providerCode}). `
     + 'Resume the mission now: read your durable ledger state, then take the next concrete action that advances the objective. '
-    + 'Do not wait or ask for permission; end the turn only after marking the goal complete with update_goal action complete '
-    + 'once the objective is genuinely achieved.'
+    + 'Do not wait or ask for permission; propose completion with update_goal action complete only once the objective '
+    + 'is genuinely achieved — the harness certifies it and denies an early attempt with the remaining work.'
 }
 
 /** Resolve one wake's delivery: resume an active disarmed goal, never revive paused or capped work. */

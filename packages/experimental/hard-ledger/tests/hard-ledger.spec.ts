@@ -8,6 +8,7 @@ import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -225,17 +226,28 @@ describe('hard ledger coverage and sweeps', () => {
   it('requires empty-sweep proof and validates counters', async () => {
     const { ctx, root } = await harness()
     expect(() => { ctx.hardLedger.recordSweep(root.agent, { phase: 'A', cellsTouched: 4, newFindings: 0 }) })
-      .toThrow('an empty sweep requires emptyProof evidence')
-    expect(() => { ctx.hardLedger.recordSweep(root.agent, { phase: 'A', cellsTouched: -1, newFindings: 1 }) })
-      .toThrow('cellsTouched must be a non-negative safe integer')
-    expect(() => { ctx.hardLedger.recordSweep(root.agent, { phase: 'A', cellsTouched: 1, newFindings: -1 }) })
-      .toThrow('newFindings must be a non-negative safe integer')
+      .toThrow('an empty sweep requires emptyProofRef evidence')
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'A', cellsTouched: -1, newFindings: 1, emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-1' },
+    }) }).toThrow('cellsTouched must be a non-negative safe integer')
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'A', cellsTouched: 1, newFindings: -1, emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-1' },
+    }) }).toThrow('newFindings must be a non-negative safe integer')
+    // A sweep that produced findings must not carry an empty proof.
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'A', cellsTouched: 1, newFindings: 2, emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-1' },
+    }) }).toThrow('a sweep with findings carries no empty proof')
+    ctx.hardLedger.writeHypothesis(root.agent, { statement: 'rebuilt parser', status: 'proposed' })
+    ctx.hardLedger.writeHypothesis(root.agent, {
+      id: 'H-1', statement: 'rebuilt parser', status: 'refuted', reason: 'the parser never accepts user input',
+    })
     ctx.hardLedger.recordSweep(root.agent, {
       phase: 'A', cellsTouched: 4, newFindings: 0,
-      emptyProof: 'H-1 refuted with replay evidence; cell src/db x sqli cleared',
+      emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-1' },
     })
     expect(ctx.hardLedger.sweepCount(root.agent, 'A')).toBe(1)
     expect(ctx.hardLedger.sweepCount(root.agent, 'B')).toBe(0)
+    expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
   })
 })
 
@@ -270,14 +282,166 @@ describe('hard ledger projection units', () => {
     expect(ctx.hardLedger.sweepCount(root.agent, 'B')).toBe(1)
   })
 
-  it('rejects non-string text and overlong empty proofs', async () => {
+  it('rejects non-string text and half-specified empty proofs', async () => {
     const { ctx, root } = await harness()
     expect(() => ctx.hardLedger.proposeFinding(root.agent, {
       ...findingRequest(), title: undefined as never,
     })).toThrow('title must be a non-empty string')
     expect(() => { ctx.hardLedger.recordSweep(root.agent, {
-      phase: 'A', cellsTouched: 1, newFindings: 0, emptyProof: 'x'.repeat(2001),
-    }) }).toThrow('emptyProof must not exceed 2000 characters')
+      phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: ' ' },
+    }) }).toThrow('emptyProofRef.hypothesisId must be a non-empty string')
+    expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+      phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'cell', module: ' ', bugClass: 'sqli' },
+    }) }).toThrow('emptyProofRef.module must be a non-empty string')
+  })
+
+  describe('empty sweep proofs', () => {
+    it('accepts a refuted hypothesis and rejects unknown or unresolved ones', async () => {
+      const { ctx, root } = await harness()
+      const id = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'login is replayable', status: 'proposed' })
+      expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: 'H-9' },
+      }) }).toThrow('unknown hypothesis id H-9')
+      expect(() => { ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: id },
+      }) }).toThrow('empty sweep proof must cite a refuted hypothesis; H-1 is proposed')
+      ctx.hardLedger.writeHypothesis(root.agent, {
+        id, statement: 'login is replayable', status: 'refuted', reason: 'replay returns 401',
+      })
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: id },
+      })
+      expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
+    })
+
+    it('accepts a model-cleared cell and rejects unknown, uncleared, or harness-screened ones', async () => {
+      const { ctx, root } = await harness()
+      const sweep = (module: string, bugClass: string): HardSweepSummaryData => ({
+        phase: 'A', cellsTouched: 1, newFindings: 0, emptyProofRef: { kind: 'cell', module, bugClass },
+      })
+      expect(() => { ctx.hardLedger.recordSweep(root.agent, sweep('src/db', 'sqli')) })
+        .toThrow('unknown coverage cell src/db × sqli')
+      ctx.hardLedger.markCoverage(root.agent, { module: 'src/db', bugClass: 'sqli', verdict: 'uncovered', declaredSinks: [] })
+      expect(() => { ctx.hardLedger.recordSweep(root.agent, sweep('src/db', 'sqli')) })
+        .toThrow('empty sweep proof must cite a cleared cell with declared sinks; src/db × sqli is uncovered')
+      ctx.hardLedger.markCoverage(root.agent, {
+        module: 'src/db', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['src/db/query.ts:42 rawQuery()'],
+      })
+      ctx.hardLedger.recordSweep(root.agent, sweep('src/db', 'sqli'))
+      // A batch clear the harness grep verified still counts as model work.
+      ctx.hardLedger.markCoverage(root.agent, {
+        module: 'src/auth', bugClass: 'cmdi', verdict: 'cleared',
+        declaredSinks: ['execSync'], source: 'model-verified',
+      })
+      ctx.hardLedger.recordSweep(root.agent, sweep('src/auth', 'cmdi'))
+      expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(2)
+      // A purely mechanical screen proves nothing about this sweep's work.
+      ctx.hardLedger.markCoverage(root.agent, {
+        module: 'src/ui', bugClass: 'xss', verdict: 'cleared',
+        declaredSinks: ['innerHTML'], source: 'harness',
+      })
+      expect(() => { ctx.hardLedger.recordSweep(root.agent, sweep('src/ui', 'xss')) })
+        .toThrow('empty sweep proof cannot cite a harness-screened cell')
+    })
+  })
+
+  describe('completion assessment', () => {
+    /** Arm a two-module two-class matrix; optionally give every cell a model verdict. */
+    function armAndCover(ctx: Context, agent: Agent, cover: boolean): void {
+      ctx.hardLedger.recordMissionArmed(agent, {
+        objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
+        modules: ['src/auth', 'src/db'], bugClasses: ['cmdi', 'sqli'],
+      })
+      if (!cover) return
+      for (const module of ['src/auth', 'src/db']) {
+        for (const bugClass of ['cmdi', 'sqli']) {
+          ctx.hardLedger.markCoverage(agent, {
+            module, bugClass, verdict: 'cleared', declaredSinks: [`${module}:1 sink()`],
+          })
+        }
+      }
+    }
+
+    it('blocks on open work and the trailing empty sweeps, then certifies with enough of both', async () => {
+      const { ctx, root } = await harness()
+      armAndCover(ctx, root.agent, false)
+      // Unverdicted matrix cells are the open work.
+      const uncovered = ctx.hardLedger.completionAssessment(root.agent, 0)
+      expect(uncovered.complete).toBe(false)
+      expect(uncovered.blockers[0]).toContain('4 coverage cell(s) have no verdict yet')
+
+      armAndCover(ctx, root.agent, true)
+      // Verdicts without a source read as model, so the audit floor is satisfied;
+      // only the trailing-sweep condition stands.
+      const oneSweep = ctx.hardLedger.completionAssessment(root.agent, 2)
+      expect(oneSweep.complete).toBe(false)
+      expect(oneSweep.blockers).toEqual(['0 of 2 final sweeps are empty-verified'])
+
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' },
+      })
+      const twoSweeps = ctx.hardLedger.completionAssessment(root.agent, 2)
+      expect(twoSweeps.complete).toBe(false)
+      expect(twoSweeps.blockers).toEqual(['1 of 2 final sweeps are empty-verified'])
+
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'B', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'cmdi' },
+      })
+      expect(ctx.hardLedger.completionAssessment(root.agent, 2)).toEqual({ complete: true, blockers: [] })
+    })
+
+    it('treats a harness-screened repository as unaudited even when every cell is verdicted', async () => {
+      const { ctx, root } = await harness()
+      ctx.hardLedger.recordMissionArmed(root.agent, {
+        objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
+        modules: ['notes'], bugClasses: ['cmdi'], inertModules: ['notes'],
+      })
+      // The screen pre-verdicts the only cell, so no open work stands and the sweep
+      // condition is off — the model-audit floor is the single blocker.
+      const floored = ctx.hardLedger.completionAssessment(root.agent, 0)
+      expect(floored.complete).toBe(false)
+      expect(floored.blockers).toEqual(['no model-audited coverage cell or resolved hypothesis exists yet'])
+      const id = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'the parser accepts raw bytes', status: 'proposed' })
+      ctx.hardLedger.writeHypothesis(root.agent, {
+        id, statement: 'the parser accepts raw bytes', status: 'refuted', reason: 'the parser rejects them',
+      })
+      expect(ctx.hardLedger.completionAssessment(root.agent, 0)).toEqual({ complete: true, blockers: [] })
+    })
+
+    it('lists bounded open-work blockers with the remainder summary', async () => {
+      const { ctx, root } = await harness()
+      ctx.hardLedger.recordMissionArmed(root.agent, {
+        objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
+        modules: ['src'], bugClasses: ['cmdi'],
+      })
+      for (let index = 0; index < 9; index += 1) {
+        ctx.hardLedger.writeHypothesis(root.agent, { statement: `hypothesis ${index}`, status: 'proposed' })
+      }
+      ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+      const assessment = ctx.hardLedger.completionAssessment(root.agent, 0)
+      expect(assessment.complete).toBe(false)
+      // Open work lists findings first, then hypotheses, then coverage: 12 items
+      // here, so the bound keeps 8, summarizes 4, and the audit floor trails last.
+      expect(assessment.blockers.filter(blocker => blocker.startsWith('hypothesis H-'))).toHaveLength(7)
+      expect(assessment.blockers[8]).toContain('4 more open item(s)')
+      expect(assessment.blockers.at(-1)).toBe('no model-audited coverage cell or resolved hypothesis exists yet')
+    })
+
+    it('counts only the trailing run of empty sweeps', async () => {
+      const { ctx, root } = await harness()
+      armAndCover(ctx, root.agent, true)
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' },
+      })
+      ctx.hardLedger.recordSweep(root.agent, { phase: 'B', cellsTouched: 4, newFindings: 2 })
+      ctx.hardLedger.recordSweep(root.agent, {
+        phase: 'A', cellsTouched: 4, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src/db', bugClass: 'sqli' },
+      })
+      expect(ctx.hardLedger.emptySweepRun(root.agent)).toBe(1)
+      const assessment = ctx.hardLedger.completionAssessment(root.agent, 2)
+      expect(assessment.complete).toBe(false)
+      expect(assessment.blockers).toContain('1 of 2 final sweeps are empty-verified')
+    })
   })
 })
 

@@ -100,16 +100,27 @@ describe('dsh --profile hard fabrication traps', () => {
         },
       }, undefined, 2) + '\n')
       // coverageSpotCheckPercent: 100 makes the deterministic cross-check run
-      // for every cleared cell instead of its default 20 percent sample.
+      // for every cleared cell instead of its default 20 percent sample; the
+      // ledger screen spot-check is off (0) so the batch-cleared cell is not
+      // sent back for a re-read. The completion gate requires one trailing
+      // empty-verified sweep, and the two-class matrix keeps the fixture's
+      // work surface exact.
       await writeFile(join(profileDir, 'cordis.patch.yml'), [
         '- id: hard-mission',
         '  config:',
         `    objective: '${MISSION}'`,
         '    target:',
         `      repoPath: '${cwd}'`,
+        '    bugClasses: [cmdi, sqli]',
         '- id: hard-verifier',
         '  config:',
         '    coverageSpotCheckPercent: 100',
+        '- id: hard-ledger',
+        '  config:',
+        '    screenSpotCheckPercent: 0',
+        '- id: hard-stopgate',
+        '  config:',
+        '    emptySweepsToFinish: 1',
         '- id: llm-deepseek',
         '  disabled: true',
         '- id: session-persistence-jsonl',
@@ -191,14 +202,30 @@ describe('dsh --profile hard fabrication traps', () => {
       ])
       expect(coverage.slice(0, 3).every(cell => cell.source === undefined)).toBe(true)
 
-      // A completed goal from an honest completion claim.
-      // Gap 1.2 note: until the completion gate lands, update_goal action
-      // complete is accepted unconditionally; that gate will tighten this.
+      // The empty sweep cites the model-cleared cell as its verifiable proof.
+      const sweeps = sessionFiles.filter(event => event.type === 'hard/sweep/summary')
+        .map(event => event.data as { newFindings: number; emptyProofRef?: { kind: string; module: string } })
+      expect(sweeps).toEqual([
+        { phase: 'A', cellsTouched: 2, newFindings: 0, emptyProofRef: { kind: 'cell', module: 'src', bugClass: 'cmdi' } },
+      ])
+
+      // The gate owns completion: the early attempt was denied with the
+      // remaining work, and the post-certification attempt was allowed.
+      const gateDecisions = sessionFiles.filter(event => event.type === 'hard/gate/decision')
+        .map(event => event.data as { decision: string; openWorkCount: number; blockers: string[] })
+      expect(gateDecisions).toHaveLength(2)
+      expect(gateDecisions[0]).toMatchObject({ decision: 'deny', openWorkCount: 2 })
+      expect(gateDecisions[0]?.blockers.join(' ')).toContain('cell src × sqli has no verdict')
+      expect(gateDecisions[1]).toMatchObject({ decision: 'allow', openWorkCount: 0, blockers: [] })
+
+      // A completed goal — accepted only through the gate's allow branch.
       const goalStates = sessionFiles.filter(event => event.type === 'goal/change')
         .map(event => event.data as { operation: string })
       expect(goalStates.at(-1)).toMatchObject({ operation: 'complete' })
     } finally {
-      await rm(cwd, { recursive: true, force: true })
+      // DSH_HARD_E2E_KEEP=1 keeps the temp dir for authored-snapshot harvest.
+      if (process.env.DSH_HARD_E2E_KEEP !== '1') await rm(cwd, { recursive: true, force: true })
+      else console.log(`hard-fabrication e2e kept ${cwd}`)
     }
   }, 180_000)
 })

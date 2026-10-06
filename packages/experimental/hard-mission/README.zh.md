@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-mission` 将配置的目标武装为持久的会话目标，固定已配置的目标仓库，并注册 `hard:mission` 系统提示区段来传达任务契约：跨回合持续推进、交替执行系统化扫描与深度阅读两类过程、且只能通过目标工具声明完成。武装时把目标提交解析为完整 sha，把已跟踪模块枚举成确定性覆盖矩阵，筛出所有文件都只带非可执行扩展名的模块，并只追加一次 `hard/mission/armed` 会话事件。它仅在 `startup` 时为全新根代理武装目标；恢复、清除、压缩与子代理的既有目标状态不受影响。
+`dsh-experimental-hard-mission` 将配置的目标武装为持久的会话目标，固定已配置的目标仓库，并注册 `hard:mission` 系统提示区段来传达任务契约：跨回合持续推进、交替执行系统化扫描与深度阅读两类过程、并把完成交给目标工具处理。武装时把目标提交解析为完整 sha，把已跟踪模块枚举成确定性覆盖矩阵，筛出所有文件都只带非可执行扩展名的模块，并只追加一次 `hard/mission/armed` 会话事件。它仅在 `startup` 时为全新根代理武装目标；恢复、清除、压缩与子代理的既有目标状态不受影响。
 
 ## 目录
 
@@ -86,7 +86,7 @@ kind: "package-reference"
 
 ```markdown
 Mission: Find and verify every authentication bypass
-This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Declare completion only with update_goal action complete once the objective is genuinely achieved; ending a turn does not end the mission.
+This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Propose completion with update_goal action complete once the objective is genuinely achieved; the harness, not you, certifies it — an early attempt is denied with the exact remaining work, and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. Ending a turn does not end the mission.
 ```
 
 #### Token effect
@@ -103,7 +103,7 @@ This session carries one durable goal and keeps working toward it across turns. 
 
 - **仅在启动时武装** — 恢复或清除后的会话保留目标服务恢复的（已解除武装的）目标；恢复与配额待机唤醒时的自动重新武装属于 hard-standby 插件。
 - **完成路径依赖目标工具** — 契约指名 `update_goal action complete`；未挂载 `dsh-tool-goal` 的组合必须由其他消费方提供该操作。
-- **无完成评估器** — 本插件只负责武装与引导；完成认证推迟到 hard 停止门与验证器包。矩阵是未来完成门要消费的分母。
+- **仅武装与引导** — 本插件自身既不否决完成也不认证完成；hard 停止门在这份矩阵之上拥有该决定，武装记录携带门所依据的 `goalId`。
 
 <a id="dev-note"></a>
 ### 开发备注

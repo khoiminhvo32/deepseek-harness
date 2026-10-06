@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/hard-harness.md
 /hard-harness:
-  en: a5ea3820f3bb2116
-  zh: 57aad8a5b502c166
+  en: 6c1a80d38031432a
+  zh: 2db59faccfe56779
 /hard-harness/running-the-profile:
   en: aefcaf291d4ac821
   zh: aefcaf291d4ac821

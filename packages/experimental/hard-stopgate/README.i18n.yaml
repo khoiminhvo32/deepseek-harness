@@ -3,29 +3,29 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/hard-stopgate/README.md
 /:
-  en: 293aa7f715b5100e
-  zh: f1bf7039f6a60948
+  en: 022dbc518fbc9676
+  zh: 90946ebcfea8686f
 /deepseek-ai-dsh-experimental-hard-stopgate:
   en: 827c732865ece205
   zh: a183d41f12801f83
 /deepseek-ai-dsh-experimental-hard-stopgate/summary:
-  en: a1abee5e3cd45d28
-  zh: 1611888254f0e39b
+  en: 1dfad8dbd57a7619
+  zh: c517c7141172df85
 /deepseek-ai-dsh-experimental-hard-stopgate/table-of-contents:
   en: 76368b6b1da79c80
   zh: 49b8d2c4457703e6
 /deepseek-ai-dsh-experimental-hard-stopgate/use-this-package:
-  en: 4a3ad33be5f9efb0
-  zh: 528319aa90f7c324
+  en: a3a6334b1298563b
+  zh: a0f18adc59cf4f19
 /deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: 42b15ac6321706aa
 /deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation/design:
-  en: 522ee1052f37a883
-  zh: ca0d58d76a3203b4
+  en: 55b78a08677cca52
+  zh: b63c1f20f8c64ed8
 /deepseek-ai-dsh-experimental-hard-stopgate/understand-the-implementation/source-map:
-  en: 86de5b1c40d2574b
-  zh: dc164b2c7cdf567a
+  en: 3f61ff02faaf76ae
+  zh: a223ea8124be7d1b
 /deepseek-ai-dsh-experimental-hard-stopgate/model-experience:
   en: 215e7ba838619b7b
   zh: 215e7ba838619b7b
@@ -33,8 +33,8 @@
   en: d30c15023e7c4413
   zh: d30c15023e7c4413
 /deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/what-the-model-sees:
-  en: 7ec04f54936f4a38
-  zh: 06a24af3700391c6
+  en: 1d7b3c26ac20c35c
+  zh: e98ab1bc150345f4
 /deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/what-the-model-sees/continuation-order:
   en: 8420b5dc6b01373d
   zh: 8420b5dc6b01373d
@@ -44,9 +44,24 @@
 /deepseek-ai-dsh-experimental-hard-stopgate/model-experience/steering-messages/kv-cache-effect:
   en: 361fdbd64ac752ff
   zh: a05b918bd2afb4d5
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/completion-denial:
+  en: 8ef7f3da9ec24f04
+  zh: 8ef7f3da9ec24f04
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/completion-denial/what-the-model-sees:
+  en: 0cfe01b1a6a8316b
+  zh: 2130b22be167f6b8
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/completion-denial/what-the-model-sees/denial-reason:
+  en: 290bc9c3bf5ff68f
+  zh: 290bc9c3bf5ff68f
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/completion-denial/token-effect:
+  en: 8adfd1ab29eda4fb
+  zh: d2fd9d3688f56e2d
+/deepseek-ai-dsh-experimental-hard-stopgate/model-experience/completion-denial/kv-cache-effect:
+  en: da7dcc8f8560d4be
+  zh: 1ccf5da9e6eef64c
 /deepseek-ai-dsh-experimental-hard-stopgate/known-limitations-and-deferred-work:
-  en: 3320f97022399433
-  zh: a8d16a633d196a34
+  en: 192619a0e51a0c12
+  zh: df7601bb09b70a8a
 /deepseek-ai-dsh-experimental-hard-stopgate/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: cdd2a143b725accd

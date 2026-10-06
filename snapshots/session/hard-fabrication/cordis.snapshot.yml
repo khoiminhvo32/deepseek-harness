@@ -20,6 +20,8 @@
 - insert:
     - id: hard-ledger
       name: '@deepseek-ai/dsh-experimental-hard-ledger'
+      config:
+        screenSpotCheckPercent: 0
     - id: hard-verifier
       name: '@deepseek-ai/dsh-experimental-hard-verifier'
       config:
@@ -33,8 +35,11 @@
         target:
           # The seeded workspace is the target git repository the session runs in.
           repoPath: !!js process.cwd()
+        bugClasses: [cmdi, sqli]
     - id: hard-stopgate
       name: '@deepseek-ai/dsh-experimental-hard-stopgate'
+      config:
+        emptySweepsToFinish: 1
     - id: hard-standby
       name: '@deepseek-ai/dsh-experimental-hard-standby'
     - id: hard-handoff

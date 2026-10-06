@@ -2,7 +2,7 @@
 
 [English](hard-harness.md) | 中文
 
-Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands, the [standby](../../packages/experimental/hard-standby/README.zh.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.zh.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.zh.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.zh.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
+Experimental hard-harness services keep one long-running objective alive in a session. The [mission plugin](../../packages/experimental/hard-mission/README.zh.md) arms the configured objective as a durable goal, the [ledger](../../packages/experimental/hard-ledger/README.zh.md) owns findings, hypotheses, coverage, and sweep state over additive `hard/*` session events, the [verifier](../../packages/experimental/hard-verifier/README.zh.md) executes findings' proofs of effect through the shell seam and recomputes their CVSS 4.0 scores, the [tools](../../packages/experimental/hard-tools/README.zh.md) are the model-facing surface, the [stop gate](../../packages/experimental/hard-stopgate/README.zh.md) steers the turn boundary back to work while an armed goal stands and owns completion: it runs the ledger's completion assessment on every `update_goal action complete` attempt, denies early attempts with the exact remaining work, and records each decision as a `hard/gate/decision` event, the [standby](../../packages/experimental/hard-standby/README.zh.md) waits out terminal quota failures and wakes the mission at the reset time, the [handoff](../../packages/experimental/hard-handoff/README.zh.md) injects the durable ledger summary after each successful compaction, the [round driver](../../packages/experimental/hard-rounds/README.zh.md) accounts for admitted goal rounds over the shipped goal-round driver and enforces the per-round step budget, and the [deep-read template](../../packages/experimental/hard-deepread/README.zh.md) owns the Phase B flow-document contract. The verifier coverage cross-check re-greps sampled `cleared` cells against each bug class fixed sink patterns and reopens a cell whose module still matches an undeclared sink.
 
 ## Running the profile
 
@@ -77,7 +77,12 @@ writeHypothesis( agent: Agent, request: { id?: string; statement: string; status
 markCoverage(agent: Agent, request: HardCoverageCellData): void
 
 /**
- * Append one completed sweep summary.
+ * Append one completed sweep summary. An empty sweep must cite verifiable
+ * evidence the ledger can check — a refuted hypothesis, or a model-cleared
+ * cell with declared sinks; a harness-screened cell cannot prove a sweep
+ * did work. A sweep with findings carries no proof. The legacy free-text
+ * `emptyProof` is only read from older logs; new records always use
+ * `emptyProofRef`.
  * @param agent - the live agent whose session receives the record.
  * @param request - the sweep phase, counters, and conditional empty proof.
  */
@@ -111,6 +116,37 @@ coverage(agent: Agent): readonly HardCoverageCellData[]
  * @returns the number of summaries recorded for the phase.
  */
 sweepCount(agent: Agent, phase: 'A' | 'B'): number
+
+/**
+ * Consecutive empty-verified sweep summaries ending at the latest one.
+ * Proof validity is a record-time invariant, so `newFindings === 0` is the
+ * whole predicate here.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the trailing run length, bounded by the projection's sweep window.
+ */
+emptySweepRun(agent: Agent): number
+
+/**
+ * The goal id the mission armed, when the arming record carries it. The
+ * completion gate only fires for this goal; records without the id predate
+ * goal attribution and never gate.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the armed goal id, or `undefined` without an attributed arming record.
+ */
+armedGoalId(agent: Agent): string | undefined
+
+/**
+ * Whether the harness certifies the mission complete. Every condition reads
+ * ledger state; none counts findings (a finding quota would pressure
+ * fabrication — a clean repository must complete). The conditions: no open
+ * work, the trailing sweep window all empty-verified, and at least one
+ * model-audited coverage cell or resolved hypothesis so a fully
+ * harness-screened repository reads as "nothing audited yet", not "done".
+ * @param agent - the live agent whose ledger state is read.
+ * @param emptySweepsToFinish - trailing empty-verified sweeps required; `0` drops that condition.
+ * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
+ */
+completionAssessment(agent: Agent, emptySweepsToFinish: number): { complete: boolean blockers: readonly string[] }
 
 /**
  * The coverage matrix folded from the mission arming record.

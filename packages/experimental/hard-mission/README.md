@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and declare completion only through the goal tools. Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, screens out modules whose every file carries a non-executable extension, and appends the `hard/mission/armed` session event once. It arms fresh root agents on `startup` only; resumed, cleared, compacted, and child agents keep their own goal state.
+`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and route completion through the goal tools. Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, screens out modules whose every file carries a non-executable extension, and appends the `hard/mission/armed` session event once. It arms fresh root agents on `startup` only; resumed, cleared, compacted, and child agents keep their own goal state.
 
 ## Table of Contents
 
@@ -86,7 +86,7 @@ One fixed mission contract whose objective, bug-class list, and deep-reading cad
 
 ```markdown
 Mission: Find and verify every authentication bypass
-This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Declare completion only with update_goal action complete once the objective is genuinely achieved; ending a turn does not end the mission.
+This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Propose completion with update_goal action complete once the objective is genuinely achieved; the harness, not you, certifies it — an early attempt is denied with the exact remaining work, and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. Ending a turn does not end the mission.
 ```
 
 #### Token effect
@@ -103,7 +103,7 @@ Prefix-stable while the plugin scope and configuration are unchanged. Activation
 
 - **Startup-only arming** — a resumed or cleared session keeps the goal service's restored (disarmed) goal; automatic re-arming on resume and on quota standby wake belongs to the hard-standby plugin.
 - **Completion path assumes the goal tools** — the contract names `update_goal action complete`; a composition without `dsh-tool-goal` must surface that action through another consumer.
-- **No completion evaluator** — arming and guidance only; certification of completion is deferred to the hard stop gate and verifier packages. The matrix is the denominator the future completion gate will consume.
+- **Arming and guidance only** — the mission itself neither vetoes completion nor certifies it; the hard stop gate owns that decision over this matrix, and the armed record carries the `goalId` the gate keys on.
 
 <a id="dev-note"></a>
 ### Dev Note

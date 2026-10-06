@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-tools` 注册 hard harness 的五个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量与 PoC 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后跨多个模块批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程，空扫描必须携带证明。
+`dsh-experimental-hard-tools` 注册 hard harness 的五个面向模型工具：`hard_submit_finding` 携带 CVSS 4.0 向量与 PoC 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后跨多个模块批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程；空扫描必须引用可验证的证明——已反驳的假设或模型已清除的单元格——由台账在记录时校验。
 
 ## 目录
 

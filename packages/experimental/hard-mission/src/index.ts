@@ -284,8 +284,10 @@ function missionContract(resolved: ResolvedConfig): string {
     + sweep
     + `Every ${resolved.deepReadEveryN} systematic passes, run a deep-reading pass that models dataflow, `
     + 'trust boundaries, and state machines to form and test hypotheses beyond pattern matching. '
-    + 'Declare completion only with update_goal action complete once the objective is genuinely achieved; '
-    + 'ending a turn does not end the mission.'
+    + 'Propose completion with update_goal action complete once the objective is genuinely achieved; '
+    + 'the harness, not you, certifies it — an early attempt is denied with the exact remaining work, '
+    + 'and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. '
+    + 'Ending a turn does not end the mission.'
 }
 
 /**
@@ -337,13 +339,14 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     if (source !== 'startup') return
     if (!ctx.agents.roots().includes(agent)) return
     if (ctx.goals.get(agent) !== undefined) return
-    ctx.goals.create(agent, {
+    const goal = ctx.goals.create(agent, {
       objective: resolved.objective,
       maxGoalRounds: resolved.maxGoalRounds,
     })
     ctx.hardLedger.recordMissionArmed(agent, {
       objective: resolved.objective,
       ...armed,
+      goalId: goal.id,
     })
   })
 }

@@ -10,9 +10,27 @@
 import { z as zod } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {
+  HardEmptySweepProof,
   HardFindingProposedData,
   HardFindingVerdictData,
 } from './types.ts'
+
+/** Sweep summaries the trailing-empty-sweep condition looks back over. */
+export const HARD_SWEEP_WINDOW = 16
+
+const emptyProofSchema: zod.ZodType<HardEmptySweepProof> = zod.discriminatedUnion('kind', [
+  zod.object({ kind: zod.literal('hypothesis'), hypothesisId: zod.string().min(1) }),
+  zod.object({ kind: zod.literal('cell'), module: zod.string().min(1), bugClass: zod.string().min(1) }),
+])
+
+const sweepSummarySchema = zod.object({
+  phase: zod.union([zod.literal('A'), zod.literal('B')]),
+  cellsTouched: zod.number().int().min(0),
+  newFindings: zod.number().int().min(0),
+  // Legacy free-text proof; only older logs carry it.
+  emptyProof: zod.string().optional(),
+  emptyProofRef: emptyProofSchema.optional(),
+})
 
 /** One proposed finding with its verifier verdict once recorded. */
 export interface HardLedgerFindingEntry {
@@ -74,6 +92,8 @@ export const hardLedgerStateSchema = zod.object({
   hypotheses: zod.array(hypothesisSchema),
   coverage: zod.array(coverageSchema),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
+  recentSweeps: zod.array(sweepSummarySchema).max(HARD_SWEEP_WINDOW).readonly(),
+  goalId: zod.string().min(1).optional(),
   matrix: matrixSchema.optional(),
   failure: zod.string().min(1).nullable(),
 })
@@ -113,10 +133,15 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
       return { ...state, coverage }
     }
     case 'hard/sweep/summary':
-      return { ...state, sweeps: { ...state.sweeps, [event.data.phase]: state.sweeps[event.data.phase] + 1 } }
+      return {
+        ...state,
+        sweeps: { ...state.sweeps, [event.data.phase]: state.sweeps[event.data.phase] + 1 },
+        recentSweeps: [...state.recentSweeps, event.data].slice(-HARD_SWEEP_WINDOW),
+      }
     case 'hard/mission/armed':
       return {
         ...state,
+        goalId: event.data.goalId,
         matrix: {
           modules: [...event.data.modules],
           bugClasses: [...event.data.bugClasses],
@@ -142,6 +167,7 @@ export function emptyHardLedgerState(): HardLedgerProjectionState {
     hypotheses: [],
     coverage: [],
     sweeps: { A: 0, B: 0 },
+    recentSweeps: [],
     failure: null,
   })
 }
@@ -158,12 +184,14 @@ export const hardLedgerProjectionDefinition = {
     hypotheses: [],
     coverage: [],
     sweeps: { A: 0, B: 0 },
+    recentSweeps: [],
     failure: null,
   }),
   apply: applyHardLedgerProjection,
-  // Version 3 adds the optional coverage source and the armed inert-modules
-  // screen; the bump forces a full log rebuild so both recover on resume.
-  stateVersion: 3,
+  // Version 4 changes the empty-sweep proof from free text to a verifiable
+  // reference and adds the bounded sweep window plus the armed goal id; the
+  // bump forces a full log rebuild so both recover on resume.
+  stateVersion: 4,
 } satisfies ProjectionDefinition<'hardLedger', HardLedgerProjectionState>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

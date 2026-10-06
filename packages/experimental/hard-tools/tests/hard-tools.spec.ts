@@ -426,11 +426,65 @@ describe('hard_update_hypothesis and methodology tools', () => {
       phase: 'A', cells_touched: 3, new_findings: 0,
     }, root.agent)
     expect(empty.isError).toBe(true)
+    // A half-specified proof fails loud before the ledger rejects the referent.
+    const half = await execute(ctx, 'hard_sweep_summary', {
+      phase: 'A', cells_touched: 3, new_findings: 0, empty_proof_kind: 'cell',
+    }, root.agent)
+    expect(half.isError).toBe(true)
+    expect(half.error?.message).toContain('empty_proof_kind cell requires a non-empty empty_proof_module')
+    const id = resultJson(await execute(ctx, 'hard_update_hypothesis', {
+      statement: 'the report builder accepts raw arguments.',
+      status: 'proposed',
+    }, root.agent)).hypothesis as Record<string, unknown>
+    const testing = await execute(ctx, 'hard_update_hypothesis', {
+      hypothesis_id: id['id'], statement: 'the report builder accepts raw arguments.', status: 'testing',
+    }, root.agent)
+    expect(testing.isError).toBe(false)
+    // A sweep whose proof cites an unresolved hypothesis is refused.
+    const unresolved = await execute(ctx, 'hard_sweep_summary', {
+      phase: 'A', cells_touched: 3, new_findings: 0, empty_proof_kind: 'hypothesis', empty_proof_id: id['id'],
+    }, root.agent)
+    expect(unresolved.isError).toBe(true)
+    const refuted = resultJson(await execute(ctx, 'hard_update_hypothesis', {
+      hypothesis_id: id['id'], statement: 'the report builder accepts raw arguments.', status: 'refuted',
+      reason: 'the builder interpolates after validation',
+    }, root.agent)).hypothesis as Record<string, unknown>
+    expect(refuted['status']).toBe('refuted')
     const proven = resultJson(await execute(ctx, 'hard_sweep_summary', {
       phase: 'A', cells_touched: 3, new_findings: 0,
-      empty_proof: 'H-1 refuted with replay evidence',
+      empty_proof_kind: 'hypothesis', empty_proof_id: id['id'],
     }, root.agent))
-    expect(proven.sweep).toMatchObject({ phase: 'A', newFindings: 0 })
+    expect(proven.sweep).toMatchObject({
+      phase: 'A', newFindings: 0, emptyProofRef: { kind: 'hypothesis', hypothesisId: id['id'] },
+    })
     expect(ctx.hardLedger.sweepCount(root.agent, 'A')).toBe(1)
+    // A sweep with findings must not carry an empty proof.
+    const withFindings = await execute(ctx, 'hard_sweep_summary', {
+      phase: 'B', cells_touched: 1, new_findings: 1, empty_proof_kind: 'hypothesis', empty_proof_id: id['id'],
+    }, root.agent)
+    expect(withFindings.isError).toBe(true)
+  })
+
+  it('cites a cleared cell as an empty-sweep proof and refuses a harness-screened one', async () => {
+    const { ctx, root } = await harness({ exitCode: 0, stdoutText: PASS_OUTPUT })
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/exec.ts:1 system()'],
+    })
+    const proven = resultJson(await execute(ctx, 'hard_sweep_summary', {
+      phase: 'A', cells_touched: 1, new_findings: 0,
+      empty_proof_kind: 'cell', empty_proof_module: 'src', empty_proof_bug_class: 'cmdi',
+    }, root.agent))
+    expect(proven.sweep).toMatchObject({
+      emptyProofRef: { kind: 'cell', module: 'src', bugClass: 'cmdi' },
+    })
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'notes', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['rawQuery'], source: 'harness',
+    })
+    const screened = await execute(ctx, 'hard_sweep_summary', {
+      phase: 'B', cells_touched: 1, new_findings: 0,
+      empty_proof_kind: 'cell', empty_proof_module: 'notes', empty_proof_bug_class: 'sqli',
+    }, root.agent)
+    expect(screened.isError).toBe(true)
+    expect(screened.error?.message).toContain('empty sweep proof cannot cite a harness-screened cell')
   })
 })

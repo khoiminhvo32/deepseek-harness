@@ -92,13 +92,61 @@ export interface HardCoverageCellData {
   readonly source?: HardCoverageSource
 }
 
+/**
+ * Verifiable evidence behind one empty sweep summary: a reference the ledger
+ * can check, never free text. A hypothesis proof must be `refuted`; a cell
+ * proof must be `cleared` with declared sinks and must not be
+ * harness-screened, because a machine screen cannot prove a sweep did work.
+ */
+export type HardEmptySweepProof =
+  | { readonly kind: 'hypothesis'; readonly hypothesisId: string }
+  | { readonly kind: 'cell'; readonly module: string; readonly bugClass: string }
+
 /** One completed sweep pass summary; purely informational. */
 export interface HardSweepSummaryData {
   readonly phase: 'A' | 'B'
   readonly cellsTouched: number
   readonly newFindings: number
-  /** Required for an empty sweep: the refuted hypothesis or cleared cell evidence. */
+  /**
+   * Legacy free-text proof of an empty sweep; only older logs carry it. New
+   * records carry the verifiable `emptyProofRef` instead.
+   */
   readonly emptyProof?: string
+  /**
+   * Verifiable evidence an empty sweep rests on, checked at record time: a
+   * refuted hypothesis, or a model-cleared cell with declared sinks.
+   */
+  readonly emptyProofRef?: HardEmptySweepProof
+}
+
+/** The harness's recorded decision on one completion attempt. */
+export interface HardGateDecisionData {
+  /** `allow` when the harness certifies completion, `deny` when work remains. */
+  readonly decision: 'allow' | 'deny'
+  /** Open-work items at decision time. */
+  readonly openWorkCount: number
+  readonly coverage: {
+    readonly verdicted: number
+    readonly total: number
+    readonly bySource: { readonly model: number; readonly modelVerified: number; readonly harness: number }
+  }
+  readonly hypotheses: {
+    /** Hypotheses in a terminal status (`confirmed` or `refuted`). */
+    readonly resolved: number
+    /** Hypotheses still proposed, testing, or deferred. */
+    readonly open: number
+  }
+  readonly findings: {
+    readonly confirmed: number
+    readonly refuted: number
+    readonly flaky: number
+    /** Proposed findings the verifier has not decided. */
+    readonly pending: number
+  }
+  /** Consecutive empty-verified sweep summaries ending at the latest one. */
+  readonly emptySweeps: number
+  /** The bounded blocking items; empty when `allow`. */
+  readonly blockers: readonly string[]
 }
 
 /** Mission arming record: the pinned target and the coverage matrix axes. */
@@ -119,4 +167,10 @@ export interface HardMissionArmedData {
    * is additive; absent reads as an empty screen.
    */
   readonly inertModules?: readonly string[]
+  /**
+   * Id of the goal this arming created. Optional so the change is additive;
+   * records without it predate goal attribution, and the completion gate
+   * never fires for them.
+   */
+  readonly goalId?: string
 }

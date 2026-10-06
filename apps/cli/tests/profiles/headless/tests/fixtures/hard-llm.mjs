@@ -51,6 +51,18 @@ function allToolText(messages) {
   }).join('\n')
 }
 
+/** The goal object from the most recent get_goal result, so revisions stay exact. */
+function lastGoal(messages) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role !== 'tool') continue
+    const text = message.content.filter(block => block.type === 'text').map(block => block.text).join('\n')
+    const match = text.match(/\{[\s\S]*"goal"[\s\S]*\}/)
+    if (match) return JSON.parse(match[0]).goal
+  }
+  return undefined
+}
+
 function toolChunks(specs) {
   const chunks = []
   for (const [index, spec] of specs.entries()) {
@@ -126,25 +138,35 @@ function script(messages) {
   if (!seen.includes('"reopenedSinks":[]')) {
     return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['execSync'] } }])
   }
-  if (!seen.includes('"phase":"A"')) {
-    return toolChunks([{ name: 'hard_sweep_summary', args: { phase: 'A', cells_touched: 1, new_findings: 1 } }])
+  // 6. Propose completion while the sqli cell is still open: the completion
+  // gate denies the attempt and names the remaining work.
+  if (!names.includes('get_goal')) return toolChunks([{ name: 'get_goal', args: {} }])
+  if (!seen.includes('The mission is not complete.')) {
+    const goal = lastGoal(messages)
+    return toolChunks([{ name: 'update_goal', args: { goal_id: goal.id, revision: goal.revision, action: 'complete' } }])
   }
-  // 6. Batch clear a class the harness grep can prove absent: the planted
-  // repository builds shell commands only, so the sqli union (the model's
-  // patterns plus the fixed table) matches nothing and every cell clears as
-  // model-verified.
+  // 7. Batch clear the remaining class the harness grep can prove absent: the
+  // planted repository builds shell commands only, so the sqli union (the
+  // model's patterns plus the fixed table) matches nothing and the cell
+  // clears as model-verified.
   if (!seen.includes('"cleared":1')) {
     return toolChunks([{ name: 'hard_clear_modules', args: { modules: ['src'], bug_class: 'sqli', patterns: ["SELECT[^\\n]*\\+"], rationale: 'The repository builds shell commands only; no SQL statement exists to concatenate.' } }])
   }
-  // 7. Complete the goal only after the ledger holds the confirmed finding.
-  // Gap 1.2 note: completion acceptance is unconditional here until the
-  // completion gate lands; that gate will tighten this step and this fixture.
-  if (!names.includes('get_goal')) return toolChunks([{ name: 'get_goal', args: {} }])
-  if (!names.includes('update_goal')) {
-    const goal = JSON.parse(toolText(messages).match(/\{[\s\S]*\}/)?.[0] ?? '{}').goal
+  // 8. Empty-verified sweep the completion gate requires, citing the
+  // model-cleared cell as the verifiable proof.
+  if (!seen.includes('"emptyProofRef"')) {
+    return toolChunks([{ name: 'hard_sweep_summary', args: { phase: 'A', cells_touched: 2, new_findings: 0, empty_proof_kind: 'cell', empty_proof_module: 'src', empty_proof_bug_class: 'cmdi' } }])
+  }
+  // 9. Re-read the goal, then complete again: the ledger now certifies and
+  // the gate allows it.
+  if (names.filter(name => name === 'get_goal').length < 2) {
+    return toolChunks([{ name: 'get_goal', args: {} }])
+  }
+  if (!seen.includes('"phase":"complete"')) {
+    const goal = lastGoal(messages)
     return toolChunks([{ name: 'update_goal', args: { goal_id: goal.id, revision: goal.revision, action: 'complete' } }])
   }
-  return textChunks('The mission is complete: one confirmed finding, two refuted fabrication attempts.')
+  return textChunks('The mission is complete: one confirmed finding, two refuted fabrication attempts, and the gate-certified sweep record.')
 }
 
 class HardFixtureAdapter extends LlmAdapter {

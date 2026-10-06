@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-tools` registers the five model-facing tools of the hard harness: `hard_submit_finding` submits a claim with its CVSS 4.0 vector and PoC and returns the verifier's executed verdict; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_mark_coverage` records systematic-pass cells; `hard_clear_modules` batch-clears one class across several modules behind a harness-verified absence grep; `hard_sweep_summary` records completed passes with mandatory empty-sweep proof.
+`dsh-experimental-hard-tools` registers the five model-facing tools of the hard harness: `hard_submit_finding` submits a claim with its CVSS 4.0 vector and PoC and returns the verifier's executed verdict; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_mark_coverage` records systematic-pass cells; `hard_clear_modules` batch-clears one class across several modules behind a harness-verified absence grep; `hard_sweep_summary` records completed passes; an empty sweep must cite a verifiable proof reference — a refuted hypothesis or a model-cleared cell — which the ledger checks at record time.
 
 ## Table of Contents
 

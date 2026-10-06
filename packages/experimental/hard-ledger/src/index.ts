@@ -16,6 +16,7 @@ import type {
   HardCoverageCellData,
   HardCoverageSource,
   HardCoverageVerdict,
+  HardEmptySweepProof,
   HardFindingId,
   HardFindingProposedData,
   HardFindingVerdictData,
@@ -34,9 +35,11 @@ export type {
   HardCoverageCellData,
   HardCoverageSource,
   HardCoverageVerdict,
+  HardEmptySweepProof,
   HardFindingId,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardGateDecisionData,
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
@@ -44,7 +47,7 @@ export type {
   HardSweepSummaryData,
   HardVerdict,
 } from './types.ts'
-export { applyHardLedgerProjection, emptyHardLedgerState, hardLedgerProjectionDefinition } from './projection.ts'
+export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
@@ -94,6 +97,9 @@ export const HARD_TEXT_LIMIT = 2000
 
 /** Maximum coverage matrix rows one arming record may carry. */
 export const HARD_MATRIX_MODULE_LIMIT = 500
+
+/** Maximum blocking items one completion assessment lists before it summarizes the rest. */
+export const HARD_BLOCKER_LIMIT = 8
 
 /**
  * The hard-harness ledger: validates and appends `hard/*` events, and serves
@@ -156,6 +162,7 @@ export class HardLedger extends Service {
       inertModules = [...suppliedInert]
     }
     for (const bugClass of data.bugClasses) this.assertText('bugClasses[]', bugClass)
+    if (data.goalId !== undefined) this.assertText('goalId', data.goalId)
     agent.session.append('hard/mission/armed', {
       objective: data.objective,
       targetRepo: data.targetRepo,
@@ -163,6 +170,7 @@ export class HardLedger extends Service {
       modules,
       bugClasses: [...data.bugClasses],
       ...(data.inertModules === undefined ? {} : { inertModules }),
+      ...(data.goalId === undefined ? {} : { goalId: data.goalId }),
     })
   }
 
@@ -278,7 +286,12 @@ export class HardLedger extends Service {
   }
 
   /**
-   * Append one completed sweep summary.
+   * Append one completed sweep summary. An empty sweep must cite verifiable
+   * evidence the ledger can check — a refuted hypothesis, or a model-cleared
+   * cell with declared sinks; a harness-screened cell cannot prove a sweep
+   * did work. A sweep with findings carries no proof. The legacy free-text
+   * `emptyProof` is only read from older logs; new records always use
+   * `emptyProofRef`.
    * @param agent - the live agent whose session receives the record.
    * @param request - the sweep phase, counters, and conditional empty proof.
    */
@@ -289,13 +302,62 @@ export class HardLedger extends Service {
     if (!Number.isSafeInteger(request.newFindings) || request.newFindings < 0) {
       throw new HarnessError('newFindings must be a non-negative safe integer', 'HARD_LEDGER_INVALID_SWEEP')
     }
-    if (request.newFindings === 0 && (request.emptyProof === undefined || request.emptyProof.trim().length === 0)) {
+    if (request.newFindings === 0) {
+      if (request.emptyProofRef === undefined) {
+        throw new HarnessError(
+          'an empty sweep requires emptyProofRef evidence', 'HARD_LEDGER_EMPTY_PROOF_REQUIRED',
+        )
+      }
+      if (request.emptyProof !== undefined) {
+        throw new HarnessError(
+          'the legacy emptyProof text is no longer accepted; cite emptyProofRef', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
+        )
+      }
+      this.assertEmptySweepProof(agent, request.emptyProofRef)
+    } else if (request.emptyProofRef !== undefined) {
       throw new HarnessError(
-        'an empty sweep requires emptyProof evidence', 'HARD_LEDGER_EMPTY_PROOF_REQUIRED',
+        'a sweep with findings carries no empty proof', 'HARD_LEDGER_EMPTY_PROOF_INVALID',
       )
     }
-    if (request.emptyProof !== undefined) this.assertText('emptyProof', request.emptyProof)
     agent.session.append('hard/sweep/summary', request)
+  }
+
+  /** The verified-referent check behind one empty sweep's proof. */
+  private assertEmptySweepProof(agent: Agent, proof: HardEmptySweepProof): void {
+    if (proof.kind === 'hypothesis') {
+      this.assertText('emptyProofRef.hypothesisId', proof.hypothesisId)
+      const record = this.state(agent.session).hypotheses.find(entry => entry.id === proof.hypothesisId)
+      if (record === undefined) {
+        throw new HarnessError(`unknown hypothesis id ${proof.hypothesisId}`, 'HARD_LEDGER_UNKNOWN_HYPOTHESIS')
+      }
+      if (record.status !== 'refuted') {
+        throw new HarnessError(
+          `empty sweep proof must cite a refuted hypothesis; ${proof.hypothesisId} is ${record.status}`,
+          'HARD_LEDGER_EMPTY_PROOF_INVALID',
+        )
+      }
+      return
+    }
+    this.assertText('emptyProofRef.module', proof.module)
+    this.assertText('emptyProofRef.bugClass', proof.bugClass)
+    const cell = this.coverage(agent).find(entry => entry.module === proof.module && entry.bugClass === proof.bugClass)
+    if (cell === undefined) {
+      throw new HarnessError(
+        `unknown coverage cell ${proof.module} × ${proof.bugClass}`, 'HARD_LEDGER_UNKNOWN_CELL',
+      )
+    }
+    if (cell.verdict !== 'cleared' || cell.declaredSinks.length === 0) {
+      throw new HarnessError(
+        `empty sweep proof must cite a cleared cell with declared sinks; ${proof.module} × ${proof.bugClass} is ${cell.verdict}`,
+        'HARD_LEDGER_EMPTY_PROOF_INVALID',
+      )
+    }
+    if (cell.source === 'harness') {
+      throw new HarnessError(
+        `empty sweep proof cannot cite a harness-screened cell; ${proof.module} × ${proof.bugClass} was cleared mechanically`,
+        'HARD_LEDGER_EMPTY_PROOF_INVALID',
+      )
+    }
   }
 
   /**
@@ -361,6 +423,70 @@ export class HardLedger extends Service {
    */
   sweepCount(agent: Agent, phase: 'A' | 'B'): number {
     return this.state(agent.session).sweeps[phase]
+  }
+
+  /**
+   * Consecutive empty-verified sweep summaries ending at the latest one.
+   * Proof validity is a record-time invariant, so `newFindings === 0` is the
+   * whole predicate here.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the trailing run length, bounded by the projection's sweep window.
+   */
+  emptySweepRun(agent: Agent): number {
+    const recent = [...this.state(agent.session).recentSweeps].reverse()
+    let run = 0
+    for (const sweep of recent) {
+      if (sweep.newFindings !== 0) break
+      run += 1
+    }
+    return run
+  }
+
+  /**
+   * The goal id the mission armed, when the arming record carries it. The
+   * completion gate only fires for this goal; records without the id predate
+   * goal attribution and never gate.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the armed goal id, or `undefined` without an attributed arming record.
+   */
+  armedGoalId(agent: Agent): string | undefined {
+    return this.state(agent.session).goalId
+  }
+
+  /**
+   * Whether the harness certifies the mission complete. Every condition reads
+   * ledger state; none counts findings (a finding quota would pressure
+   * fabrication — a clean repository must complete). The conditions: no open
+   * work, the trailing sweep window all empty-verified, and at least one
+   * model-audited coverage cell or resolved hypothesis so a fully
+   * harness-screened repository reads as "nothing audited yet", not "done".
+   * @param agent - the live agent whose ledger state is read.
+   * @param emptySweepsToFinish - trailing empty-verified sweeps required; `0` drops that condition.
+   * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
+   */
+  completionAssessment(agent: Agent, emptySweepsToFinish: number): {
+    complete: boolean
+    blockers: readonly string[]
+  } {
+    const blockers: string[] = []
+    const work = this.openWork(agent)
+    if (work.length > 0) {
+      blockers.push(...work.slice(0, HARD_BLOCKER_LIMIT))
+      if (work.length > HARD_BLOCKER_LIMIT) blockers.push(`…and ${work.length - HARD_BLOCKER_LIMIT} more open item(s)`)
+    }
+    if (emptySweepsToFinish > 0) {
+      const trailing = this.emptySweepRun(agent)
+      if (trailing < emptySweepsToFinish) {
+        blockers.push(`${trailing} of ${emptySweepsToFinish} final sweeps are empty-verified`)
+      }
+    }
+    const bySource = this.coverageBySource(agent)
+    const resolved = this.hypotheses(agent)
+      .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
+    if (bySource.model === 0 && bySource.modelVerified === 0 && resolved === 0) {
+      blockers.push('no model-audited coverage cell or resolved hypothesis exists yet')
+    }
+    return { complete: blockers.length === 0, blockers }
   }
 
   /**

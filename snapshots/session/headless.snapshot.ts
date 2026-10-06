@@ -489,6 +489,10 @@ const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
     })
     expect(run(['init', '--quiet']).status).toBe(0)
     expect(run(['add', '-A']).status).toBe(0)
+    // The seed .gitignore only keeps runtime residue out of the commit; it is
+    // repo infrastructure, not code, so it leaves the tracked set the armed
+    // matrix enumerates and never becomes a coverage module row.
+    expect(run(['rm', '--cached', '--quiet', '.gitignore']).status).toBe(0)
     // Fixed identity and raw epoch dates keep the seeded commit sha — and the
     // armed matrix recorded from it — identical across runs and machines.
     const commit = run(['-c', 'user.name=hard-snapshot', '-c', 'user.email=hard@snapshot',

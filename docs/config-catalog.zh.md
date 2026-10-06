@@ -1036,7 +1036,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:59`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:62`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1161,8 +1161,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-experimental-hard-stopgate`
 
-- `inject`: `goals` · `sessionProjections`
-- `source`: [`packages/experimental/hard-stopgate/src/index.ts:43`](../packages/experimental/hard-stopgate/src/index.ts)
+- `inject`: `goals` · `sessionProjections` · `hardLedger`
+- `source`: [`packages/experimental/hard-stopgate/src/index.ts:53`](../packages/experimental/hard-stopgate/src/index.ts)
 
 ```ts config-catalog
 /** Stop-gate plugin config. */
@@ -1173,6 +1173,11 @@ export interface Config {
    * the model cannot or will not advance the goal.
    */
   maxSteersPerTurn?: number
+  /**
+   * Trailing sweep summaries that must be empty-verified before the
+   * completion gate certifies the mission done; `0` drops the condition.
+   */
+  emptySweepsToFinish?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-stopgate -->

@@ -1541,9 +1541,25 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
       "type": "number",
       "description": "Confirmed findings this pass produced."
     },
-    "empty_proof": {
+    "empty_proof_kind": {
       "type": "string",
-      "description": "Required when new_findings is zero: the refuted hypothesis or cleared cell."
+      "description": "Required when new_findings is zero: what proves this sweep did work.",
+      "enum": [
+        "hypothesis",
+        "cell"
+      ]
+    },
+    "empty_proof_id": {
+      "type": "string",
+      "description": "With empty_proof_kind hypothesis: the H-n id, which must already be refuted."
+    },
+    "empty_proof_module": {
+      "type": "string",
+      "description": "With empty_proof_kind cell: the module of the cleared cell being cited."
+    },
+    "empty_proof_bug_class": {
+      "type": "string",
+      "description": "With empty_proof_kind cell: the bug class of the cleared cell being cited."
     }
   },
   "required": [

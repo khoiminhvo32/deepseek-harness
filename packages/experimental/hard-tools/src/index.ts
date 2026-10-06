@@ -12,7 +12,7 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
-import type { HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardEmptySweepProof, HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 export const name = 'hard-tools'
@@ -346,9 +346,21 @@ export function apply(ctx: Context, _config: Config): void {
       },
       cells_touched: { type: 'number', required: true, description: 'Coverage cells touched this pass.' },
       new_findings: { type: 'number', required: true, description: 'Confirmed findings this pass produced.' },
-      empty_proof: {
+      empty_proof_kind: {
+        type: 'string', enum: ['hypothesis', 'cell'],
+        description: 'Required when new_findings is zero: what proves this sweep did work.',
+      },
+      empty_proof_id: {
         type: 'string',
-        description: 'Required when new_findings is zero: the refuted hypothesis or cleared cell.',
+        description: 'With empty_proof_kind hypothesis: the H-n id, which must already be refuted.',
+      },
+      empty_proof_module: {
+        type: 'string',
+        description: 'With empty_proof_kind cell: the module of the cleared cell being cited.',
+      },
+      empty_proof_bug_class: {
+        type: 'string',
+        description: 'With empty_proof_kind cell: the bug class of the cleared cell being cited.',
       },
     },
     output: {
@@ -361,6 +373,15 @@ export function apply(ctx: Context, _config: Config): void {
               phase: { type: 'string', required: true, enum: ['A', 'B'] },
               cellsTouched: { type: 'integer', required: true },
               newFindings: { type: 'integer', required: true },
+              emptyProofRef: {
+                type: 'object', additionalProperties: false,
+                properties: {
+                  kind: { type: 'string', required: true, enum: ['hypothesis', 'cell'] },
+                  hypothesisId: { type: 'string' },
+                  module: { type: 'string' },
+                  bugClass: { type: 'string' },
+                },
+              },
             },
           },
         },
@@ -369,16 +390,58 @@ export function apply(ctx: Context, _config: Config): void {
     },
     execute(args, exec) {
       if (exec.agent === undefined) throw new Error('hard_sweep_summary requires a live agent')
+      const emptyProofRef = emptyProofFrom(args)
       ledger.recordSweep(exec.agent, {
         phase: args.phase,
         cellsTouched: args.cells_touched,
         newFindings: args.new_findings,
-        ...args.empty_proof === undefined ? {} : { emptyProof: args.empty_proof },
+        ...emptyProofRef === undefined ? {} : { emptyProofRef },
       })
       return Promise.resolve({
-        sweep: { phase: args.phase, cellsTouched: args.cells_touched, newFindings: args.new_findings },
+        sweep: {
+          phase: args.phase,
+          cellsTouched: args.cells_touched,
+          newFindings: args.new_findings,
+          ...emptyProofRef === undefined ? {} : { emptyProofRef },
+        },
       })
     },
     presentCall: args => present(`Sweep ${args.phase}: ${args.new_findings} findings`, args.phase),
   }))
+}
+
+/** Assemble the structured empty-sweep proof from the model's arguments, failing loud on a half-specified one. */
+function emptyProofFrom(args: {
+  empty_proof_kind?: 'hypothesis' | 'cell'
+  empty_proof_id?: string
+  empty_proof_module?: string
+  empty_proof_bug_class?: string
+}): HardEmptySweepProof | undefined {
+  const kind = args.empty_proof_kind
+  if (kind === undefined) {
+    if (args.empty_proof_id !== undefined || args.empty_proof_module !== undefined
+      || args.empty_proof_bug_class !== undefined) {
+      throw new Error('empty_proof_id, empty_proof_module, and empty_proof_bug_class require empty_proof_kind')
+    }
+    return undefined
+  }
+  if (kind === 'hypothesis') {
+    if (args.empty_proof_module !== undefined || args.empty_proof_bug_class !== undefined) {
+      throw new Error('empty_proof_module and empty_proof_bug_class are valid only with empty_proof_kind cell')
+    }
+    const id = args.empty_proof_id
+    if (id === undefined || id.trim().length === 0) {
+      throw new Error('empty_proof_kind hypothesis requires the empty_proof_id of a refuted hypothesis')
+    }
+    return { kind: 'hypothesis', hypothesisId: id }
+  }
+  if (args.empty_proof_id !== undefined) {
+    throw new Error('empty_proof_id is valid only with empty_proof_kind hypothesis')
+  }
+  const module = args.empty_proof_module
+  const bugClass = args.empty_proof_bug_class
+  if (module === undefined || module.trim().length === 0 || bugClass === undefined || bugClass.trim().length === 0) {
+    throw new Error('empty_proof_kind cell requires a non-empty empty_proof_module and empty_proof_bug_class')
+  }
+  return { kind: 'cell', module, bugClass }
 }

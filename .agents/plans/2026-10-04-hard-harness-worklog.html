@@ -696,6 +696,21 @@ but no package named "@deepseek-ai/dsh-hard-ledger" is present in the workspace<
   </table>
 </section>
 
+<section id="pr7-review-live">
+  <h2><span class="h2-index">14</span>PR7 review: cross-check fail-closed + đường inert end-to-end</h2>
+  <p class="intro">Section cập nhật realtime trong phiên review PR7 (2026-10-06). Phát hiện chính của user: bug pattern newline đã sửa, nhưng cơ chế che nó suốt hai PR thì còn nguyên — <code>2>/dev/null || true</code> trong auditCoverage nuốt mọi lỗi grep về exit 0, stdout rỗng → missed rỗng → cell PASS. Trong lúc 6/17 class mang pattern hỏng, cross-check của cả 6 bị tắt lặng lẽ mà không ai biết; e2e không bắt vì chỉ dùng cmdi.</p>
+  <table>
+    <thead><tr><th>Bước</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>auditCoverage fail-closed</td><td><span class="chip pass">xong</span></td><td>Bỏ mask; guard chung <code>assertGrepSettled(result, what, code)</code> (trích chung với screenModules sau khi jscpd bắt clone 7 dòng): chấp nhận exit 0/1, còn lại — lỗi, timeout, lẫn aborted — throw <code>HARD_VERIFIER_AUDIT_FAILED</code>. Chứng minh 17/17 pattern hiện tại sạch trên BSD grep nên happy path không đổi; e2e/snapshot giữ nguyên expect</td></tr>
+      <tr><td>Tool đánh suspicious khi audit lỗi</td><td><span class="chip pass">xong</span></td><td>hard_mark_coverage bắt đúng <code>AUDIT_FAILED</code>, mark cell về <code>suspicious</code> (fold last-write-wins thay thế clearance vừa ghi) rồi rethrow — bản ghi durable không giữ clearance mà cross-check không thể đánh giá; model vẫn thấy tool error</td></tr>
+      <tr><td>Đường inert chạy end-to-end</td><td><span class="chip pass">xong</span></td><td>Gợi ý đầu (docs/README.md) không tới matrix: PR7 B7 đưa <code>docs</code> vào DEFAULT_EXCLUDE_GLOBS — thư mục bị loại trước khi inert screening kịp thấy (refresh lộ qua commit sha đổi nhưng modules đứng yên). Đổi sang <code>notes/NOTES.md</code> (không phải README để tránh scope i18n pairing): armed mang <code>modules: [".","notes","src"]</code>, <code>inertModules: ["notes"]</code>; e2e assert chuỗi đầy đủ</td></tr>
+      <tr><td>JSDoc repo-scope lookup</td><td><span class="chip pass">xong</span></td><td>coverageProgress: class cấp repo được verdict một lần cho cả repo — <code>.some</code> cố ý bỏ qua module; ghi một câu để người sau không "sửa" nhầm. Generator catalog fold cả ba JSDoc/prose vào hard-harness.{md,zh.md} + config-catalog (chỉ lệch số dòng) + api-catalog; pairing re-record <code>--write</code></td></tr>
+      <tr><td>Gates cuối review</td><td><span class="chip pass">xong</span></td><td>hard specs 85/85 (4 packages sau refactor; 106/106 8 packages trước đó) + e2e 1/1 + refresh→replay snapshot xanh + doc-sync 42/42 + duplication 0 + lint 0/0 + typecheck 0 + pairing 877. Commit <code>ad48a45825</code> push lên fork. Suite e2e đầy đủ: 7 file fail nằm ngoài vùng chỉnh sửa (lớp lỗi môi trường đã biết — stagehand/browser)</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <div class="statusline">Cập nhật lần cuối bởi agent phiên 2026-10-06. Section PR2 live được sửa liên tục trong phiên làm việc; mỗi thay đổi có evidence kèm theo.</div>
 </main>
 </div>

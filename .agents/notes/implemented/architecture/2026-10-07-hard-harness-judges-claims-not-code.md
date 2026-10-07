@@ -42,5 +42,5 @@ The harness judges claims, not code. The model finds bugs; the harness refuses a
 - Fail-closed classification is strict: a root module with `package.json` or `.gitignore`, or a frontend module with `.css`, is unscreened, so batch screens are unavailable there and the model reads cells individually.
 - Missions over targets with vendored trees cost more; the cost is visible and the exclusion is one configured glob away.
 - Each audit is a cold-context reader run that does not share the mission agent's prompt cache, so the budget is explicit and conservative by default, and the plugin ships switched off.
-- A one-shot headless run exits when the mission agent idles, so audits still running stay requested until a resume restarts them.
+- A one-shot headless run exits when the mission agent idles, which lost every audit of the first pilot, so an idle mission agent with audits in flight holds its maintenance slot until they settle; audits therefore lengthen the mission's wall-clock time without changing what it sees.
 - Two directions remain: a worktree pinned at the commit for the reader, which removes drift from the measurement, and a binary track whose crash oracle the harness observes itself — the first structural path to a witness the harness sees rather than one the model writes.

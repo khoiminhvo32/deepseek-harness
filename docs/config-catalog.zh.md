@@ -1047,6 +1047,14 @@ export interface Config {
   auditTimeoutMinutes?: number
   /** Wall-clock budget of one workspace git check in seconds. */
   gitTimeoutSeconds?: number
+  /**
+   * Keep an idle mission agent busy until its pending audits settle. A
+   * one-shot headless run exits when the agent idles, so without the hold the
+   * last audits never record a result. The hold delays, never changes, what
+   * the mission agent sees: input that wakes it during the hold waits for the
+   * audits.
+   */
+  drainWhenIdle?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-audit -->

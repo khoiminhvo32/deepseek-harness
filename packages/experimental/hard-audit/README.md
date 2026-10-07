@@ -54,6 +54,7 @@ Run the mission from the target repository: the reader shares the mission agent'
 - **Checked after the fact.** Read tools can open any path, so blindness is verified from the reader's own log: every path argument of `read`, `read_image`, `glob`, `grep`, and `lsp` must resolve, through symlinks, inside the target and outside harness state (`.dsh/` and the DSH home). A path the reader's own earlier tool result named — its spill file — is allowed. A breach records `contaminated` and voids the measurement.
 - **Workspace checks before and after.** The reader shares the mission agent's working tree. A module holding a non-inert binary is `binary` without a reader. Untracked or modified files, or a commit after the pin, are `workspace-drift`, checked again after the reader settles because the mission agent keeps writing.
 - **Resolved reports only.** Every location or examined symbol must resolve at the pinned commit through the verifier's citation check, and at least one must lie in the audited cell; otherwise the result is `citation`.
+- **Held at idle.** When the mission agent goes idle with audits still queued or running, the plugin claims the agent's maintenance slot in the idle transition until they settle, so a one-shot headless run, which exits when the agent idles, records them first. Input that wakes the agent during the hold waits; nothing the mission agent sees changes. `drainWhenIdle: false` turns the hold off.
 - **Durable and resumable.** The `hardAudit` projection folds the latest verdict seq per cell, pending requests, and the charged budget. A resumed mission restarts pending audits; a request whose cell was marked again before its reader started settles as `superseded`.
 
 ### Source map
@@ -93,7 +94,7 @@ None for the mission agent; each reader builds its own prefix.
 
 - **Shadow mode only** — a flag does not reopen the cell or block completion yet; binding audits to the gate waits for measured cost and flag rates.
 - **Detection, not confinement** — the read tools stay unconfined, so a contaminated read is voided after it happened. Session logs configured to a non-hidden directory inside the target, which a pathless `grep` would search, are not detected.
-- **Headless exit** — a one-shot headless run exits when the mission agent goes idle; audits still running stay requested without a result until a resume.
+- **Held idle** — an idle mission agent waits for its audits, so audits can lengthen a mission's wall-clock time and an interactive user's next message waits behind them.
 - **Shared working tree** — the reader reads the live tree, so drift voids an audit instead of being read around; a worktree at the pinned commit would remove that.
 - **Binary modules** — the reader has no decompiler, so any module or repository-wide cell holding a non-inert binary is `binary`.
 - **Global mission sections** — the mission and deep-read system-prompt sections still reach the reader; they carry the objective, not claims.

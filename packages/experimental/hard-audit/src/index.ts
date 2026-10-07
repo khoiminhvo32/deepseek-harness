@@ -143,6 +143,14 @@ export interface Config {
   auditTimeoutMinutes?: number
   /** Wall-clock budget of one workspace git check in seconds. */
   gitTimeoutSeconds?: number
+  /**
+   * Keep an idle mission agent busy until its pending audits settle. A
+   * one-shot headless run exits when the agent idles, so without the hold the
+   * last audits never record a result. The hold delays, never changes, what
+   * the mission agent sees: input that wakes it during the hold waits for the
+   * audits.
+   */
+  drainWhenIdle?: boolean
 }
 
 /** Schemastery config for the audit plugin. */
@@ -161,6 +169,7 @@ export const Config: z<Config> = z.object({
   maxConcurrentAudits: z.number().step(1).min(1).max(8).default(DEFAULT_MAX_CONCURRENT_AUDITS),
   auditTimeoutMinutes: z.number().step(1).min(1).default(DEFAULT_AUDIT_TIMEOUT_MINUTES),
   gitTimeoutSeconds: z.number().step(1).min(1).default(DEFAULT_GIT_TIMEOUT_SECONDS),
+  drainWhenIdle: z.boolean().default(true),
 })
 
 /** Fully materialized audit inputs. */
@@ -174,6 +183,7 @@ interface ResolvedConfig {
   readonly maxConcurrentAudits: number
   readonly auditTimeoutMs: number
   readonly gitTimeoutMs: number
+  readonly drainWhenIdle: boolean
 }
 
 /** Validate one integer config field against its inclusive range. */
@@ -218,6 +228,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxConcurrentAudits: integerIn('maxConcurrentAudits', config.maxConcurrentAudits ?? DEFAULT_MAX_CONCURRENT_AUDITS, 1, 8),
     auditTimeoutMs: integerIn('auditTimeoutMinutes', config.auditTimeoutMinutes ?? DEFAULT_AUDIT_TIMEOUT_MINUTES, 1, unbounded) * 60_000,
     gitTimeoutMs: integerIn('gitTimeoutSeconds', config.gitTimeoutSeconds ?? DEFAULT_GIT_TIMEOUT_SECONDS, 1, unbounded) * 1_000,
+    drainWhenIdle: config.drainWhenIdle ?? true,
   }
 }
 
@@ -305,6 +316,34 @@ export function apply(ctx: Context, config: Config): void {
   const labeled = new Map<string, ReaderObservation>()
   /** Reader observations by child session id. */
   const readers = new Map<SessionId, ReaderObservation>()
+  /** Drains waiting for one mission agent's audits to settle. */
+  const drains = new Map<SessionId, (() => void)[]>()
+
+  /** Whether one mission agent still has a queued or running audit. */
+  function hasAudits(agentId: SessionId): boolean {
+    return queue.some(job => job.agentId === agentId) || [...running.values()].some(entry => entry.agentId === agentId)
+  }
+
+  /** Release every drain of one mission agent. */
+  function releaseDrains(agentId: SessionId): void {
+    for (const release of drains.get(agentId) ?? []) release()
+    drains.delete(agentId)
+  }
+
+  /** Release the drains of one mission agent once it has no audit left. */
+  function settleDrains(agentId: SessionId): void {
+    if (!hasAudits(agentId)) releaseDrains(agentId)
+  }
+
+  /** Resolve once the agent has no audit left, or when the hold is cancelled. */
+  function drain(agentId: SessionId, signal: AbortSignal): Promise<void> {
+    const settled = Promise.withResolvers<void>()
+    const release = (): void => { settled.resolve() }
+    drains.set(agentId, [...drains.get(agentId) ?? [], release])
+    signal.addEventListener('abort', release, { once: true })
+    settleDrains(agentId)
+    return settled.promise.finally(() => { signal.removeEventListener('abort', release) })
+  }
 
   ctx.effect(() => () => {
     for (const { controller } of running.values()) controller.abort(new Error('hard-audit disposed'))
@@ -537,6 +576,7 @@ export function apply(ctx: Context, config: Config): void {
         running.delete(key)
         known.delete(key)
         pump()
+        settleDrains(job.agentId)
       })
     }
   }
@@ -637,6 +677,17 @@ export function apply(ctx: Context, config: Config): void {
     for (const pending of auditState(agent).pending) enqueue({ agentId: agent.id, request: pending })
   })
 
+  ctx.on('agent/status', ({ agent, status }) => {
+    // Only a mission root ever has audits, so a delegated child is never held.
+    if (!resolved.drainWhenIdle || status !== 'idle' || !hasAudits(agent.id)) return
+    // Claimed in the idle transition itself, so a caller awaiting whenIdle() waits for the audits.
+    try {
+      void agent.runMaintenance(signal => drain(agent.id, signal))
+    } catch (error: unknown) {
+      ctx.logger.warn(`hard-audit: could not hold ${agent.id} for its audits: ${errorText(error)}`)
+    }
+  })
+
   ctx.on('agent/disposed', ({ agent }) => {
     for (let index = queue.length - 1; index >= 0; index -= 1) {
       const job = queue[index] as AuditJob
@@ -647,5 +698,6 @@ export function apply(ctx: Context, config: Config): void {
     for (const { agentId, controller } of running.values()) {
       if (agentId === agent.id) controller.abort(new Error('hard-audit: mission agent disposed'))
     }
+    releaseDrains(agent.id)
   })
 }

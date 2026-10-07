@@ -1,6 +1,7 @@
 /** Keyless end-to-end hard-profile run of the independent audit: the mission agent clears a
- * vulnerable cell, and a blind reader spawned through the shipped subagent provider reads the
- * module and flags it, recorded beside the clear. */
+ * vulnerable cell and stops at once, and a blind reader spawned through the shipped subagent
+ * provider reads the module and flags it, recorded beside the clear before the one-shot run
+ * exits. */
 
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
@@ -39,7 +40,7 @@ function records(content: string) {
 }
 
 describe('dsh --profile hard independent audit', () => {
-  it('has a blind reader re-read a sampled clear and records its flag beside the clear', async () => {
+  it('has a blind reader re-read a sampled clear and records its flag before the run exits', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-hard-audit-'))
     try {
       await mkdir(join(cwd, 'src'), { recursive: true })
@@ -73,7 +74,9 @@ describe('dsh --profile hard independent audit', () => {
         },
       }, undefined, 2) + '\n')
       // The cross-check is off so the wrong clear stands; every per-cell
-      // clear is audited, so the one clear is sampled.
+      // clear is audited, so the one clear is sampled. One goal round ends
+      // the mission while the slower reader still runs, so the result exists
+      // only because the idle mission agent holds for the audit.
       await writeFile(join(profileDir, 'cordis.patch.yml'), [
         '- id: hard-mission',
         '  config:',
@@ -81,6 +84,7 @@ describe('dsh --profile hard independent audit', () => {
         '    target:',
         `      repoPath: '${cwd}'`,
         '    bugClasses: [cmdi]',
+        '    maxGoalRounds: 1',
         '- id: hard-verifier',
         '  config:',
         '    coverageSpotCheckPercent: 0',

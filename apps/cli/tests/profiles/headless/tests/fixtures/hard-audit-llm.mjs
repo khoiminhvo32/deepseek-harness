@@ -1,12 +1,9 @@
-/** Deterministic keyless hard-audit adapter: the mission agent clears a cell wrongly and waits; the blind reader reads the module and flags it. */
+/** Deterministic keyless hard-audit adapter: the mission agent clears a cell wrongly and stops at once; the blind reader reads the module and flags it. */
 
 import { ToolCallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
 
 /** The mission agent's declared site; the reader's prompt must never carry it. */
 export const CLAIMED_SINK = 'src/reports.js:buildReport - the user parameter is quoted before it reaches execSync'
-
-/** The bash command the mission agent runs to wait for the shadow audit's result in its own session log. */
-export const WAIT_FOR_AUDIT = 'for i in $(seq 1 300); do grep -rqs \'"hard/audit/result"\' .dsh/sessions && exit 0; sleep 0.1; done; exit 1'
 
 let nextCall = 0
 
@@ -57,19 +54,22 @@ function reader(request) {
   })
 }
 
-/** The mission agent: clear the vulnerable cell, then wait for the shadow audit and stop. */
+/** The mission agent: clear the vulnerable cell, then stop without waiting for anything. */
 function mission(request) {
   const called = calledTools(request.messages)
   if (!called.includes('hard_mark_coverage')) {
     return toolChunks('hard_mark_coverage', { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: [CLAIMED_SINK] })
   }
-  if (!called.includes('bash')) return toolChunks('bash', { command: WAIT_FOR_AUDIT, description: 'Wait for the audit record' })
   return textChunks('The cell is cleared.')
 }
+
+/** How long each reader response takes, so the mission agent stops while the reader still runs. */
+const READER_LATENCY_MS = 1500
 
 class HardAuditFixtureAdapter extends LlmAdapter {
   async *stream(request) {
     const isReader = (request.tools ?? []).some(tool => tool.name === 'structured_output')
+    if (isReader) await new Promise(resolve => setTimeout(resolve, READER_LATENCY_MS))
     yield* isReader ? reader(request) : mission(request)
   }
 }

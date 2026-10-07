@@ -761,6 +761,81 @@ describe('hard-audit lifecycle', () => {
     expect(root.session.snapshotEvents().filter(event => event.type === 'hard/audit/result')).toEqual([])
   })
 
+  it('holds an idle mission agent until its audits settle, so a one-shot run records them', async () => {
+    const { ctx, root, subagents } = await harness()
+    const holds: Promise<unknown>[] = []
+    const cancel = new AbortController()
+    root.runMaintenance = (task) => {
+      const held = task(cancel.signal)
+      holds.push(held)
+      return held
+    }
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    subagents.scripts.push({ structured: CLEAN_SRC, during: () => gate })
+    clear(ctx, root, 'src')
+    await vi.waitFor(() => { expect(subagents.starts).toHaveLength(1) })
+    agentEvents(ctx, root).emit('agent/status', { status: 'running' })
+    expect(holds).toHaveLength(0)
+    agentEvents(ctx, root).emit('agent/status', { status: 'idle' })
+    expect(holds).toHaveLength(1)
+    let settled = false
+    void holds[0]?.then(() => { settled = true })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(settled).toBe(false)
+    release()
+    await vi.waitFor(() => { expect(settled).toBe(true) })
+    expect(root.session.snapshotEvents().filter(event => event.type === 'hard/audit/result')).toHaveLength(1)
+    // Nothing pending: an idle transition holds nothing.
+    agentEvents(ctx, root).emit('agent/status', { status: 'idle' })
+    expect(holds).toHaveLength(1)
+  })
+
+  it('releases the hold on cancellation or disposal, and never holds a busy agent or when switched off', async () => {
+    const { ctx, root, subagents } = await harness()
+    const signals: AbortController[] = []
+    const holds: Promise<unknown>[] = []
+    root.runMaintenance = (task) => {
+      const controller = new AbortController()
+      signals.push(controller)
+      const held = task(controller.signal)
+      holds.push(held)
+      return held
+    }
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    subagents.scripts.push({ structured: CLEAN_SRC, during: () => gate })
+    clear(ctx, root, 'src')
+    await vi.waitFor(() => { expect(subagents.starts).toHaveLength(1) })
+    agentEvents(ctx, root).emit('agent/status', { status: 'idle' })
+    signals[0]?.abort()
+    await holds[0]
+    agentEvents(ctx, root).emit('agent/status', { status: 'idle' })
+    agentEvents(ctx, root).emit('agent/disposed', {})
+    await holds[1]
+    // A hold another maintenance task already owns is reported, not raised.
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    root.runMaintenance = () => { throw new Error('agent already has active work') }
+    clear(ctx, root, 'lib')
+    await vi.waitFor(() => { expect(requests(root)).toHaveLength(2) })
+    agentEvents(ctx, root).emit('agent/status', { status: 'idle' })
+    expect(warn).toHaveBeenCalledWith(`hard-audit: could not hold ${root.id} for its audits: agent already has active work`)
+    release()
+
+    const off = await harness({ drainWhenIdle: false })
+    let offHeld = false
+    off.root.runMaintenance = (task) => { offHeld = true; return task(new AbortController().signal) }
+    let offRelease: () => void = () => {}
+    const offGate = new Promise<void>((resolve) => { offRelease = resolve })
+    off.subagents.scripts.push({ structured: CLEAN_SRC, during: () => offGate })
+    clear(off.ctx, off.root, 'src')
+    await vi.waitFor(() => { expect(off.subagents.starts).toHaveLength(1) })
+    agentEvents(off.ctx, off.root).emit('agent/status', { status: 'idle' })
+    expect(offHeld).toBe(false)
+    offRelease()
+    await results(off.root, 1)
+  })
+
   it('registers nothing when disabled and refuses invalid config', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

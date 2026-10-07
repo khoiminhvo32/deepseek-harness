@@ -1282,6 +1282,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['`HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.'],
       },
       {
+        signature: 'assertScreenableModules(agent: Agent, modules: readonly string[]): void',
+        description: 'Reject a batch screen over modules the coverage cross-check cannot screen. A batch clear rests only on a grep over the modules, and the grep is silent on a module holding a binary or a language the fixed pattern tables were not written for — so the shortcut is closed there and every cell needs an individual model read. Per-cell verdicts stay open on such modules; they surface as blind clears. Without an armed matrix, or on an arming record that predates the screenability field, every module passes.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the screenability record.' }, { name: 'modules', description: 'the module names a batch screen is about to clear.' }],
+        throws: ['`HARD_LEDGER_UNSCREENED_MODULE` naming the unscreened modules in the list.'],
+      },
+      {
         signature: 'recordSweep(agent: Agent, request: HardSweepSummaryData): void',
         description: 'Append one completed sweep summary. An empty sweep must cite verifiable evidence the ledger can check — a refuted hypothesis, a model-cleared cell with declared sinks, or a recorded flow document with resolvable citations; a harness-screened cell cannot prove a sweep did work. A sweep with findings carries no proof. The legacy free-text `emptyProof` is only read from older logs; new records carry `emptyProofRef` or `emptyProofFlowDoc`.',
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the sweep phase, counters, and conditional empty proof.' }],
@@ -1365,9 +1371,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'coverageBySource(agent: Agent): CoverageBySource',
-        description: 'Verdicted matrix cells partitioned by who decided them: the model\'s own reads, batch clears the harness grep confirmed, and the purely mechanical inert-module screen. A cell carrying no source reads as `model`, so older logs partition unchanged. The math lives in `coverageBySourceFromState` — the same function the pilot report reads after folding the log.',
+        description: 'Verdicted matrix cells partitioned by who decided them: the model\'s own reads, batch screens the model cleared without reading, and every harness decision. A cell carrying no source reads as `model`, so older logs partition unchanged. The math lives in `coverageBySourceFromState` — the same function the pilot report reads after folding the log.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'the three counts; all zero without a matrix.',
+      },
+      {
+        signature: 'blindClears(agent: Agent): number',
+        description: 'Model-cleared module-scoped matrix cells in modules the coverage cross-check cannot screen, where nothing but the model\'s own read stands behind the verdict. The math lives in `blindClearsFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the blind-clear count; zero without a screenability record.',
       },
       {
         signature: 'openWork(agent: Agent): string[]',
@@ -1404,7 +1416,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>',
-        description: 'Mechanical absence screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD coverage, never subtract — a narrow pattern choice cannot sneak past the harness table. An empty grep on every module proves the absence predicate; any match fails the whole batch and returns the matching lines as evidence for a manual read. The pattern table follows the class\'s reading: guarded-surface classes grep for the exported operations (zero matches = no exported surface), sink classes grep for the sink shapes, and the one remaining absence-shaped class (`login-bypass`) is refused — for its protective sinks an empty grep is suspicious, not clean.',
+        description: 'Mechanical screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD matches, never subtract — a narrow pattern choice cannot sneak past the harness table. Any match fails the whole batch and returns the matching lines as evidence for a manual read. An empty grep is silence, not proof of absence: the caller records the cells as a batch screen, the weakest model tier, and refuses modules the tables cannot screen before this runs. The pattern table follows the class\'s reading: guarded-surface classes grep for the exported operations, sink classes grep for the sink shapes, and the one remaining absence-shaped class (`login-bypass`) is refused — for its protective sinks an empty grep is suspicious, not clean.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'bugClass', description: 'the bug class to prove absent.' }, { name: 'modules', description: 'the target-repo-relative modules to grep.' }, { name: 'patterns', description: 'the model\'s own extended-regex absence patterns.' }],
         returns: '`clean: true` when every grep came back empty, else `clean: false` with the bounded matching lines.',
         throws: ['when the class is absence-shaped or has no fixed patterns, the grep errors, or no matrix is armed.'],
@@ -5651,8 +5663,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardLedgerProjectionState = zod.infer<typeof hardLedgerStateSchema>;',
   },
   {
+    name: 'HardMatrixExclusions',
+    declaration: 'export interface HardMatrixExclusions {\n    readonly globs: readonly string[];\n    readonly fileCount: number;\n    readonly sample: readonly string[];\n}',
+  },
+  {
     name: 'HardMissionArmedData',
-    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly goalId?: string;\n}',
+    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly unscreenedModules?: readonly string[];\n    readonly exclusions?: HardMatrixExclusions;\n    readonly ignoredEntryCount?: number;\n    readonly goalId?: string;\n}',
   },
   {
     name: 'HardSweepSummaryData',

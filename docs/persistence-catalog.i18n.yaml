@@ -9,8 +9,8 @@
   en: e7c80d1de4d328b4
   zh: d9f368c27fd9f998
 /session-persistence-event-catalog/persistence-type-fingerprints:
-  en: db663fa8b52e31a7
-  zh: e59d6a50034b13f0
+  en: fe481fa07309be71
+  zh: ffd229f2e7f370b0
 /session-persistence-event-catalog/event-envelope:
   en: 7ebb1a2e0dd1f916
   zh: 8946f415dda5c1b8
@@ -1185,35 +1185,38 @@
   en: c315ea493032f390
   zh: c8755305baf047b1
 /session-persistence-event-catalog/resolved-persistence-types/hardcoveragecelldata:
-  en: 36830c7612ef43b8
-  zh: ed9e6104eb467b8a
+  en: 9fa08ac3f6a2b089
+  zh: f97a9a73aa1d9abf
 /session-persistence-event-catalog/resolved-persistence-types/hardcoverageverdict:
   en: 459d178f9776fab5
   zh: 9944ee45b09bf048
 /session-persistence-event-catalog/resolved-persistence-types/hardfindingproposeddata:
-  en: a33f70973bcf2194
-  zh: 51d59a5d67364ccd
+  en: 8ec6725e3c91271f
+  zh: c182fa82914a0fbf
 /session-persistence-event-catalog/resolved-persistence-types/hardfindingverdictdata:
-  en: 9364672de50e6fec
-  zh: 6199f047cb700e7e
+  en: e09f4eac694a6b11
+  zh: 2d7fb64bfd8546c4
 /session-persistence-event-catalog/resolved-persistence-types/hardflowdocdata:
-  en: 7993abdc7f5fbd39
-  zh: 8718f086e12d217f
+  en: 05aa7fee11b6d384
+  zh: 419c08c0422edee3
 /session-persistence-event-catalog/resolved-persistence-types/hardflowdocsections:
-  en: 07950a4f044f2a64
-  zh: f781c29d375d01ed
+  en: 3ead5afbea1d71a2
+  zh: 5148560227e9d6ea
 /session-persistence-event-catalog/resolved-persistence-types/hardgatedecisiondata:
-  en: 3c0421c3cbacaf50
-  zh: a8f6f8c808e229e0
+  en: 313cc3dea3efe09d
+  zh: c46a7908af04017c
 /session-persistence-event-catalog/resolved-persistence-types/hardhypothesisstatedata:
-  en: d6a1ad63cd227c41
-  zh: 41e5dc7efd1ffc81
+  en: 8d407a4005d75cee
+  zh: 4b2b9bb3a8da2df6
 /session-persistence-event-catalog/resolved-persistence-types/hardhypothesisstatus:
-  en: 1ed054d34c1a463b
-  zh: 0eb62984b2d7651a
+  en: ae555712e6109dae
+  zh: eaa218be21868ef6
+/session-persistence-event-catalog/resolved-persistence-types/hardmatrixexclusions:
+  en: 20f2ac7dc7fb3ab3
+  zh: 20a800c655fb2edd
 /session-persistence-event-catalog/resolved-persistence-types/hardmissionarmeddata:
-  en: 4df05ea8834bb32b
-  zh: f4355719966fc2ec
+  en: 4a908dd008066348
+  zh: e37e6acec4ddf716
 /session-persistence-event-catalog/resolved-persistence-types/hardroundenddata:
   en: bcedcb63c1b3a2da
   zh: cc22e5f5dcc69352
@@ -1236,8 +1239,8 @@
   en: 96f7f73ea7762cc2
   zh: 70fe079128cb8201
 /session-persistence-event-catalog/resolved-persistence-types/hardsweepsummarydata:
-  en: e3a346917ae0aa01
-  zh: 1ebaf71c9a148915
+  en: 1b2c1f76abd06e37
+  zh: 7944c5daea4a1181
 /session-persistence-event-catalog/resolved-persistence-types/hardverdict:
   en: 1f3125f826fcd84c
   zh: 17250bfc7800af48
@@ -1602,11 +1605,11 @@
   en: a117573a5d58cb3c
   zh: d5ad59e17a3a815d
 /session-persistence-event-catalog/resolved-persistence-types/arguments-callid-name-step:
-  en: 37b15b3f9d32b9b4
-  zh: aaeac30823508256
-/session-persistence-event-catalog/resolved-persistence-types/bysource-total-verdicted:
-  en: afdcd591e244b796
-  zh: 6dab31c1cd03d262
+  en: 3ec98f3e28a521ec
+  zh: 044d8dd4fd7f5edb
+/session-persistence-event-catalog/resolved-persistence-types/blindclears-bysource-excludedfilecount-total:
+  en: 45b5442f1023a77e
+  zh: 4c7b812f8c5fd0df
 /session-persistence-event-catalog/resolved-persistence-types/callid-files-turn:
   en: 5f4d3f66ed86a14d
   zh: 7c729360fa1279e6
@@ -1653,8 +1656,8 @@
   en: b7c3ec1cc9ba09ad
   zh: 409033c12898f8cb
 /session-persistence-event-catalog/resolved-persistence-types/confirmed-flaky-pending-refuted:
-  en: 9c067832ffafe134
-  zh: 6fdd386a2c2a96b6
+  en: 5b76806b050025a9
+  zh: 290f164c3218ba44
 /session-persistence-event-catalog/resolved-persistence-types/decision-durationms-exitcode-handlerid:
   en: ed8ca43bb7622393
   zh: 697e1ccbe9439aa9
@@ -1692,8 +1695,8 @@
   en: 24b255fad71fa21c
   zh: 9cedbd538af06ef2
 /session-persistence-event-catalog/resolved-persistence-types/harness-model-modelverified:
-  en: 43588853a7044f8c
-  zh: fe87c542472b0ae3
+  en: 05bc346d2ce52fa3
+  zh: 89a7f978ebb09698
 /session-persistence-event-catalog/resolved-persistence-types/header-reason-startsseries:
   en: edc4f60aa67aecd1
   zh: 4eb69d5098c1a856
@@ -1731,8 +1734,8 @@
   en: 80fbfa82f97978bb
   zh: 93bc3518ec21088d
 /session-persistence-event-catalog/resolved-persistence-types/kind-cell:
-  en: c0712771d6b707fc
-  zh: 5bafef13eaa3d9c4
+  en: cb940aa107200712
+  zh: c563a6d969ef2182
 /session-persistence-event-catalog/resolved-persistence-types/kind-completed:
   en: 2f3ffb879c568b64
   zh: ffc7d0f2b64494fc
@@ -1899,8 +1902,8 @@
   en: e7f20ecc0764b343
   zh: b04eb75ebba8836d
 /session-persistence-event-catalog/resolved-persistence-types/kind-hypothesis:
-  en: aadf26336785bc41
-  zh: 5a2538e1274f3510
+  en: 5783571b6c4d0587
+  zh: bbd52b8f2206846a
 /session-persistence-event-catalog/resolved-persistence-types/kind-interrupted:
   en: 9e87f168b322c617
   zh: bf81e0aa69f46c08
@@ -2166,8 +2169,8 @@
   en: 11a2342abb706737
   zh: 3be74af3ca92e524
 /session-persistence-event-catalog/resolved-persistence-types/open-resolved:
-  en: 55381ef9969f1383
-  zh: e31e5928deba01d1
+  en: 749fc3b0f83465b0
+  zh: 6475017beba554ff
 /session-persistence-event-catalog/resolved-persistence-types/policy-source:
   en: 00f1d435f82d2753
   zh: c2ab108ad2748a6c
@@ -2283,17 +2286,17 @@
   en: d0941e844bba5d1b
   zh: bc45e74c5627fecf
 /session-persistence-event-catalog/resolved-persistence-types/type-hard-flow-doc:
-  en: 771477d983bf8a20
-  zh: 8492a7830c9275d8
+  en: a2b04efebeddf1c5
+  zh: 9d41386d88986901
 /session-persistence-event-catalog/resolved-persistence-types/type-hard-gate-decision:
-  en: 14c24e0a23f97329
-  zh: 2ecdee85ed1f2fda
+  en: 6c1b8b0764b6adf5
+  zh: 74b8c7c9c0b699fa
 /session-persistence-event-catalog/resolved-persistence-types/type-hard-hypothesis-state:
-  en: b36af11c83e1e8d3
-  zh: c44adb7a4f46c299
+  en: 466091c0b62fc4b7
+  zh: ad48babed2cbc87d
 /session-persistence-event-catalog/resolved-persistence-types/type-hard-mission-armed:
-  en: ffc8ff2efb7c220e
-  zh: b2496ce3ed58de2b
+  en: eb9f9d95ee04ef54
+  zh: 75ef7df7f64e6272
 /session-persistence-event-catalog/resolved-persistence-types/type-hard-round-end:
   en: 2a7d2a50bf72a822
   zh: ab921e35c886639f

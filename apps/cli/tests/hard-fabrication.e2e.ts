@@ -63,8 +63,7 @@ describe('dsh --profile hard fabrication traps', () => {
       await writeFile(join(cwd, 'src', 'session.js'), SESSION_SOURCE)
       // One notes-only module so the full inert chain runs for real: arming
       // enumerates it, the ledger pre-verdicts its cells, and openWork never
-      // lists them. Not named docs — the default exclude globs drop that
-      // directory from the matrix before inert screening ever sees it.
+      // lists them.
       await mkdir(join(cwd, 'notes'), { recursive: true })
       await writeFile(join(cwd, 'notes', 'NOTES.md'), '# Hard target\n\nNotes only; this module screens inert in the coverage matrix.\n')
       // The target is a real git repository so the mission pins the commit and
@@ -165,6 +164,9 @@ describe('dsh --profile hard fabrication traps', () => {
         modules: string[]
         bugClasses: string[]
         inertModules?: string[]
+        unscreenedModules?: string[]
+        exclusions?: unknown
+        ignoredEntryCount?: number
       } | undefined
       expect(armed).toBeDefined()
       expect(armed?.targetRepo).toBe(cwd)
@@ -174,6 +176,13 @@ describe('dsh --profile hard fabrication traps', () => {
       // The notes module holds only Markdown, so it screens inert; the src
       // files are all JavaScript and stay in the work surface.
       expect(armed?.inertModules).toEqual(['notes'])
+      // Every code file is JavaScript, which the fixed pattern tables cover, so
+      // the cross-check can screen every module; nothing is excluded by
+      // default, and the harness's own `.dsh/` state is not drift or an
+      // ignored target entry.
+      expect(armed?.unscreenedModules).toEqual([])
+      expect(armed?.exclusions).toBeUndefined()
+      expect(armed?.ignoredEntryCount).toBe(0)
       // The stop gate steered the premature clean claim back to work.
       const steerings = sessionFiles.filter(event => event.type === 'user/message')
         .filter((event) => {

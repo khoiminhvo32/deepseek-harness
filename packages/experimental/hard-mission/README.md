@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the configured target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, and route completion through the goal tools; every PoC must fail under a benign payload (the specificity check). Arming resolves the target commit to its full sha, enumerates the tracked modules into the deterministic coverage matrix, screens out modules whose every file carries a non-executable extension, and appends the `hard/mission/armed` session event once; only fresh root agents arm on `startup`.
+`dsh-experimental-hard-mission` arms the configured objective as a durable session goal, pins the target repository, and registers the `hard:mission` system-prompt section that teaches the mission contract: keep working across turns, alternate systematic and deep-reading passes, route completion through the goal tools, and make every PoC fail under a benign payload (the specificity check). Arming enumerates every file the pinned commit tracks into the coverage matrix, records inert and unscreened modules, and appends `hard/mission/armed` once; only fresh root agents arm on `startup`, over a working tree that matches the commit.
 
 ## Table of Contents
 
@@ -37,14 +37,18 @@ Mount the plugin beside the goal service when a deployment owns one long-lived o
       repoPath: /abs/path/to/target-repo
       commit: HEAD
       moduleDepth: 2
-      excludeGlobs: ['node_modules/**', 'vendor/**', 'dist/**', 'build/**']
+      excludeGlobs: []   # empty by default; an exclusion is recorded and reported
 ```
 
-`target.repoPath` is required and must be absolute. At load the plugin resolves `target.commit` (default `HEAD`) through `git rev-parse`, lists the tracked files with `git ls-files` — so `.gitignore` is respected for free and the enumeration is tied to the pinned commit — filters them through `target.excludeGlobs` (root-anchored globs), and groups the survivors by their first `target.moduleDepth` (default 2) directory segments; a repository-root file becomes the module `.`. Zero surviving modules or more than 500 modules fail the load; lower `moduleDepth` or exclude more trees in the latter case. The result is sorted and deduplicated, so re-arming over the same commit reproduces the identical matrix, and the ledger serves it as the coverage denominator.
+`target.repoPath` is required and must be absolute. At load the plugin resolves `target.commit` (default `HEAD`) through `git rev-parse` and lists the files that commit tracks — a numstat diff of its tree against the empty tree, which also marks binary content — so the enumeration is tied to the pinned commit, not the index or the working tree. It filters them through `target.excludeGlobs` (root-anchored globs, empty by default) and groups the survivors by their first `target.moduleDepth` (default 2) directory segments; a repository-root file becomes the module `.`. Zero surviving modules or more than 500 modules fail the load; in the latter case lower `moduleDepth` so modules group coarser — the harness never advises dropping code to fit. The result is sorted and deduplicated, so re-arming over the same commit reproduces the identical matrix, and the ledger serves it as the coverage denominator.
 
-The default `excludeGlobs` also skip the usual non-source trees (`.git`, `docs`, `doc`, `locales`, `i18n`, `assets`, `fixtures`, `testdata`, `__snapshots__`, and minified bundles), but the defaults are a starting point, not a promise: **you must tune `excludeGlobs` to the target repository.** A wrong denominator silently skews both the coverage matrix and every completion decision built on it.
+Nothing is excluded by default: vendored libraries, built bundles, and translation catalogs ship to production too, so the harness audits every file the pinned commit tracks. An exclusion is the deployment's explicit decision, and the armed event records it — the applied globs, the excluded tracked-file count, and a bounded sample — so the report and the panel state what the coverage ratio leaves out. **Auditing a large `vendor/` tree multiplies the cost of a mission;** excluding it is a legitimate choice, but never a silent one.
 
-After grouping, every module whose every tracked file carries one of the inert extensions (`.md`, `.markdown`, `.txt`, `.rst`, the raster and font binaries, and the gettext catalogs) is recorded in the armed event's `inertModules` and needs no module-class coverage. The list is deliberately conservative: an unknown extension counts as code, `.svg` stays code (it can carry `<script>`), configuration and template formats stay code, and extensionless files (Dockerfile, Makefile) stay code — so the screen can only under-screen, never dismiss a module that holds a surface. When every module screens inert the load fails: `target has no code modules`.
+After grouping, every module whose every tracked file carries one of the inert extensions (`.md`, `.markdown`, `.txt`, `.rst`, and the raster and font binaries) is recorded in the armed event's `inertModules` and needs no module-class coverage. The list is deliberately conservative: an unknown extension counts as code, `.svg` stays code (it can carry `<script>`), configuration and template formats stay code, gettext catalogs stay code (a translation echoed unescaped into a page is an XSS vector), and extensionless files (Dockerfile, Makefile) stay code — so the screen can only under-screen, never dismiss a module that holds a surface. When every module screens inert the load fails: `target has no code modules`.
+
+Every non-inert module that holds a tracked binary — whatever its extension, because the cross-check's `grep -I` skips binary content — or a tracked file whose extension the verifier's fixed pattern tables were not written for (`SCREENED_EXTENSIONS`: the JavaScript and TypeScript family, Python, and Java) is recorded in `unscreenedModules`. The cross-check grep is silent on such a module, so it neither re-opens nor supports a clear there: a batch clear is refused, and the model's own clear stands as a blind clear that the report and the panel count.
+
+The working tree must match the pinned commit when a goal first arms, because the model reads and runs the working tree while the matrix and every citation resolve against the commit. The first arming of a fresh root agent fails — rejecting its creation before any goal exists — when a tracked file differs from the commit or an untracked, unignored file exists, and names the bounded set of paths. Paths under the harness's own state directories (the project-local `.dsh/` and a DSH home placed inside the target) are not drift, and ignored entries are counted into the armed event's `ignoredEntryCount`. Loading never fails on drift, so a resumed session still loads over the files its own run created.
 
 `bugClasses` defaults to the systematic-pass list of every OWASP Top 10 class with mechanical source-to-sink semantics (sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race); an empty list removes the class list from the contract. Insecure design and security logging have no mechanical source-sink pair and stay in the deep-reading pass. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-mission) is the exhaustive source for every accepted field.
 
@@ -59,7 +63,8 @@ After grouping, every module whose every tracked file carries one of the inert e
 ### Design
 
 - **Arming at creation.** The plugin listens on `agent/created` and arms a goal through `ctx.goals.create` only when the source is `startup`, the agent is a registry root, and no goal is current. Every other source, child agent, or existing goal is left untouched, so the goal service's restore-and-disarm policy for persisted sessions stays authoritative.
-- **Target pinning at load.** Before any agent exists, `apply` resolves the target commit and enumerates the coverage matrix through the shell seam (`git rev-parse`, then `git ls-files`), so a misconfigured target — missing repository, unresolvable commit, no surviving module, or an oversized matrix — fails the load instead of arming a mission without a denominator. The matrix rides the additive `hard/mission/armed` session event the ledger folds.
+- **Target pinning at load.** Before any agent exists, `apply` resolves the target commit and enumerates the coverage matrix through the shell seam (`git rev-parse`, then a numstat diff of the commit's tree with external diff drivers and textconv off), so a misconfigured target — missing repository, unresolvable commit, no surviving module, or an oversized matrix — fails the load instead of arming a mission without a denominator. The matrix rides the additive `hard/mission/armed` session event the ledger folds.
+- **Drift refusal at first arming.** The same load measures working-tree drift but does not fail on it; the `agent/created` listener throws for a fresh root over a drifted tree, and the agent loop's direct announce turns that into a failed creation. A resumed session never re-checks.
 - **One contract section.** The `hard:mission` section renders the objective, the systematic-pass class list, and the deep-reading cadence from the resolved config. It is static text: it changes only when the deployment configuration changes.
 
 ### Source map
@@ -67,7 +72,7 @@ After grouping, every module whose every tracked file carries one of the inert e
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: config, contract rendering, section registration, startup arming, target pinning |
-| [`src/modules.ts`](src/modules.ts) | Pure module grouping and exclusion-glob filtering over tracked paths |
+| [`src/modules.ts`](src/modules.ts) | Pure module grouping, exclusion-glob filtering, and the inert and unscreened classifications over tracked paths |
 
 </details>
 

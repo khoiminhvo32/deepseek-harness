@@ -14,7 +14,9 @@
  * Deliberately NOT inert, and why: `.svg` can carry `<script>` and is a real
  * XSS vector; `.html`, `.json`, `.yml`, `.yaml`, and `.toml` are
  * configuration and template surface; `.csv` is a formula-injection vector;
- * `.lock` is the very surface of the dependencies class; and extensionless
+ * `.lock` is the very surface of the dependencies class; gettext catalogs
+ * (`.po`, `.pot`, `.mo`) feed translated strings into rendered pages, where
+ * an unescaped echo of a translation is an XSS vector; and extensionless
  * files (Dockerfile, Makefile) are code.
  */
 export const INERT_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -33,10 +35,28 @@ export const INERT_EXTENSIONS: ReadonlySet<string> = new Set([
   '.ttf',
   '.otf',
   '.eot',
-  '.po',
-  '.pot',
-  '.mo',
 ])
+
+/** One tracked file at the pinned commit, with git's binary classification. */
+export interface TrackedFile {
+  /** Repo-relative, forward-slash path. */
+  readonly path: string
+  /** Whether git classifies the content as binary — what `grep -I` skips. */
+  readonly binary: boolean
+}
+
+/**
+ * The lowercase extension of one path's basename, or `''` when the basename
+ * has none. A leading dot alone (`.gitignore`) is a name, not an extension,
+ * and a dotted directory never lends its dot to an extensionless file.
+ * @param path - a repo-relative, forward-slash path.
+ * @returns the extension including its dot, or the empty string.
+ */
+export function extensionOf(path: string): string {
+  const name = path.slice(path.lastIndexOf('/') + 1)
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(dot).toLowerCase() : ''
+}
 
 /**
  * The coverage module one tracked file belongs to: the first `moduleDepth`
@@ -91,13 +111,39 @@ export function inertModulesFromPaths(
   }
   const inert: string[] = []
   for (const [module, files] of filesByModule) {
-    const everyFileInert = files.length > 0 && files.every((file) => {
-      const dot = file.lastIndexOf('.')
-      return dot > 0 && inertExtensions.has(file.slice(dot).toLowerCase())
-    })
+    const everyFileInert = files.length > 0 && files.every(file => inertExtensions.has(extensionOf(file)))
     if (everyFileInert) inert.push(module)
   }
   return inert.sort()
+}
+
+/**
+ * The modules the coverage cross-check cannot screen: any module holding a
+ * tracked file that is neither inert nor screenable — a binary (whatever its
+ * extension, because `grep -I` skips it by content), or a code file whose
+ * extension the fixed pattern tables were not written for. One such file is
+ * enough; a module mixing a covered language with an uncovered one is
+ * unscreened. An inert-only module is never listed. The result is sorted and
+ * deduplicated.
+ * @param files - the tracked files at the pinned commit with their binary classification.
+ * @param moduleDepth - directory segments per module, 1 through 6.
+ * @param inertExtensions - extensions that cannot carry executable code.
+ * @param screenedExtensions - extensions the fixed pattern tables were written for.
+ * @returns the sorted, deduplicated unscreened module names.
+ */
+export function unscreenedModulesFromFiles(
+  files: readonly TrackedFile[],
+  moduleDepth: number,
+  inertExtensions: ReadonlySet<string>,
+  screenedExtensions: ReadonlySet<string>,
+): readonly string[] {
+  const unscreened = new Set<string>()
+  for (const file of files) {
+    const extension = extensionOf(file.path)
+    if (inertExtensions.has(extension)) continue
+    if (file.binary || !screenedExtensions.has(extension)) unscreened.add(moduleOfPath(file.path, moduleDepth))
+  }
+  return [...unscreened].sort()
 }
 
 /**

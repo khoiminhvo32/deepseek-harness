@@ -10,6 +10,7 @@
 import { z as zod } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import {
+  blindClearsFromState,
   completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
@@ -119,6 +120,13 @@ const matrixSchema = zod.object({
   targetRepo: zod.string().min(1),
   commit: zod.string().regex(/^[0-9a-f]{40}$|^[0-9a-f]{64}$/u),
   inertModules: zod.array(zod.string().min(1)).optional(),
+  unscreenedModules: zod.array(zod.string().min(1)).optional(),
+  exclusions: zod.object({
+    globs: zod.array(zod.string().min(1)),
+    fileCount: zod.number().int().min(0),
+    sample: zod.array(zod.string().min(1)),
+  }).optional(),
+  ignoredEntryCount: zod.number().int().min(0).optional(),
 })
 
 /** Validates persisted projection state before it seeds a fold. */
@@ -192,6 +200,15 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
           targetRepo: event.data.targetRepo,
           commit: event.data.commit,
           ...(event.data.inertModules === undefined ? {} : { inertModules: [...event.data.inertModules] }),
+          ...(event.data.unscreenedModules === undefined ? {} : { unscreenedModules: [...event.data.unscreenedModules] }),
+          ...(event.data.exclusions === undefined ? {} : {
+            exclusions: {
+              globs: [...event.data.exclusions.globs],
+              fileCount: event.data.exclusions.fileCount,
+              sample: [...event.data.exclusions.sample],
+            },
+          }),
+          ...(event.data.ignoredEntryCount === undefined ? {} : { ignoredEntryCount: event.data.ignoredEntryCount }),
         },
       }
     default:
@@ -226,6 +243,11 @@ const clientViewSchema = zod.object({
     bugClasses: zod.array(zod.string()),
     classScopes: zod.record(zod.string(), zod.enum(['module', 'repo'])),
     inertModules: zod.array(zod.string()).optional(),
+    unscreenedModules: zod.array(zod.string()).optional(),
+    exclusions: zod.object({
+      globs: zod.array(zod.string()),
+      fileCount: zod.number().int().min(0),
+    }).optional(),
     targetRepo: zod.string(),
     commit: zod.string(),
   }).optional(),
@@ -244,6 +266,7 @@ const clientViewSchema = zod.object({
     modelVerified: zod.number().int().min(0),
     harness: zod.number().int().min(0),
   }),
+  blindClears: zod.number().int().min(0),
   gate: zod.object({
     complete: zod.boolean(),
     blockers: zod.array(zod.string()),
@@ -267,6 +290,10 @@ function buildHardLedgerView(state: HardLedgerProjectionState, thresholds: Ledge
         bugClasses: [...matrix.bugClasses],
         classScopes: Object.fromEntries(matrix.bugClasses.map(bugClass => [bugClass, classScope(bugClass)])),
         ...(matrix.inertModules === undefined ? {} : { inertModules: [...matrix.inertModules] }),
+        ...(matrix.unscreenedModules === undefined ? {} : { unscreenedModules: [...matrix.unscreenedModules] }),
+        ...(matrix.exclusions === undefined ? {} : {
+          exclusions: { globs: [...matrix.exclusions.globs], fileCount: matrix.exclusions.fileCount },
+        }),
         targetRepo: matrix.targetRepo,
         commit: matrix.commit,
       },
@@ -279,6 +306,7 @@ function buildHardLedgerView(state: HardLedgerProjectionState, thresholds: Ledge
     })),
     progress: coverageProgressFromState(state),
     bySource: coverageBySourceFromState(state),
+    blindClears: blindClearsFromState(state),
     gate: completionAssessmentFromState(state, thresholds),
   }
 }

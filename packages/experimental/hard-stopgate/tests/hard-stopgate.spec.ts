@@ -18,6 +18,7 @@ import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as hardStopgate from '@deepseek-ai/dsh-experimental-hard-stopgate'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardMissionArmedData } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { hardStandbyProjectionDefinition } from '@deepseek-ai/dsh-experimental-hard-standby'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
@@ -117,7 +118,12 @@ function openTurn(stub: StubAgent, text = 'prompt'): void {
 }
 
 /** Arm the harness goal the gate keys on: a goal plus its ledger arming record. */
-function armGoal(ctx: Context, agent: Agent, objective: string): GoalRef {
+function armGoal(
+  ctx: Context,
+  agent: Agent,
+  objective: string,
+  matrix: Partial<Pick<HardMissionArmedData, 'modules' | 'unscreenedModules' | 'exclusions'>> = {},
+): GoalRef {
   const goal = ctx.goals.create(agent, { objective, maxGoalRounds: 9 })
   ctx.hardLedger.recordMissionArmed(agent, {
     objective,
@@ -126,6 +132,7 @@ function armGoal(ctx: Context, agent: Agent, objective: string): GoalRef {
     modules: ['src'],
     bugClasses: ['cmdi'],
     goalId: goal.id,
+    ...matrix,
   })
   return { id: goal.id, revision: goal.revision }
 }
@@ -324,6 +331,33 @@ describe('hard stopgate completion gate', () => {
       emptySweeps: 1,
       blockers: [],
     })
+  })
+
+  it('records blind clears and the configured exclusion count beside the coverage ratio', async () => {
+    const { ctx, root } = await harness({}, { tools: true })
+    const ref = armGoal(ctx, root.agent, 'find bugs', {
+      modules: ['src', 'wp'],
+      unscreenedModules: ['wp'],
+      exclusions: { globs: ['vendor/**'], fileCount: 3, sample: ['vendor/a.php', 'vendor/b.php', 'vendor/c.php'] },
+    })
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'wp', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/ajax.php:my_delete_item'],
+    })
+    openTurn(root)
+    await execute(ctx, 'update_goal', { goal_id: ref.id, revision: ref.revision, action: 'complete' }, root.agent)
+    const decisions = root.session.snapshotEvents().filter(event => event.type === 'hard/gate/decision')
+    expect(decisions[0]?.data).toMatchObject({
+      decision: 'deny',
+      coverage: { verdicted: 1, total: 2, blindClears: 1, excludedFileCount: 3 },
+    })
+    // Without exclusions the count is absent, not zero: nothing was left out.
+    const plain = await harness({}, { tools: true })
+    const plainRef = armGoal(plain.ctx, plain.root.agent, 'find bugs')
+    openTurn(plain.root)
+    await execute(plain.ctx, 'update_goal', { goal_id: plainRef.id, revision: plainRef.revision, action: 'complete' }, plain.root.agent)
+    const plainDecision = plain.root.session.snapshotEvents().find(event => event.type === 'hard/gate/decision')
+    expect(plainDecision?.data).toMatchObject({ coverage: { blindClears: 0 } })
+    expect((plainDecision?.data as { coverage: Record<string, unknown> }).coverage).not.toHaveProperty('excludedFileCount')
   })
 
   it('denies again when the gate still blocks after a first attempt', async () => {

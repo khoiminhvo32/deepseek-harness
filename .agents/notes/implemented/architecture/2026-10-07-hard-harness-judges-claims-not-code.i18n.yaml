@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-07-hard-harness-judges-claims-not-code.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-07-hard-harness-judges-claims-not-code.md
+/agent-note-the-hard-harness-judges-claims-not-code:
+  en: 29d778b9f6357116
+  zh: 65e353863d8b5fa9
+/agent-note-the-hard-harness-judges-claims-not-code/problem:
+  en: 19000a6c54c7d4f0
+  zh: 31b6555f14f5443b
+/agent-note-the-hard-harness-judges-claims-not-code/decision:
+  en: 6d75d7407c387f16
+  zh: 99b74be7c4c14258
+/agent-note-the-hard-harness-judges-claims-not-code/alternatives-considered:
+  en: de51425356fefe88
+  zh: 983551fe75b8e2b2
+/agent-note-the-hard-harness-judges-claims-not-code/consequences:
+  en: fdfd38d9c81c3537
+  zh: eb9378563a1f32ef

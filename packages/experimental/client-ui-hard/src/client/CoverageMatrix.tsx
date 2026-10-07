@@ -3,8 +3,10 @@
  * grid, the coverage ratio, the target, and the completion gate's state. Each
  * cell shows two facts in its face — the verdict and who decided it — because
  * a machine-screened clear is a different claim from a model's own read.
- * Repository-scoped classes sweep the repo as a whole, so they render as one
- * strip cell instead of one per module.
+ * A mark overlays the face rather than adding a color: a model clear in a
+ * module the harness cannot screen carries the blind mark, because nothing
+ * but that read stands behind it. Repository-scoped classes sweep the repo as
+ * a whole, so they render as one strip cell instead of one per module.
  */
 import type { ReactNode } from 'react'
 // The `hardLedger` key on SessionProjectionMap arrives through this merge.
@@ -42,16 +44,38 @@ const FACE_LABEL: Record<CellFace, HardKey> = {
   uncovered: 'verdict.uncovered',
 }
 
-/** One grid cell: a colored square whose tooltip names the cell, verdict, and decider. */
-function MatrixCell({ face, subject, label }: {
+/** A fact overlaid on a cell's face without changing its color. */
+type CellMark = 'blind'
+
+/** Locale key of each cell mark, for the tooltip and the legend. */
+const MARK_LABEL: Record<CellMark, HardKey> = {
+  blind: 'mark.blind',
+}
+
+/** Style class of each cell mark. */
+const MARK_CLASS: Record<CellMark, string | undefined> = {
+  blind: css.markBlind,
+}
+
+/** One grid cell: a colored square whose tooltip names the cell, verdict, decider, and any mark. */
+function MatrixCell({ face, subject, label, mark, markLabel }: {
   face: CellFace
   /** Tooltip and aria subject: `module × class`, or the repository label. */
   subject: string
   label: string
+  mark?: CellMark
+  markLabel?: string
 }): ReactNode {
+  const described = markLabel === undefined ? label : `${label} · ${markLabel}`
   return (
-    <Tooltip label={`${subject} — ${label}`} side="top" delayMs={300}>
-      <span className={`${css.cell} ${css[face]}`} data-hard-cell={face} role="img" aria-label={`${subject} ${label}`} />
+    <Tooltip label={`${subject} — ${described}`} side="top" delayMs={300}>
+      <span
+        className={[css.cell, css[face], mark === undefined ? undefined : MARK_CLASS[mark]].filter(Boolean).join(' ')}
+        data-hard-cell={face}
+        {...(mark === undefined ? {} : { 'data-hard-mark': mark })}
+        role="img"
+        aria-label={`${subject} ${described}`}
+      />
     </Tooltip>
   )
 }
@@ -97,6 +121,10 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
 
   const byCell = new Map(view.cells.map(cell => [`${cell.module}\u0000${cell.bugClass}`, cell]))
   const inert = new Set(matrix.inertModules ?? [])
+  const unscreened = new Set(matrix.unscreenedModules ?? [])
+  // A model clear in an unscreened module is blind: the grep is silent there.
+  const markOf = (module: string, face: CellFace): CellMark | undefined =>
+    unscreened.has(module) && (face === 'model' || face === 'model-verified') ? 'blind' : undefined
   // Repository-scoped classes sweep the repo as a whole; the grid stays module-scoped.
   const scopeOf = (bugClass: string): 'module' | 'repo' => matrix.classScopes[bugClass] ?? 'module'
   const moduleClasses = matrix.bugClasses.filter(bugClass => scopeOf(bugClass) === 'module')
@@ -116,7 +144,15 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
           <StateDot state={view.gate.complete ? 'done' : 'ongoing'} />
           {t(view.gate.complete ? 'gate.certified' : 'gate.blocked')}
         </span>
+        {view.blindClears > 0 && (
+          <span className={css.blind} data-hard-blind>{t('blind.count', { count: view.blindClears })}</span>
+        )}
       </header>
+      {matrix.exclusions !== undefined && (
+        <div className={css.exclusions} data-hard-exclusions>
+          {t('exclusions', { count: matrix.exclusions.fileCount, globs: matrix.exclusions.globs.join(', ') })}
+        </div>
+      )}
       {!view.gate.complete && view.gate.blockers.length > 0 && (
         <ul className={css.blockers} data-hard-blockers role="list">
           {view.gate.blockers.slice(0, 4).map(blocker => <li key={blocker}>{blocker}</li>)}
@@ -137,9 +173,15 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
                 <th scope="row" className={css.moduleCell}>{module}</th>
                 {moduleClasses.map((bugClass) => {
                   const face = faceOf(byCell.get(`${module}\u0000${bugClass}`), inert.has(module))
+                  const mark = markOf(module, face)
                   return (
                     <td key={bugClass} className={css.cellSlot}>
-                      <MatrixCell face={face} subject={`${module} × ${bugClass}`} label={t(FACE_LABEL[face])} />
+                      <MatrixCell
+                        face={face}
+                        subject={`${module} × ${bugClass}`}
+                        label={t(FACE_LABEL[face])}
+                        {...(mark === undefined ? {} : { mark, markLabel: t(MARK_LABEL[mark]) })}
+                      />
                     </td>
                   )
                 })}
@@ -168,6 +210,9 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
             <span className={`${css.cell} ${css[face]}`} aria-hidden="true" /> {t(FACE_LABEL[face])}
           </span>
         ))}
+        <span className={css.legendItem}>
+          <span className={`${css.cell} ${css.uncovered} ${css.markBlind}`} aria-hidden="true" /> {t(MARK_LABEL.blind)}
+        </span>
       </footer>
     </div>
   )

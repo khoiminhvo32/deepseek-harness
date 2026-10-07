@@ -13,6 +13,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import {
+  blindClearsFromState,
   completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
@@ -37,6 +38,7 @@ import type {
   HardHypothesisId,
   HardHypothesisStateData,
   HardHypothesisStatus,
+  HardMatrixExclusions,
   HardMissionArmedData,
   HardSweepSummaryData,
 } from './types.ts'
@@ -62,6 +64,7 @@ export type {
   HardHypothesisStateData,
   HardHypothesisStatus,
   HardLedgerClientView,
+  HardMatrixExclusions,
   HardMissionArmedData,
   HardSweepSummaryData,
   HardVerdict,
@@ -69,6 +72,7 @@ export type {
 export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, hardLedgerProjectionDefinition, hardLedgerStateSchema } from './projection.ts'
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 export {
+  blindClearsFromState,
   completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
@@ -143,6 +147,9 @@ export const HARD_MATRIX_MODULE_LIMIT = 500
 /** Maximum matrix rows one rejection message lists before it summarizes the rest. */
 export const HARD_MATRIX_ROWS_LIST_LIMIT = 12
 
+/** Maximum excluded paths one arming record samples; the count covers the rest. */
+export const HARD_EXCLUDED_SAMPLE_LIMIT = 20
+
 /** Maximum blocking items one completion assessment lists before it summarizes the rest. */
 export const HARD_BLOCKER_LIMIT = 8
 
@@ -192,19 +199,22 @@ export class HardLedger extends Service {
       || new Set(modules).size !== modules.length) {
       throw new HarnessError('modules must be sorted and deduplicated', 'HARD_LEDGER_UNSORTED_MATRIX')
     }
-    let inertModules: readonly string[] = []
-    if (data.inertModules !== undefined) {
-      const suppliedInert: readonly string[] = data.inertModules
-      if (suppliedInert.some(module => typeof module !== 'string' || module.trim().length === 0)) {
-        throw new HarnessError('inertModules must be an array of non-empty module names', 'HARD_LEDGER_INVALID_TEXT')
-      }
-      const inertSorted = [...suppliedInert].sort()
-      if (inertSorted.some((module, index) => module !== suppliedInert[index])
-        || new Set(suppliedInert).size !== suppliedInert.length
-        || suppliedInert.some(module => !modules.includes(module))) {
-        throw new HarnessError('inertModules must be a sorted deduplicated subset of modules', 'HARD_LEDGER_UNSORTED_MATRIX')
-      }
-      inertModules = [...suppliedInert]
+    const inertModules = data.inertModules === undefined
+      ? undefined
+      : this.moduleSubset('inertModules', data.inertModules, modules)
+    const unscreenedModules = data.unscreenedModules === undefined
+      ? undefined
+      : this.moduleSubset('unscreenedModules', data.unscreenedModules, modules)
+    if (unscreenedModules !== undefined && unscreenedModules.some(module => inertModules?.includes(module) === true)) {
+      throw new HarnessError(
+        'unscreenedModules must be disjoint from inertModules: an inert module carries no code to screen',
+        'HARD_LEDGER_UNSORTED_MATRIX',
+      )
+    }
+    const exclusions = data.exclusions === undefined ? undefined : this.exclusionsRecord(data.exclusions)
+    if (data.ignoredEntryCount !== undefined
+      && (!Number.isSafeInteger(data.ignoredEntryCount) || data.ignoredEntryCount < 0)) {
+      throw new HarnessError('ignoredEntryCount must be a non-negative safe integer', 'HARD_LEDGER_INVALID_MATRIX_COUNT')
     }
     for (const bugClass of data.bugClasses) this.assertText('bugClasses[]', bugClass)
     if (data.goalId !== undefined) this.assertText('goalId', data.goalId)
@@ -214,9 +224,62 @@ export class HardLedger extends Service {
       commit: data.commit,
       modules,
       bugClasses: [...data.bugClasses],
-      ...(data.inertModules === undefined ? {} : { inertModules }),
+      ...(inertModules === undefined ? {} : { inertModules }),
+      ...(unscreenedModules === undefined ? {} : { unscreenedModules }),
+      ...(exclusions === undefined ? {} : { exclusions }),
+      ...(data.ignoredEntryCount === undefined ? {} : { ignoredEntryCount: data.ignoredEntryCount }),
       ...(data.goalId === undefined ? {} : { goalId: data.goalId }),
     })
+  }
+
+  /**
+   * Validate one module list an arming record carries beside the matrix rows:
+   * non-empty names, sorted, deduplicated, and every entry a row.
+   * @param field - the record field, worded for the error message.
+   * @param supplied - the list the caller supplied.
+   * @param modules - the validated matrix rows.
+   * @returns a detached copy of the list.
+   */
+  private moduleSubset(field: string, supplied: readonly string[], modules: readonly string[]): readonly string[] {
+    if (supplied.some(module => typeof module !== 'string' || module.trim().length === 0)) {
+      throw new HarnessError(`${field} must be an array of non-empty module names`, 'HARD_LEDGER_INVALID_TEXT')
+    }
+    const sorted = [...supplied].sort()
+    if (sorted.some((module, index) => module !== supplied[index])
+      || new Set(supplied).size !== supplied.length
+      || supplied.some(module => !modules.includes(module))) {
+      throw new HarnessError(`${field} must be a sorted deduplicated subset of modules`, 'HARD_LEDGER_UNSORTED_MATRIX')
+    }
+    return [...supplied]
+  }
+
+  /**
+   * Validate the exclusion record of one arming: at least one glob, a
+   * non-negative count, and a sorted sample no longer than the count or
+   * `HARD_EXCLUDED_SAMPLE_LIMIT`.
+   * @param exclusions - the caller's exclusion record.
+   * @returns a detached copy of the record.
+   */
+  private exclusionsRecord(exclusions: HardMatrixExclusions): HardMatrixExclusions {
+    if (exclusions.globs.length === 0) {
+      throw new HarnessError('exclusions must name at least one applied glob', 'HARD_LEDGER_INVALID_EXCLUSIONS')
+    }
+    for (const glob of exclusions.globs) this.assertText('exclusions.globs[]', glob)
+    if (!Number.isSafeInteger(exclusions.fileCount) || exclusions.fileCount < 0) {
+      throw new HarnessError('exclusions.fileCount must be a non-negative safe integer', 'HARD_LEDGER_INVALID_EXCLUSIONS')
+    }
+    const sample = exclusions.sample
+    if (sample.length > Math.min(exclusions.fileCount, HARD_EXCLUDED_SAMPLE_LIMIT)) {
+      throw new HarnessError(
+        `exclusions.sample must not exceed the excluded file count or ${HARD_EXCLUDED_SAMPLE_LIMIT} paths`,
+        'HARD_LEDGER_INVALID_EXCLUSIONS',
+      )
+    }
+    for (const path of sample) this.assertText('exclusions.sample[]', path)
+    if ([...sample].sort().some((path, index) => path !== sample[index])) {
+      throw new HarnessError('exclusions.sample must be sorted', 'HARD_LEDGER_INVALID_EXCLUSIONS')
+    }
+    return { globs: [...exclusions.globs], fileCount: exclusions.fileCount, sample: [...sample] }
   }
 
   /**
@@ -388,6 +451,33 @@ export class HardLedger extends Service {
       `${subject} inert — the harness already screened ${pronoun} as containing no code, so a cleared verdict `
       + 'is redundant work; record suspicious instead if you actually found something there',
       'HARD_LEDGER_INERT_MODULE',
+    )
+  }
+
+  /**
+   * Reject a batch screen over modules the coverage cross-check cannot screen.
+   * A batch clear rests only on a grep over the modules, and the grep is
+   * silent on a module holding a binary or a language the fixed pattern
+   * tables were not written for — so the shortcut is closed there and every
+   * cell needs an individual model read. Per-cell verdicts stay open on such
+   * modules; they surface as blind clears. Without an armed matrix, or on an
+   * arming record that predates the screenability field, every module passes.
+   * @param agent - the live agent whose ledger matrix carries the screenability record.
+   * @param modules - the module names a batch screen is about to clear.
+   * @throws `HARD_LEDGER_UNSCREENED_MODULE` naming the unscreened modules in the list.
+   */
+  assertScreenableModules(agent: Agent, modules: readonly string[]): void {
+    const unscreened = this.coverageMatrix(agent)?.unscreenedModules
+    if (unscreened === undefined || unscreened.length === 0) return
+    const blocked = [...new Set(modules)].filter(module => unscreened.includes(module))
+    if (blocked.length === 0) return
+    const subject = blocked.length === 1
+      ? `module "${blocked[0]}" holds`
+      : `modules ${blocked.map(entry => `"${entry}"`).join(', ')} hold`
+    throw new HarnessError(
+      `${subject} a binary file or a language the harness cannot screen, so its grep proves nothing; `
+      + 'read each cell yourself and record it with hard_mark_coverage',
+      'HARD_LEDGER_UNSCREENED_MODULE',
     )
   }
 
@@ -717,8 +807,8 @@ export class HardLedger extends Service {
 
   /**
    * Verdicted matrix cells partitioned by who decided them: the model's own
-   * reads, batch clears the harness grep confirmed, and the purely mechanical
-   * inert-module screen. A cell carrying no source reads as `model`, so older
+   * reads, batch screens the model cleared without reading, and every harness
+   * decision. A cell carrying no source reads as `model`, so older
    * logs partition unchanged. The math lives in `coverageBySourceFromState` —
    * the same function the pilot report reads after folding the log.
    * @param agent - the live agent whose ledger state is read.
@@ -726,6 +816,17 @@ export class HardLedger extends Service {
    */
   coverageBySource(agent: Agent): CoverageBySource {
     return coverageBySourceFromState(this.state(agent.session))
+  }
+
+  /**
+   * Model-cleared module-scoped matrix cells in modules the coverage
+   * cross-check cannot screen, where nothing but the model's own read stands
+   * behind the verdict. The math lives in `blindClearsFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the blind-clear count; zero without a screenability record.
+   */
+  blindClears(agent: Agent): number {
+    return blindClearsFromState(this.state(agent.session))
   }
 
   /**

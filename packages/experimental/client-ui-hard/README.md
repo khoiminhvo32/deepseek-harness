@@ -33,7 +33,7 @@ The guide tab in the right sidebar lists a Hard coverage capsule; picking it ope
 
 ### Read the matrix
 
-Rows are the armed modules, columns the armed bug classes — both are session data and stay untranslated. Each cell's color names verdict and decider together: blue for a cleared cell the model read itself, green for a batch clear the harness grep confirmed, neutral gray for the inert-module screen, red for a cell the harness cross-check reopened, amber for a suspicious call the model made on its own, and a hollow outline for cells without a verdict. Hovering a cell names its module, class, verdict, and decider. The header shows the ratio, the target repository with the pinned commit, and the gate: certified, or open with the first blockers listed.
+Rows are the armed modules, columns the armed bug classes — both are session data and stay untranslated. Each cell's color names verdict and decider together: blue for a cleared cell the model read itself, green for a batch screen the model cleared without reading, neutral gray for the inert-module screen, red for a cell the harness cross-check reopened, amber for a suspicious call the model made on its own, and a hollow outline for cells without a verdict. A corner dot marks a model clear in a module the harness cannot screen, where nothing but the model's read stands behind the verdict; the mark overlays the color instead of replacing it. Hovering a cell names its module, class, verdict, decider, and any mark. The header shows the ratio, the target repository with the pinned commit, the gate (certified, or open with the first blockers listed), and the blind-clear count when there is one; a line below it states how many tracked files a configured exclusion removed.
 
 -----
 

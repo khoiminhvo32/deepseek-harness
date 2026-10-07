@@ -49,14 +49,16 @@ const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systemati
   + 'or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any '
   + 'operation none of your declarations mention.'
 
-const CLEAR_MODULES_DESCRIPTION = 'Batch-clear one bug class across several modules WITH harness verification. '
-  + 'Provide extended-regex patterns that prove this class\'s sinks are absent from those modules; the harness greps '
-  + 'each module for the union of your patterns and its own fixed table, so your patterns can only add coverage, '
-  + 'never subtract. An empty grep clears every cell as model-verified; any match clears nothing and returns the '
-  + 'matching lines for a manual read. login-bypass is refused: its sinks are protective checks, so an empty grep '
-  + 'is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations instead of '
-  + 'sinks: an empty grep proves the module exports nothing to protect, and any match names an operation whose '
-  + 'guard hard_mark_coverage must declare.'
+const CLEAR_MODULES_DESCRIPTION = 'Batch-screen one bug class across several modules without reading them cell by '
+  + 'cell. Provide extended-regex patterns for this class\'s sinks; the harness greps each module for the union of '
+  + 'your patterns and its own fixed table, so your patterns can only add matches, never subtract. Any match clears '
+  + 'nothing and returns the matching lines for a manual read. An empty grep records every cell as a batch screen — '
+  + 'the weakest verdict: a silent grep is not proof of absence, it never satisfies the completion requirement for '
+  + 'audited cells, and the harness may send screened cells back for a manual read. Modules the harness cannot '
+  + 'screen are refused: any module holding a binary file or a language its fixed table was not written for — read '
+  + 'those cells yourself with hard_mark_coverage. login-bypass is refused: its sinks are protective checks, so an '
+  + 'empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations '
+  + 'instead of sinks, and any match names an operation whose guard hard_mark_coverage must declare.'
 
 const SWEEP_DESCRIPTION = 'Record one completed sweep pass. When the pass found nothing, empty_proof is required: '
   + 'name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep '
@@ -466,8 +468,10 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       if (modules.length > 50) throw new Error('modules must not exceed 50 entries per batch')
       ledger.assertModulesInMatrix(agent, modules)
       // A batch clear on an inert module duplicates the screen the harness
-      // already ran; refuse the whole batch before any grep runs.
+      // already ran, and one on an unscreened module rests on a grep that is
+      // silent there; refuse the whole batch before any grep runs.
       ledger.assertClearableModules(agent, modules)
+      ledger.assertScreenableModules(agent, modules)
       if (args.patterns.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
         throw new Error('patterns entries must be non-empty strings')
       }

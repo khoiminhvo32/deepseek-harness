@@ -9,7 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { applyHardLedgerProjection, completionAssessmentFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -544,6 +544,28 @@ describe('hard ledger projection units', () => {
       expect(ctx.hardLedger.completionAssessment(root.agent)).toEqual({ complete: true, blockers: [] })
     })
 
+    it('does not count a batch screen toward the audit floor; one per-cell model read does', async () => {
+      // The re-read spot check is off so the batch screen leaves no open work behind.
+      const { ctx, root } = await harness({ emptySweepsToFinish: 0, screenSpotCheckPercent: 0 })
+      ctx.hardLedger.recordMissionArmed(root.agent, {
+        objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'd'.repeat(40),
+        modules: ['src/auth', 'src/db'], bugClasses: ['cmdi'],
+      })
+      for (const module of ['src/auth', 'src/db']) {
+        ctx.hardLedger.markCoverage(root.agent, {
+          module, bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['execSync'], source: 'model-verified',
+        })
+      }
+      // Every cell is verdicted, but the model read none of them.
+      const screened = ctx.hardLedger.completionAssessment(root.agent)
+      expect(screened.complete).toBe(false)
+      expect(screened.blockers).toEqual(['no model-audited coverage cell or resolved hypothesis exists yet'])
+      ctx.hardLedger.markCoverage(root.agent, {
+        module: 'src/db', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/db/index.js:runQuery'],
+      })
+      expect(ctx.hardLedger.completionAssessment(root.agent)).toEqual({ complete: true, blockers: [] })
+    })
+
     it('lists bounded open-work blockers with the remainder summary', async () => {
       const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
       ctx.hardLedger.recordMissionArmed(root.agent, {
@@ -692,6 +714,85 @@ describe('hard ledger coverage matrix', () => {
     })
     expect(() => { ctx.hardLedger.assertModulesInMatrix(root.agent, ['poc']) })
       .toThrow(`the matrix rows at commit ${'d'.repeat(40)} are: m00, m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, …and 2 more`)
+  })
+
+  it('refuses a batch screen over unscreened modules, naming them, and passes without a screenability record', async () => {
+    const { ctx, root } = await harness()
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['lib', 'src', 'wp/admin'],
+      bugClasses: ['cmdi'],
+      unscreenedModules: ['lib', 'wp/admin'],
+    })
+    expect(ctx.hardLedger.coverageMatrix(root.agent)?.unscreenedModules).toEqual(['lib', 'wp/admin'])
+    expect(() => { ctx.hardLedger.assertScreenableModules(root.agent, ['src', 'wp/admin']) })
+      .toThrow('module "wp/admin" holds a binary file or a language the harness cannot screen, so its grep proves nothing')
+    expect(() => { ctx.hardLedger.assertScreenableModules(root.agent, ['lib', 'wp/admin', 'lib']) })
+      .toThrow('modules "lib", "wp/admin" hold a binary file or a language the harness cannot screen')
+    expect(() => { ctx.hardLedger.assertScreenableModules(root.agent, ['src']) }).not.toThrow()
+    // A per-cell verdict stays open on an unscreened module.
+    ctx.hardLedger.markCoverage(root.agent, {
+      module: 'wp/admin', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/admin/ajax.php:my_delete_item'],
+    })
+    expect(ctx.hardLedger.blindClears(root.agent)).toBe(1)
+    // An arming record without the field, or no matrix at all, screens everything.
+    const legacy = await harness()
+    expect(() => { legacy.ctx.hardLedger.assertScreenableModules(legacy.root.agent, ['wp/admin']) }).not.toThrow()
+    legacy.ctx.hardLedger.recordMissionArmed(legacy.root.agent, {
+      objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+      modules: ['wp/admin'], bugClasses: ['cmdi'],
+    })
+    expect(() => { legacy.ctx.hardLedger.assertScreenableModules(legacy.root.agent, ['wp/admin']) }).not.toThrow()
+    expect(legacy.ctx.hardLedger.blindClears(legacy.root.agent)).toBe(0)
+  })
+
+  it('records exclusions and ignored entries, and rejects invalid screenability and exclusion records', async () => {
+    const { ctx, root } = await harness()
+    const armed = {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'c'.repeat(40),
+      modules: ['docs', 'src'],
+      bugClasses: ['cmdi'],
+    }
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, unscreenedModules: ['src', 'docs'] }) })
+      .toThrow('unscreenedModules must be a sorted deduplicated subset of modules')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, unscreenedModules: [' '] }) })
+      .toThrow('unscreenedModules must be an array of non-empty module names')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, inertModules: ['docs'], unscreenedModules: ['docs'],
+    }) }).toThrow('unscreenedModules must be disjoint from inertModules')
+    const exclusions = { globs: ['vendor/**'], fileCount: 2, sample: ['vendor/a.php', 'vendor/b.php'] }
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, exclusions: { ...exclusions, globs: [] } }) })
+      .toThrow('exclusions must name at least one applied glob')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, exclusions: { ...exclusions, globs: [' '] } }) })
+      .toThrow('exclusions.globs[] must be a non-empty string')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, exclusions: { ...exclusions, fileCount: -1 } }) })
+      .toThrow('exclusions.fileCount must be a non-negative safe integer')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, exclusions: { ...exclusions, fileCount: 1 } }) })
+      .toThrow('exclusions.sample must not exceed the excluded file count or 20 paths')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, exclusions: { ...exclusions, fileCount: 30, sample: Array.from({ length: 21 }, (_, index) => `v/${String(index).padStart(2, '0')}`) },
+    }) }).toThrow('exclusions.sample must not exceed the excluded file count or 20 paths')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, exclusions: { ...exclusions, sample: ['vendor/b.php', 'vendor/a.php'] },
+    }) }).toThrow('exclusions.sample must be sorted')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, exclusions: { ...exclusions, sample: ['vendor/a.php', ' '] },
+    }) }).toThrow('exclusions.sample[] must be a non-empty string')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, ignoredEntryCount: -1 }) })
+      .toThrow('ignoredEntryCount must be a non-negative safe integer')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, ignoredEntryCount: 1.5 }) })
+      .toThrow('ignoredEntryCount must be a non-negative safe integer')
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      ...armed, inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3,
+    })
+    expect(ctx.hardLedger.coverageMatrix(root.agent)).toEqual({
+      modules: ['docs', 'src'], bugClasses: ['cmdi'], targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+      inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3,
+    })
   })
 
   it('rejects invalid arming records with stable codes', async () => {
@@ -992,6 +1093,55 @@ describe('hard ledger aggregates over folded state', () => {
       { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] } },
     ])
     expect(matrixCellsFromState(armed).map(cell => `${cell.module}×${cell.bugClass}`)).toEqual(['src×cmdi'])
+  })
+
+  it('counts blind clears: model clears in unscreened modules, never harness decisions or repo-scoped cells', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['notes', 'src', 'wp'], bugClasses: ['cmdi', 'sqli', 'dependencies'],
+          inertModules: ['notes'], unscreenedModules: ['wp'],
+        },
+      },
+      // A model read on an unscreened module: blind.
+      { type: 'hard/coverage/cell', data: { module: 'wp', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/a.php:run'] } },
+      // A legacy batch screen recorded on an unscreened module before the refusal existed: blind.
+      { type: 'hard/coverage/cell', data: { module: 'wp', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['p'], source: 'model-verified' } },
+      // A model clear on a screened module, a repository-scoped class, and a suspicious verdict: not blind.
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/a.ts:run'] } },
+      { type: 'hard/coverage/cell', data: { module: 'wp', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['composer.lock'] } },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: [] } },
+    ])
+    expect(blindClearsFromState(state)).toBe(2)
+    // A harness re-open over the blind model read removes it from the count.
+    const reopened = applyHardLedgerProjection(state, {
+      type: 'hard/coverage/cell',
+      data: { module: 'wp', bugClass: 'cmdi', verdict: 'suspicious', declaredSinks: ['wp/a.php:9: passthru($x)'], source: 'harness' },
+    } as never)
+    expect(blindClearsFromState(reopened)).toBe(1)
+    expect(blindClearsFromState(emptyHardLedgerState())).toBe(0)
+  })
+
+  it('carries screenability, exclusions, and blind clears through the client wire view', () => {
+    const definition = hardLedgerProjectionDefinition()
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['src', 'wp'], bugClasses: ['cmdi'], unscreenedModules: ['wp'],
+          exclusions: { globs: ['vendor/**'], fileCount: 7, sample: ['vendor/a.php'] }, ignoredEntryCount: 2,
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'wp', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/a.php:run'] } },
+    ])
+    const view = definition.wire.view(state)
+    expect(definition.wire.viewSchema.parse(view)).toEqual(view)
+    // The sample stays host-side; the panel needs only the globs and the count.
+    expect(view.matrix).toMatchObject({ unscreenedModules: ['wp'], exclusions: { globs: ['vendor/**'], fileCount: 7 } })
+    expect(view.blindClears).toBe(1)
   })
 
   it('publishes the client wire view: schema-validated matrix, cells, aggregates, and gate', () => {

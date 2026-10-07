@@ -12,7 +12,7 @@ The hard bundle is an installation-owned optional bundle: switch it on for a pro
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
 
-覆盖矩阵来自 mission 的武装记录：加载时 mission 插件固定已配置的目标仓库（把 `target.commit` 解析为完整 sha），并用 `git ls-files` 枚举已跟踪模块，因此分母天然尊重 `.gitignore`，同一提交上逐字节复现。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量清除一个类别，记录 `source: model-verified`，而模型自己的标记不带归因（读作 `model`）。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
+覆盖矩阵来自 mission 的武装记录：加载时 mission 插件固定已配置的目标仓库（把 `target.commit` 解析为完整 sha），并枚举该提交跟踪的每个文件，因此分母在同一提交上逐字节复现。默认不排除任何内容；已配置的排除会记录在武装记录中，并在覆盖率旁报告。首次武装会拒绝与提交不一致的工作区，因为模型读取的是工作区，而引用按提交解析。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量筛查一个类别，记录 `source: model-verified`——最弱的模型级别，从不满足完成评估的审计下限——而模型自己的标记不带归因（读作 `model`）。grep 只能指控：含二进制或固定表并非为其语言编写的模块被记录为不可筛查，在那里批量筛查会被拒绝，模型清除计为盲清除。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
 
 ## Proof-of-effect contract
 
@@ -105,6 +105,20 @@ assertModulesInMatrix(agent: Agent, modules: readonly string[]): void
  * @throws `HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.
  */
 assertClearableModules(agent: Agent, modules: readonly string[]): void
+
+/**
+ * Reject a batch screen over modules the coverage cross-check cannot screen.
+ * A batch clear rests only on a grep over the modules, and the grep is
+ * silent on a module holding a binary or a language the fixed pattern
+ * tables were not written for — so the shortcut is closed there and every
+ * cell needs an individual model read. Per-cell verdicts stay open on such
+ * modules; they surface as blind clears. Without an armed matrix, or on an
+ * arming record that predates the screenability field, every module passes.
+ * @param agent - the live agent whose ledger matrix carries the screenability record.
+ * @param modules - the module names a batch screen is about to clear.
+ * @throws `HARD_LEDGER_UNSCREENED_MODULE` naming the unscreened modules in the list.
+ */
+assertScreenableModules(agent: Agent, modules: readonly string[]): void
 
 /**
  * Append one completed sweep summary. An empty sweep must cite verifiable
@@ -243,14 +257,23 @@ uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
 
 /**
  * Verdicted matrix cells partitioned by who decided them: the model's own
- * reads, batch clears the harness grep confirmed, and the purely mechanical
- * inert-module screen. A cell carrying no source reads as `model`, so older
+ * reads, batch screens the model cleared without reading, and every harness
+ * decision. A cell carrying no source reads as `model`, so older
  * logs partition unchanged. The math lives in `coverageBySourceFromState` —
  * the same function the pilot report reads after folding the log.
  * @param agent - the live agent whose ledger state is read.
  * @returns the three counts; all zero without a matrix.
  */
 coverageBySource(agent: Agent): CoverageBySource
+
+/**
+ * Model-cleared module-scoped matrix cells in modules the coverage
+ * cross-check cannot screen, where nothing but the model's own read stands
+ * behind the verdict. The math lives in `blindClearsFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the blind-clear count; zero without a screenability record.
+ */
+blindClears(agent: Agent): number
 
 /**
  * Model-facing open work summary: pending verifications, unresolved
@@ -334,18 +357,19 @@ async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReop
 async checkFlowCitations( agent: Agent, citations: readonly FlowCitationEntry[], ): Promise<{ rejected: readonly FlowCitationReject[] }>
 
 /**
- * Mechanical absence screen behind the batch clear: grep the requested
- * modules for the union of the model's patterns and the class's fixed
- * patterns, anchored at the pinned target repository. The union means the
- * model's patterns can only ADD coverage, never subtract — a narrow
- * pattern choice cannot sneak past the harness table. An empty grep on
- * every module proves the absence predicate; any match fails the whole
- * batch and returns the matching lines as evidence for a manual read.
- * The pattern table follows the class's reading: guarded-surface classes
- * grep for the exported operations (zero matches = no exported surface),
- * sink classes grep for the sink shapes, and the one remaining
- * absence-shaped class (`login-bypass`) is refused — for its protective
- * sinks an empty grep is suspicious, not clean.
+ * Mechanical screen behind the batch clear: grep the requested modules for
+ * the union of the model's patterns and the class's fixed patterns,
+ * anchored at the pinned target repository. The union means the model's
+ * patterns can only ADD matches, never subtract — a narrow pattern choice
+ * cannot sneak past the harness table. Any match fails the whole batch and
+ * returns the matching lines as evidence for a manual read. An empty grep
+ * is silence, not proof of absence: the caller records the cells as a batch
+ * screen, the weakest model tier, and refuses modules the tables cannot
+ * screen before this runs. The pattern table follows the class's reading:
+ * guarded-surface classes grep for the exported operations, sink classes
+ * grep for the sink shapes, and the one remaining absence-shaped class
+ * (`login-bypass`) is refused — for its protective sinks an empty grep is
+ * suspicious, not clean.
  * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param bugClass - the bug class to prove absent.
  * @param modules - the target-repo-relative modules to grep.

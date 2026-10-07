@@ -28,14 +28,15 @@ const MATRIX: HardLedgerClientView['matrix'] = {
   commit: 'a'.repeat(40),
 }
 
-/** All six legend labels; the legend is complete exactly when every one appears. */
+/** All six face labels plus the blind mark; the legend is complete exactly when every one appears. */
 const LEGEND_LABELS = [
   '已清除 · 模型读码',
-  '已清除 · 批量验证',
+  '已清除 · 批量筛查（未逐格读码）',
   '已清除 · 机器筛查',
   '可疑 · 机器复核打回',
   '可疑 · 模型自报',
   '未覆盖',
+  '机器无法筛查此模块',
 ]
 
 /** The panel never reads tab chrome; the props type still carries the seat hook. */
@@ -48,6 +49,7 @@ function view(overrides: {
   cells?: HardLedgerClientView['cells']
   progress?: HardLedgerClientView['progress']
   gate?: HardLedgerClientView['gate']
+  blindClears?: number
   /** `'none'` renders the no-arming-record empty state. */
   matrix?: 'none' | HardLedgerClientView['matrix']
 } = {}): HardLedgerClientView {
@@ -60,6 +62,7 @@ function view(overrides: {
     ],
     progress: overrides.progress ?? { verdicted: 4, total: 4 },
     bySource: overrides.cells === undefined ? { model: 1, modelVerified: 0, harness: 3 } : { model: 0, modelVerified: 0, harness: 0 },
+    blindClears: overrides.blindClears ?? 0,
     gate: overrides.gate ?? { complete: true, blockers: [] },
   }
 }
@@ -162,6 +165,40 @@ describe('CoverageMatrix', () => {
     expect(root?.querySelector('[data-hard-cell="model"]')).not.toBeNull()
     expect(root?.querySelector('[data-hard-cell="model-verified"]')).not.toBeNull()
     expect(root?.querySelectorAll('[data-hard-cell="harness"]')).toHaveLength(2)
+  })
+
+  it('marks model clears in unscreened modules as blind, and counts them in the header', () => {
+    const { container } = render(<CoverageMatrix {...bench({ state: 'ready', view: view({
+      matrix: { ...MATRIX, unscreenedModules: ['src'] },
+      cells: [
+        { module: 'src', bugClass: 'cmdi', verdict: 'cleared', source: 'model' },
+        { module: 'src', bugClass: 'sqli', verdict: 'suspicious', source: 'model' },
+      ],
+      blindClears: 1,
+    }) })} />)
+    const root = container.querySelector('[data-hard-coverage]')
+    // Only the model clear carries the mark: a suspicious verdict is not a clear,
+    // and the inert module's harness screen is a mechanical fact.
+    const marked = root?.querySelectorAll('[data-hard-mark="blind"]')
+    expect(marked).toHaveLength(1)
+    expect(marked?.[0]?.getAttribute('data-hard-cell')).toBe('model')
+    expect(marked?.[0]?.getAttribute('aria-label')).toContain('机器无法筛查此模块')
+    expect(root?.querySelector('[data-hard-blind]')?.textContent).toBe('1 个盲清除')
+  })
+
+  it('omits the blind count, the blind marks, and the exclusion line when none apply', () => {
+    const { container } = render(<CoverageMatrix {...bench({ state: 'ready', view: view() })} />)
+    expect(container.querySelector('[data-hard-blind]')).toBeNull()
+    expect(container.querySelector('[data-hard-mark]')).toBeNull()
+    expect(container.querySelector('[data-hard-exclusions]')).toBeNull()
+  })
+
+  it('states what the configured exclusions removed beside the coverage ratio', () => {
+    const { container } = render(<CoverageMatrix {...bench({ state: 'ready', view: view({
+      matrix: { ...MATRIX, exclusions: { globs: ['vendor/**', 'dist/**'], fileCount: 42 } },
+    }) })} />)
+    expect(container.querySelector('[data-hard-exclusions]')?.textContent)
+      .toBe('42 个已跟踪文件按配置排除（vendor/**, dist/**）')
   })
 
   it('lists bounded gate blockers when the gate is open', () => {

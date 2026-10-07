@@ -12,7 +12,7 @@ The hard bundle is an installation-owned optional bundle: switch it on for a pro
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
 
-The coverage matrix comes from the mission's arming record: at load the mission plugin pins the configured target repository (resolving `target.commit` to its full sha) and enumerates the tracked modules with `git ls-files`, so the denominator respects `.gitignore` and reproduces byte-for-byte on the same commit. The matrix rides one additive `hard/mission/armed` event. Three economics keep the denominator reachable on real repositories: `CLASS_SCOPE` gives `dependencies` and `misconfig` one repository-level cell instead of one per module; modules whose every tracked file is non-executable (`inertModules`) are pre-verdicted by the harness without a model event; and `hard_clear_modules` batch-clears one class across modules behind a harness grep that unions the model's patterns with the fixed table, recording `source: model-verified` while the model's own marks stay unattributed (read as `model`). `coverageProgress` counts verdicts over the scoped total, `uncoveredCells` lists only the cells that still need the model, `coverageBySource` partitions verdicts by decider, and `openWork` sends a hash-sampled share of batch-cleared cells back for a manual re-read so the screen's false-negative rate stays measured.
+The coverage matrix comes from the mission's arming record: at load the mission plugin pins the configured target repository (resolving `target.commit` to its full sha) and enumerates every file that commit tracks, so the denominator reproduces byte-for-byte on the same commit. Nothing is excluded by default; a configured exclusion is recorded in the arming record and reported beside the coverage ratio. The first arming refuses a working tree that differs from the commit, because the model reads the working tree while citations resolve against the commit. The matrix rides one additive `hard/mission/armed` event. Three economics keep the denominator reachable on real repositories: `CLASS_SCOPE` gives `dependencies` and `misconfig` one repository-level cell instead of one per module; modules whose every tracked file is non-executable (`inertModules`) are pre-verdicted by the harness without a model event; and `hard_clear_modules` batch-screens one class across modules behind a harness grep that unions the model's patterns with the fixed table, recording `source: model-verified` — the weakest model tier, which never satisfies the completion assessment's audit floor — while the model's own marks stay unattributed (read as `model`). The grep can only accuse: a module holding a binary or a language the fixed tables were not written for is recorded as unscreened, a batch screen there is refused, and a model clear there counts as a blind clear. `coverageProgress` counts verdicts over the scoped total, `uncoveredCells` lists only the cells that still need the model, `coverageBySource` partitions verdicts by decider, and `openWork` sends a hash-sampled share of batch-cleared cells back for a manual re-read so the screen's false-negative rate stays measured.
 
 ## Proof-of-effect contract
 
@@ -105,6 +105,20 @@ assertModulesInMatrix(agent: Agent, modules: readonly string[]): void
  * @throws `HARD_LEDGER_INERT_MODULE` naming the inert modules in the list.
  */
 assertClearableModules(agent: Agent, modules: readonly string[]): void
+
+/**
+ * Reject a batch screen over modules the coverage cross-check cannot screen.
+ * A batch clear rests only on a grep over the modules, and the grep is
+ * silent on a module holding a binary or a language the fixed pattern
+ * tables were not written for — so the shortcut is closed there and every
+ * cell needs an individual model read. Per-cell verdicts stay open on such
+ * modules; they surface as blind clears. Without an armed matrix, or on an
+ * arming record that predates the screenability field, every module passes.
+ * @param agent - the live agent whose ledger matrix carries the screenability record.
+ * @param modules - the module names a batch screen is about to clear.
+ * @throws `HARD_LEDGER_UNSCREENED_MODULE` naming the unscreened modules in the list.
+ */
+assertScreenableModules(agent: Agent, modules: readonly string[]): void
 
 /**
  * Append one completed sweep summary. An empty sweep must cite verifiable
@@ -243,14 +257,23 @@ uncoveredCells(agent: Agent): readonly { module: string; bugClass: string }[]
 
 /**
  * Verdicted matrix cells partitioned by who decided them: the model's own
- * reads, batch clears the harness grep confirmed, and the purely mechanical
- * inert-module screen. A cell carrying no source reads as `model`, so older
+ * reads, batch screens the model cleared without reading, and every harness
+ * decision. A cell carrying no source reads as `model`, so older
  * logs partition unchanged. The math lives in `coverageBySourceFromState` —
  * the same function the pilot report reads after folding the log.
  * @param agent - the live agent whose ledger state is read.
  * @returns the three counts; all zero without a matrix.
  */
 coverageBySource(agent: Agent): CoverageBySource
+
+/**
+ * Model-cleared module-scoped matrix cells in modules the coverage
+ * cross-check cannot screen, where nothing but the model's own read stands
+ * behind the verdict. The math lives in `blindClearsFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the blind-clear count; zero without a screenability record.
+ */
+blindClears(agent: Agent): number
 
 /**
  * Model-facing open work summary: pending verifications, unresolved
@@ -334,18 +357,19 @@ async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReop
 async checkFlowCitations( agent: Agent, citations: readonly FlowCitationEntry[], ): Promise<{ rejected: readonly FlowCitationReject[] }>
 
 /**
- * Mechanical absence screen behind the batch clear: grep the requested
- * modules for the union of the model's patterns and the class's fixed
- * patterns, anchored at the pinned target repository. The union means the
- * model's patterns can only ADD coverage, never subtract — a narrow
- * pattern choice cannot sneak past the harness table. An empty grep on
- * every module proves the absence predicate; any match fails the whole
- * batch and returns the matching lines as evidence for a manual read.
- * The pattern table follows the class's reading: guarded-surface classes
- * grep for the exported operations (zero matches = no exported surface),
- * sink classes grep for the sink shapes, and the one remaining
- * absence-shaped class (`login-bypass`) is refused — for its protective
- * sinks an empty grep is suspicious, not clean.
+ * Mechanical screen behind the batch clear: grep the requested modules for
+ * the union of the model's patterns and the class's fixed patterns,
+ * anchored at the pinned target repository. The union means the model's
+ * patterns can only ADD matches, never subtract — a narrow pattern choice
+ * cannot sneak past the harness table. Any match fails the whole batch and
+ * returns the matching lines as evidence for a manual read. An empty grep
+ * is silence, not proof of absence: the caller records the cells as a batch
+ * screen, the weakest model tier, and refuses modules the tables cannot
+ * screen before this runs. The pattern table follows the class's reading:
+ * guarded-surface classes grep for the exported operations, sink classes
+ * grep for the sink shapes, and the one remaining absence-shaped class
+ * (`login-bypass`) is refused — for its protective sinks an empty grep is
+ * suspicious, not clean.
  * @param agent - the live agent whose ledger matrix anchors the grep.
  * @param bugClass - the bug class to prove absent.
  * @param modules - the target-repo-relative modules to grep.

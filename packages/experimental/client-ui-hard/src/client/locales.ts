@@ -17,11 +17,14 @@ export const zh = {
   'scope.repo': '整个仓库',
   'column.module': '模块',
   'face.model': '已清除 · 模型读码',
-  'face.modelVerified': '已清除 · 批量验证',
+  'face.modelVerified': '已清除 · 批量筛查（未逐格读码）',
   'face.harness': '已清除 · 机器筛查',
   'face.suspiciousHarness': '可疑 · 机器复核打回',
   'face.suspiciousModel': '可疑 · 模型自报',
   'verdict.uncovered': '未覆盖',
+  'mark.blind': '机器无法筛查此模块',
+  'blind.count': '{count} 个盲清除',
+  exclusions: '{count} 个已跟踪文件按配置排除（{globs}）',
 } satisfies Record<string, string>
 
 /** Hard-harness locale key union. */
@@ -41,9 +44,12 @@ export const en = {
   'scope.repo': 'Repository',
   'column.module': 'Module',
   'face.model': 'Cleared · model read',
-  'face.modelVerified': 'Cleared · batch verified',
+  'face.modelVerified': 'Cleared · batch screen, unread',
   'face.harness': 'Cleared · harness screen',
   'face.suspiciousHarness': 'Suspicious · harness re-open',
   'face.suspiciousModel': 'Suspicious · model sighting',
   'verdict.uncovered': 'Uncovered',
+  'mark.blind': 'Harness cannot screen this module',
+  'blind.count': '{count} blind clears',
+  exclusions: '{count} tracked files excluded by configuration ({globs})',
 } satisfies Record<HardKey, string>

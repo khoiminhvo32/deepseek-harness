@@ -110,6 +110,7 @@ function gateDecision(
 ): HardGateDecisionData {
   const progress = ctx.hardLedger.coverageProgress(agent)
   const bySource = ctx.hardLedger.coverageBySource(agent)
+  const exclusions = ctx.hardLedger.coverageMatrix(agent)?.exclusions
   const hypotheses = ctx.hardLedger.hypotheses(agent)
   const resolved = hypotheses
     .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
@@ -123,6 +124,8 @@ function gateDecision(
       verdicted: progress.verdicted,
       total: progress.total,
       bySource: { model: bySource.model, modelVerified: bySource.modelVerified, harness: bySource.harness },
+      blindClears: ctx.hardLedger.blindClears(agent),
+      ...(exclusions === undefined ? {} : { excludedFileCount: exclusions.fileCount }),
     },
     hypotheses: { resolved, open: hypotheses.length - resolved },
     findings: {

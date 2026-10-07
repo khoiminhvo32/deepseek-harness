@@ -497,18 +497,19 @@ export class HardVerifier extends Service {
   }
 
   /**
-   * Mechanical absence screen behind the batch clear: grep the requested
-   * modules for the union of the model's patterns and the class's fixed
-   * patterns, anchored at the pinned target repository. The union means the
-   * model's patterns can only ADD coverage, never subtract — a narrow
-   * pattern choice cannot sneak past the harness table. An empty grep on
-   * every module proves the absence predicate; any match fails the whole
-   * batch and returns the matching lines as evidence for a manual read.
-   * The pattern table follows the class's reading: guarded-surface classes
-   * grep for the exported operations (zero matches = no exported surface),
-   * sink classes grep for the sink shapes, and the one remaining
-   * absence-shaped class (`login-bypass`) is refused — for its protective
-   * sinks an empty grep is suspicious, not clean.
+   * Mechanical screen behind the batch clear: grep the requested modules for
+   * the union of the model's patterns and the class's fixed patterns,
+   * anchored at the pinned target repository. The union means the model's
+   * patterns can only ADD matches, never subtract — a narrow pattern choice
+   * cannot sneak past the harness table. Any match fails the whole batch and
+   * returns the matching lines as evidence for a manual read. An empty grep
+   * is silence, not proof of absence: the caller records the cells as a batch
+   * screen, the weakest model tier, and refuses modules the tables cannot
+   * screen before this runs. The pattern table follows the class's reading:
+   * guarded-surface classes grep for the exported operations, sink classes
+   * grep for the sink shapes, and the one remaining absence-shaped class
+   * (`login-bypass`) is refused — for its protective sinks an empty grep is
+   * suspicious, not clean.
    * @param agent - the live agent whose ledger matrix anchors the grep.
    * @param bugClass - the bug class to prove absent.
    * @param modules - the target-repo-relative modules to grep.
@@ -561,7 +562,7 @@ export class HardVerifier extends Service {
 }
 
 export { parseVector, scoreVector, macroVector, severityBand } from './cvss4.ts'
-export { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
+export { GUARDED_SURFACE_PATTERNS, SCREENED_EXTENSIONS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 export { claimHash, rootFingerprint } from './fingerprint.ts'
 export { classifyRuns, runSatisfied } from './verdict.ts'
 export type { PoCRunRecord } from './verdict.ts'

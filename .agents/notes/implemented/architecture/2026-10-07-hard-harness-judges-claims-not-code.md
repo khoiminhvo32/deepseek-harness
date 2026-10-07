@@ -1,0 +1,36 @@
+# Agent Note: The hard harness judges claims, not code
+
+Status: implemented
+
+English | [中文](2026-10-07-hard-harness-judges-claims-not-code.zh.md)
+
+## Problem
+
+The hard harness exists to keep a model working until a mission is genuinely complete. A model stops by claiming it is done — "I swept everything and found nothing" — so the harness's only leverage is refusing a completion claim, and it can refuse only what it can check.
+
+The coverage cross-check grepped a module against fixed sink tables and read an empty grep as clean. Run against one PHP file holding five real WordPress holes (no capability check, SQL built into `$wpdb->get_results`, `include $_GET`, an arbitrary file write, `passthru`), every class's patterns matched nothing, and `hard_clear_modules` would have recorded every cell as `model-verified`: full coverage, no finding, harness attribution, on vulnerable code. All three verifier greps also pass `-I`, which skips binary content whatever the extension, so a shared library read as clean too. Separately, the default exclusion globs dropped `vendor/`, `dist/`, `assets/`, and other trees that ship to production, and the arming record never said so, so a coverage ratio could stand on a silently shrunk denominator.
+
+## Decision
+
+The harness judges claims, not code. The model finds bugs; the harness refuses a completion claim it cannot back, and never certifies what it did not check.
+
+- **Findings and clears are asymmetric.** A finding carries a machine-checkable artifact — the PoC, its marker, the benign arm — and stays `demonstrated`, never `proven`, because the model writes the PoC. A clear has no machine witness in any language, so the harness does not certify one.
+- **A grep can only accuse.** A match the model did not declare re-opens the cell; an empty grep is silence. `model-verified` therefore means a batch screen — cells the model cleared without reading while a grep found nothing — the weakest model tier, and the completion assessment's audit floor counts only individually decided model cells and resolved hypotheses.
+- **Screenability is a recorded property of each module.** At arming, `hard-mission` lists the pinned commit's files through a numstat diff against the empty tree, which also marks binaries. A non-inert module holding a binary, or a file whose extension `SCREENED_EXTENSIONS` (the verifier's table, written for the JavaScript and TypeScript family, Python, and Java) does not cover, is recorded in `unscreenedModules`. Classification reads content as well as extension because `grep -I` does. `hard_clear_modules` refuses such a module before any grep runs, and a model clear there counts as a blind clear in the ledger, the gate decision record, the panel, and the pilot report.
+- **The denominator is the whole pinned commit.** `excludeGlobs` defaults to empty; an exclusion is the deployment's explicit choice, recorded in the arming event with a count and a bounded sample and reported beside the ratio. The 500-row cap advises a coarser `moduleDepth`, never dropping code.
+- **The working tree must match the pinned commit at the first arming.** The model reads the working tree while the matrix and citations resolve against the commit. Load measures drift without failing — a resumed session loads over the files its own run created, including PoCs, which the PoC contract places inside the target — and the startup listener refuses a fresh root over a drifted tree. The harness's own state directories are not drift.
+
+## Alternatives considered
+
+- **Per-language pattern packs for PHP, Go, Rust, and others.** Rejected as the route to correctness: it makes the harness a better bug finder, which is the model's job, and scales with languages times classes while always trailing them. Once a missing pack is recorded as unscreened instead of read as clean, a pack is an optimization.
+- **A vacuity check on the model's batch patterns** (they must match something somewhere in the repository). Rejected as a trust gate: one pattern matching an unrelated string in another module passes it, the same one-more-line defeat as the echo trap and the negative-control ladder.
+- **Requiring the model's patterns to match the sinks it declared.** Rejected: the model's artifacts agreeing with each other proves nothing.
+- **Language servers in the harness.** Rejected for the harness: an LSP reports symbols and references, not taint. It belongs in the toolbox of an LLM reading code.
+- **Failing the load on drift.** Rejected: a resumed session would fail to load over its own PoC files.
+
+## Consequences
+
+- On a language the tables do not cover, the harness now reports "N blind clears" instead of "100% verified". That is less coverage on paper and an honest one.
+- Fail-closed classification is strict: a root module with `package.json` or `.gitignore`, or a frontend module with `.css`, is unscreened, so batch screens are unavailable there and the model reads cells individually.
+- Missions over targets with vendored trees cost more; the cost is visible and the exclusion is one configured glob away.
+- The independent-reader direction — the harness spawning a fresh, claim-blind LLM to re-read a sampled clear, with a worktree pinned at the commit as its isolation — is the next step toward a witness for clears; this note does not ship it.

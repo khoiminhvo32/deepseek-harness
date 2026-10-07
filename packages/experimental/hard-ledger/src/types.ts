@@ -26,13 +26,17 @@ export type HardCoverageVerdict = 'cleared' | 'suspicious' | 'uncovered'
 /**
  * Who decided one coverage cell's verdict. Absent means `model` — the
  * historical behavior — so older logs read back with unchanged meaning.
- * `model-verified` marks a batch clear the harness grep confirmed. `harness`
- * names both ways the harness concludes without the model: a re-open, where
- * the harness appends a suspicious verdict over a model decision it audited
- * (an event-backed cell), and the mechanical inert-module screen (a cell
- * with no event — the module was pre-screened as carrying no code). The two
- * share the source because both are harness conclusions; a reader that must
- * tell them apart uses the presence of an event, never the source value.
+ * `model-verified` marks a batch screen: the model cleared the cells without
+ * reading them individually, and a grep over the module found nothing. It is
+ * the weakest model tier — an empty grep is silence, never a certificate of
+ * absence — so it does not satisfy the completion assessment's audit floor.
+ * `harness` names both ways the harness concludes without the model: a
+ * re-open, where the harness appends a suspicious verdict over a model
+ * decision it audited (an event-backed cell), and the mechanical inert-module
+ * screen (a cell with no event — the module was pre-screened as carrying no
+ * code). The two share the source because both are harness conclusions; a
+ * reader that must tell them apart uses the presence of an event, never the
+ * source value.
  */
 export type HardCoverageSource = 'model' | 'model-verified' | 'harness'
 
@@ -239,6 +243,14 @@ export interface HardGateDecisionData {
     readonly verdicted: number
     readonly total: number
     readonly bySource: { readonly model: number; readonly modelVerified: number; readonly harness: number }
+    /**
+     * Model-cleared matrix cells in modules the cross-check cannot screen:
+     * nothing but the model's read stands behind them. Optional so the change
+     * is additive; absent on records written before screenability existed.
+     */
+    readonly blindClears?: number
+    /** Tracked files the configured exclusion globs kept out of the matrix; absent when none applied. */
+    readonly excludedFileCount?: number
   }
   readonly hypotheses: {
     /** Hypotheses in a terminal status (`confirmed` or `refuted`). */
@@ -259,6 +271,21 @@ export interface HardGateDecisionData {
   readonly blockers: readonly string[]
 }
 
+/**
+ * Tracked files at the pinned commit that the configured exclusion globs kept
+ * out of the coverage matrix. The harness excludes nothing by default; every
+ * exclusion is the deployment's explicit choice, and this record is how the
+ * coverage ratio states what its denominator omits.
+ */
+export interface HardMatrixExclusions {
+  /** The exclusion globs the arming applied, as configured. */
+  readonly globs: readonly string[]
+  /** Tracked files at the pinned commit the globs excluded. */
+  readonly fileCount: number
+  /** The first excluded paths in sorted order, bounded by `HARD_EXCLUDED_SAMPLE_LIMIT`. */
+  readonly sample: readonly string[]
+}
+
 /** Mission arming record: the pinned target and the coverage matrix axes. */
 export interface HardMissionArmedData {
   /** The durable objective the armed goal carries. */
@@ -277,6 +304,25 @@ export interface HardMissionArmedData {
    * additive; absent reads as an empty screen.
    */
   readonly inertModules?: readonly string[]
+  /**
+   * Sorted subset of `modules` the coverage cross-check cannot screen: a
+   * non-inert module holding a tracked binary file, or a tracked file whose
+   * extension the fixed pattern tables were not written for. The grep is
+   * silent there, so a batch clear is refused and a model clear stands as a
+   * blind clear. Disjoint from `inertModules`. Optional so the change is
+   * additive; absent reads as every module screenable, which is how older
+   * records were treated.
+   */
+  readonly unscreenedModules?: readonly string[]
+  /** What the configured exclusion globs kept out of the matrix; absent when none applied. */
+  readonly exclusions?: HardMatrixExclusions
+  /**
+   * Untracked paths git ignores in the target working tree at arm time, one
+   * entry per ignored directory, outside the harness's own state
+   * directories. They are outside the pinned commit, so the matrix cannot
+   * cover them. Optional so the change is additive.
+   */
+  readonly ignoredEntryCount?: number
   /**
    * Id of the goal this arming created. Optional so the change is additive;
    * records without it predate goal attribution, and the completion gate
@@ -300,6 +346,10 @@ export interface HardLedgerClientView {
     /** Sweep scope per bug class: repository-level classes render one cell, not one per module. */
     readonly classScopes: Readonly<Record<string, 'module' | 'repo'>>
     readonly inertModules?: readonly string[]
+    /** Modules the coverage cross-check cannot screen; absent on older arming records. */
+    readonly unscreenedModules?: readonly string[]
+    /** The configured exclusions and how many tracked files they removed; absent when none applied. */
+    readonly exclusions?: { readonly globs: readonly string[]; readonly fileCount: number }
     readonly targetRepo: string
     readonly commit: string
   }
@@ -314,6 +364,8 @@ export interface HardLedgerClientView {
   readonly progress: { readonly verdicted: number; readonly total: number }
   /** The same cells partitioned by decider. */
   readonly bySource: { readonly model: number; readonly modelVerified: number; readonly harness: number }
+  /** Model-cleared matrix cells in modules the cross-check cannot screen. */
+  readonly blindClears: number
   /** The harness's current completion assessment with its bounded blockers. */
   readonly gate: { readonly complete: boolean; readonly blockers: readonly string[] }
 }

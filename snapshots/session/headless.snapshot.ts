@@ -491,8 +491,12 @@ const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
     expect(run(['add', '-A']).status).toBe(0)
     // The seed .gitignore only keeps runtime residue out of the commit; it is
     // repo infrastructure, not code, so it leaves the tracked set the armed
-    // matrix enumerates and never becomes a coverage module row.
+    // matrix enumerates and never becomes a coverage module row. Git ignores
+    // the file itself through the repository-local exclude list, so the
+    // mission's first-arming drift check sees an ignored entry, not an
+    // untracked file the pinned commit does not hold.
     expect(run(['rm', '--cached', '--quiet', '.gitignore']).status).toBe(0)
+    await writeFile(join(cwd, '.git', 'info', 'exclude'), '.gitignore\n', { flag: 'a' })
     // Fixed identity and raw epoch dates keep the seeded commit sha — and the
     // armed matrix recorded from it — identical across runs and machines.
     const commit = run(['-c', 'user.name=hard-snapshot', '-c', 'user.email=hard@snapshot',

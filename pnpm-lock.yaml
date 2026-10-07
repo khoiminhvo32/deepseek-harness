@@ -8242,9 +8242,15 @@ importers:
       '@deepseek-ai/dsh-experimental-hard-ledger':
         specifier: workspace:*
         version: link:../hard-ledger
+      '@deepseek-ai/dsh-experimental-hard-verifier':
+        specifier: workspace:*
+        version: link:../hard-verifier
       '@deepseek-ai/dsh-goal':
         specifier: workspace:*
         version: link:../../goal/goal
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session

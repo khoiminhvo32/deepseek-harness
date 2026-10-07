@@ -419,8 +419,8 @@ describe('hard_update_hypothesis and methodology tools', () => {
   })
 
   it('batch-clears guarded-surface classes when the module exports nothing, and refuses login-bypass', async () => {
-    // The guarded-surface grep names exported operations: zero matches prove
-    // the module exposes no operation for these classes to guard.
+    // The guarded-surface grep names exported operations: zero matches record
+    // a batch screen, which re-opens nothing and certifies nothing.
     const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
@@ -491,6 +491,32 @@ describe('hard_update_hypothesis and methodology tools', () => {
       .toContain('module "data/manuals" is inert — the harness already screened it as containing no code')
     // The whole batch was refused before any cell was cleared.
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+  })
+
+  it('refuses a batch over a module the harness cannot screen before any grep runs', async () => {
+    // A grep that would match proves the refusal precedes the screen: had the
+    // screen run, this batch would have returned evidence instead of an error.
+    const { ctx, root } = await harness({ exitCode: 0, stdoutText: 'wp/admin/ajax.php:9: passthru($cmd)\n' })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src', 'wp/admin'],
+      bugClasses: ['cmdi'],
+      unscreenedModules: ['wp/admin'],
+    })
+    const refused = await execute(ctx, 'hard_clear_modules', {
+      modules: ['src', 'wp/admin'], bug_class: 'cmdi', patterns: ['passthru\\('], rationale: 'r',
+    }, root.agent)
+    expect(refused.isError).toBe(true)
+    expect((refused.content[0] as { type: string; text: string }).text)
+      .toContain('module "wp/admin" holds a binary file or a language the harness cannot screen, so its grep proves nothing')
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+    // The same module stays open to an individual read, which counts as a blind clear.
+    resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'wp/admin', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['wp/admin/ajax.php:my_delete_item'],
+    }, root.agent))
+    expect(ctx.hardLedger.blindClears(root.agent)).toBe(1)
   })
 
   it('defaults omitted declared_sinks and rejects blank hypothesis ids', async () => {

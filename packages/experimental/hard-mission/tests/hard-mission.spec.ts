@@ -234,12 +234,16 @@ describe('hard mission target pinning', () => {
   it('records the armed matrix: pinned sha, grouped modules, and the class columns', async () => {
     const { ctx, root } = await harness(missionConfig())
     expect(ctx.hardLedger.coverageMatrix(root.agent)).toEqual({
-      modules: ['.', 'src', 'src/parser'],
+      // Nothing is excluded by default: the vendored tree is audited like the rest.
+      modules: ['.', 'src', 'src/parser', 'vendor/lib'],
       bugClasses: [...hardMission.DEFAULT_BUG_CLASSES],
       targetRepo,
       commit: targetSha,
       // The root module holds only README.md, so the inert screen screens it.
       inertModules: ['.'],
+      // Every code file is TypeScript or JavaScript, which the pattern tables cover.
+      unscreenedModules: [],
+      ignoredEntryCount: 0,
     })
     expect(ctx.goals.get(root.agent)?.revision).toBe(1)
   })
@@ -265,16 +269,158 @@ describe('hard mission target pinning', () => {
       target: { commit: targetSha, moduleDepth: 1 },
     }))
     expect(ctx.hardLedger.coverageMatrix(root.agent)).toMatchObject({
-      modules: ['.', 'src'],
+      modules: ['.', 'src', 'vendor'],
       commit: targetSha,
     })
   })
 
-  it('excludes trees before grouping, so excluded files never become modules', async () => {
+  it('excludes configured trees before grouping and records what the exclusion removed', async () => {
+    const { ctx, root } = await harness(missionConfig({ target: { excludeGlobs: ['vendor/**'] } }))
+    const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+    expect(matrix?.modules).toEqual(['.', 'src', 'src/parser'])
+    expect(matrix?.exclusions).toEqual({ globs: ['vendor/**'], fileCount: 1, sample: ['vendor/lib/vendored.js'] })
+  })
+
+  it('records no exclusion block when no glob is configured', async () => {
     const { ctx, root } = await harness(missionConfig())
-    const modules = ctx.hardLedger.coverageMatrix(root.agent)?.modules ?? []
-    expect(modules).not.toContain('vendor')
-    expect(modules).not.toContain('vendor/lib')
+    expect(ctx.hardLedger.coverageMatrix(root.agent)?.exclusions).toBeUndefined()
+    expect(hardMission.DEFAULT_EXCLUDE_GLOBS).toEqual([])
+  })
+
+  it('marks a PHP module unscreened: the fixed patterns match none of five real WordPress holes', async () => {
+    const php = await mkdtemp(join(tmpdir(), 'hard-mission-php-'))
+    try {
+      const repo = join(php, 'repo')
+      await mkdir(join(repo, 'wp', 'admin'), { recursive: true })
+      await mkdir(join(repo, 'src'), { recursive: true })
+      await writeFile(join(repo, 'src', 'app.ts'), 'export {}\n')
+      await writeFile(join(repo, 'wp', 'admin', 'ajax.php'), [
+        '<?php',
+        "add_action( 'wp_ajax_delete_item', 'my_delete_item' );",
+        'function my_delete_item() {',
+        "    $id = $_POST['id'];",
+        '    global $wpdb;',
+        '    $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}items WHERE id = $id" );',
+        "    include $_GET['tpl'] . '.php';",
+        "    file_put_contents( WP_CONTENT_DIR . '/' . $_POST['name'], $_POST['body'] );",
+        "    passthru( 'convert ' . $_POST['file'] );",
+        '}',
+        '',
+      ].join('\n'))
+      seedGitRepo(repo)
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
+      expect(ctx.hardLedger.coverageMatrix(root.agent)?.unscreenedModules).toEqual(['wp/admin'])
+    } finally {
+      await rm(php, { recursive: true, force: true })
+    }
+  })
+
+  it('marks binary, unknown-language, and mixed-language modules unscreened by content, not only extension', async () => {
+    const mixed = await mkdtemp(join(tmpdir(), 'hard-mission-mixed-'))
+    try {
+      const repo = join(mixed, 'repo')
+      for (const directory of ['bin', 'odd', 'mix', 'web', 'po']) await mkdir(join(repo, directory), { recursive: true })
+      // A NUL byte makes git classify the file as binary whatever its extension says.
+      await writeFile(join(repo, 'bin', 'blob.js'), Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x01, 0x02]))
+      await writeFile(join(repo, 'odd', 'thing.xyz'), 'run(x)\n')
+      await writeFile(join(repo, 'mix', 'a.ts'), 'export {}\n')
+      await writeFile(join(repo, 'mix', 'b.php'), '<?php echo 1;\n')
+      await writeFile(join(repo, 'web', 'page.ts'), 'export {}\n')
+      await writeFile(join(repo, 'web', 'notes.md'), '# notes\n')
+      // Translation catalogs reach rendered pages, so they are no longer inert.
+      await writeFile(join(repo, 'po', 'fr.po'), 'msgid "x"\nmsgstr "<b>y</b>"\n')
+      seedGitRepo(repo)
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
+      const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+      expect(matrix?.unscreenedModules).toEqual(['bin', 'mix', 'odd', 'po'])
+      expect(matrix?.inertModules).toEqual([])
+    } finally {
+      await rm(mixed, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses the first arming over files the pinned commit does not hold, and never re-checks on resume', async () => {
+    const dirty = await mkdtemp(join(tmpdir(), 'hard-mission-dirty-'))
+    try {
+      const repo = join(dirty, 'repo')
+      await mkdir(join(repo, 'src'), { recursive: true })
+      await writeFile(join(repo, 'src', 'app.ts'), 'export {}\n')
+      await writeFile(join(repo, '.gitignore'), 'build/\n')
+      seedGitRepo(repo)
+      await mkdir(join(repo, 'build'), { recursive: true })
+      await writeFile(join(repo, 'build', 'out.js'), 'x\n')
+      await writeFile(join(repo, 'src', 'new.ts'), 'export {}\n')
+      await writeFile(join(repo, 'src', 'app.ts'), 'export const changed = 1\n')
+      // Loading never fails on dirt: a resumed session must still load.
+      const ctx = await baseHarness()
+      await ctx.plugin(hardMission, missionConfig({ target: { repoPath: repo } }))
+      const resumed = stubAgent(`hard-mission-resumed-${Math.random()}`, undefined, ctx)
+      ctx.agents.enter(resumed.agent, undefined)
+      await ctx.agents.announce(resumed.agent, 'resume')
+      expect(ctx.goals.get(resumed.agent)).toBeUndefined()
+      // The first arming names the untracked and the modified file. The agent
+      // loop announces a created root directly, so the refusal fails its creation.
+      const fresh = stubAgent(`hard-mission-fresh-${Math.random()}`, undefined, ctx)
+      ctx.agents.enter(fresh.agent, undefined)
+      await expect(ctx.agents.announce(fresh.agent, 'startup')).rejects.toThrow(
+        /target working tree differs from the pinned commit .*: src\/app\.ts \(modified\), src\/new\.ts \(untracked\)/,
+      )
+      expect(ctx.goals.get(fresh.agent)).toBeUndefined()
+    } finally {
+      await rm(dirty, { recursive: true, force: true })
+    }
+  })
+
+  it('treats the harness state directory inside the target as its own, not as drift', async () => {
+    const stateful = await mkdtemp(join(tmpdir(), 'hard-mission-state-'))
+    const previousHome = process.env.DSH_HOME
+    try {
+      const repo = join(stateful, 'repo')
+      await mkdir(join(repo, 'src'), { recursive: true })
+      await writeFile(join(repo, 'src', 'app.ts'), 'export {}\n')
+      seedGitRepo(repo)
+      // The project-local `.dsh/` directory and a DSH home placed inside the
+      // target both hold harness state written before the first arming.
+      await mkdir(join(repo, '.dsh', 'profiles', 'hard'), { recursive: true })
+      await writeFile(join(repo, '.dsh', '.anonymous-user-id'), 'x\n')
+      await mkdir(join(repo, 'state', 'home'), { recursive: true })
+      await writeFile(join(repo, 'state', 'home', 'settings.json'), '{}\n')
+      process.env.DSH_HOME = join(repo, 'state', 'home')
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
+      expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+      // A real untracked file beside the state directories still refuses.
+      await writeFile(join(repo, 'src', 'new.ts'), 'export {}\n')
+      const second = await baseHarness()
+      await second.plugin(hardMission, missionConfig({ target: { repoPath: repo } }))
+      const fresh = stubAgent(`hard-mission-state-fresh-${Math.random()}`, undefined, second)
+      second.agents.enter(fresh.agent, undefined)
+      await expect(second.agents.announce(fresh.agent, 'startup')).rejects.toThrow(/: src\/new\.ts \(untracked\);/)
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previousHome
+      await rm(stateful, { recursive: true, force: true })
+    }
+  })
+
+  it('counts ignored entries without failing the arming', async () => {
+    const ignored = await mkdtemp(join(tmpdir(), 'hard-mission-ignored-'))
+    try {
+      const repo = join(ignored, 'repo')
+      await mkdir(join(repo, 'src'), { recursive: true })
+      await writeFile(join(repo, 'src', 'app.ts'), 'export {}\n')
+      await writeFile(join(repo, '.gitignore'), 'build/\n*.log\n')
+      seedGitRepo(repo)
+      await mkdir(join(repo, 'build', 'deep'), { recursive: true })
+      await writeFile(join(repo, 'build', 'deep', 'a.js'), 'x\n')
+      await writeFile(join(repo, 'build', 'b.js'), 'x\n')
+      await writeFile(join(repo, 'trace.log'), 'x\n')
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
+      // One entry per ignored directory plus the ignored file.
+      expect(ctx.hardLedger.coverageMatrix(root.agent)?.ignoredEntryCount).toBe(2)
+      expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+    } finally {
+      await rm(ignored, { recursive: true, force: true })
+    }
   })
 
   it('fails loud at load when the target path is not a git repository', async () => {
@@ -311,9 +457,15 @@ describe('hard mission target pinning', () => {
       }
       seedGitRepo(repo)
       const ctx = await baseHarness()
-      await expect(ctx.plugin(hardMission, missionConfig({
+      const loaded = ctx.plugin(hardMission, missionConfig({
         target: { repoPath: repo, moduleDepth: 1 },
-      }))).rejects.toThrow(/log cap/)
+      }))
+      await expect(loaded).rejects.toThrow(/log cap.*too large for one mission/)
+      await expect(loaded).rejects.not.toThrow(/exclude/)
+      const deeper = await baseHarness()
+      await expect(deeper.plugin(hardMission, missionConfig({
+        target: { repoPath: repo, moduleDepth: 2 },
+      }))).rejects.toThrow(/log cap; lower target\.moduleDepth from 2 so modules group coarser/)
     } finally {
       await rm(oversized, { recursive: true, force: true })
     }
@@ -459,5 +611,9 @@ describe('coverage module enumeration', () => {
     expect(hardMission.inertModulesFromPaths(['deploy/Dockerfile', 'deploy/README.md'], 1, inert)).toEqual([])
     // A dotfile is its own extension, not an inert one.
     expect(hardMission.inertModulesFromPaths(['.gitignore'], 2, inert)).toEqual([])
+    // Translation catalogs are rendered into pages, so they are not inert.
+    expect(hardMission.inertModulesFromPaths(['i18n/fr.po', 'i18n/fr.mo', 'i18n/app.pot'], 1, inert)).toEqual([])
+    // The extension is the basename's: a dotted directory does not lend one to an extensionless file.
+    expect(hardMission.inertModulesFromPaths(['docs.v1/Makefile'], 1, inert)).toEqual([])
   })
 })

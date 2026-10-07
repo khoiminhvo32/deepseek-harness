@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-tools` 注册 hard harness 的六个面向模型工具：`hard_submit_finding` 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_record_flow` 在钉住提交处的引用解析背后记录模块的深读 flow 文档；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在 harness 验证的缺席 grep 背后批量清除一个类别；`hard_sweep_summary` 记录完成的扫描过程，扫描未发现任何内容时引用已反驳的假设、模型已清除的单元格或已记录的 flow 文档。台账在记录时校验每项证明。
+`dsh-experimental-hard-tools` 注册 hard harness 的六个面向模型工具：`hard_submit_finding` 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_record_flow` 在钉住提交处的引用解析背后记录模块的深读 flow 文档；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在一个只能拒绝的 grep 背后跨模块批量筛查一个类别，grep 沉默时记录为最弱的模型级别；`hard_sweep_summary` 记录完成的扫描过程，扫描未发现任何内容时引用已反驳的假设、模型已清除的单元格或已记录的 flow 文档。台账在记录时校验每项证明。
 
 ## 目录
 
@@ -44,7 +44,7 @@ kind: "package-reference"
 ### Design
 
 - **提交时验证。** `hard_submit_finding` 对 claim（PoC 必须打印的标记）与根因（去重键）做哈希，通过台账提出，然后等待 `hardVerifier.verify` 再作答；模型看到的是执行后的结论，而不是假设。工具描述传授 specificity 契约：从 `$1` 读取 payload、绝不硬编码，因为 harness 会用良性载荷重跑 PoC 并要求其失败。
-- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。`hard_mark_coverage` 拒绝非武装矩阵行的模块并点名有效行，也拒绝在筛查早已裁决的惰性模块上给出 `cleared`（`suspicious` 仍可记录）；harness 重开或 fail-closed 审计给其单元显式标注 `source: 'harness'`，报告因此不会把模型自己给出的 `suspicious` 判定读作投机。`hard_clear_modules` 在任何模块越界或惰性时于任何 grep 之前拒绝整批。
+- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。`hard_mark_coverage` 拒绝非武装矩阵行的模块并点名有效行，也拒绝在筛查早已裁决的惰性模块上给出 `cleared`（`suspicious` 仍可记录）；harness 重开或 fail-closed 审计给其单元显式标注 `source: 'harness'`，报告因此不会把模型自己给出的 `suspicious` 判定读作投机。`hard_clear_modules` 在任何模块越界、惰性或不可筛查时于任何 grep 之前拒绝整批——不可筛查模块含二进制，或固定模式表并非为其语言编写，在那里 grep 什么也证明不了。
 
 ### Source map
 

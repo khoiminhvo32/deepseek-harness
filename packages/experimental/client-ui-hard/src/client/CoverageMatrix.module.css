@@ -113,7 +113,7 @@
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
 }
 
-/* Cleared by the harness-verified batch grep: the success tint. */
+/* Batch screen: cleared by a silent grep, no cell read individually. */
 .model-verified {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, transparent);
 }
@@ -136,6 +136,32 @@
 /* No verdict yet. */
 .uncovered {
   border: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+/* Blind mark: a corner dot over the face, so the face keeps its verdict color. */
+.markBlind {
+  position: relative;
+}
+
+.markBlind::after {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-state-warn-primary);
+  content: '';
+}
+
+.blind {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.exclusions {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
 }
 
 .legend {

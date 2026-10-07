@@ -11,6 +11,28 @@
  * @module
  */
 
+/**
+ * File extensions the fixed pattern tables were written for: the
+ * JavaScript/TypeScript family, Python, and Java. Covered means a table names
+ * this language's sink and surface shapes, not that the table is complete for
+ * it. The mission records a module holding any tracked code file outside this
+ * set — or any binary, which `grep -I` skips whatever its extension — as
+ * unscreened: the cross-check grep is silent there, so it can neither re-open
+ * nor support a clear.
+ */
+export const SCREENED_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.jsx',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.tsx',
+  '.py',
+  '.java',
+])
+
 /** Per-class grep -E alternations naming that class's sink shapes. */
 export const SINK_PATTERNS: Readonly<Record<string, readonly string[]>> = {
   sqli: [
@@ -116,8 +138,8 @@ const EXPORTED_SURFACE_PATTERNS: readonly string[] = [
  * opposite reading of `SINK_PATTERNS`, whose patterns name the dangerous site
  * itself. For these classes a cross-check match is an operation the model must
  * have declared a guard for — or declared deliberately unguarded, with the
- * reason — and zero matches prove no exported surface exists, which is a clean
- * result rather than a suspicious one.
+ * reason. Zero matches is silence: the table recognizes no exported operation,
+ * which re-opens nothing and certifies nothing.
  */
 export const GUARDED_SURFACE_PATTERNS: Readonly<Record<string, readonly string[]>> = {
   authz: EXPORTED_SURFACE_PATTERNS,

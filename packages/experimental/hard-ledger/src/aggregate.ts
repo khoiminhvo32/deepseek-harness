@@ -112,7 +112,7 @@ export function coverageProgressFromState(state: HardLedgerProjectionState): Cov
 /**
  * Verdicted matrix cells partitioned by who decided them, exactly as the
  * `coverageBySource` service method reports it: the model's own reads,
- * batch clears the harness grep confirmed, and every harness decision —
+ * batch screens the model cleared without reading, and every harness decision —
  * both a re-open the harness appended over a model verdict and the purely
  * mechanical inert-module screen. A cell carrying no source reads as
  * `model`, so older logs partition unchanged.
@@ -148,6 +148,30 @@ export function coverageBySourceFromState(state: HardLedgerProjectionState): Cov
     if (folded !== undefined) tally(cellData(folded).source)
   }
   return counts
+}
+
+/**
+ * Model-cleared module-scoped matrix cells in modules the coverage
+ * cross-check cannot screen, exactly as the `blindClears` service method
+ * reports it. Nothing but the model's own read stands behind such a cell: the
+ * grep is silent there, so it neither re-opens nor corroborates. Harness
+ * decisions (re-opens and the inert screen) never count; repository-scoped
+ * classes never count, because their cells are not tied to one module's
+ * files. Zero without a matrix or on an arming record that predates the
+ * screenability field.
+ * @param state - the folded ledger projection state.
+ * @returns the blind-clear count.
+ */
+export function blindClearsFromState(state: HardLedgerProjectionState): number {
+  const unscreened = new Set(state.matrix?.unscreenedModules ?? [])
+  if (unscreened.size === 0) return 0
+  let blind = 0
+  for (const cell of matrixCellsFromState(state)) {
+    if (cell.verdict !== 'cleared' || cell.source === 'harness') continue
+    if (classScope(cell.bugClass) !== 'module') continue
+    if (unscreened.has(cell.module)) blind += 1
+  }
+  return blind
 }
 
 /**
@@ -273,8 +297,8 @@ const AGGREGATE_BLOCKER_LIMIT = 8
  * Whether the harness certifies the mission complete, identical to the
  * service method's output: no open work, the trailing sweep window all
  * empty-verified, and at least one model-audited coverage cell or resolved
- * hypothesis so a fully harness-screened repository reads as "nothing
- * audited yet", not "done". Never counts findings.
+ * hypothesis so a fully harness-screened or fully batch-screened repository
+ * reads as "nothing audited yet", not "done". Never counts findings.
  * @param state - the folded ledger projection state.
  * @param thresholds - the ledger's spot-check percent and trailing-sweep requirement.
  * @returns the verdict plus the bounded blockers, phrased to serve directly as the denial reason.
@@ -295,13 +319,13 @@ export function completionAssessmentFromState(state: HardLedgerProjectionState, 
   const bySource = coverageBySourceFromState(state)
   const resolved = state.hypotheses
     .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
-  // The audit floor asks whether any model decision stands: a cell the model
-  // decided that the harness has not re-opened. A re-open appends the latest
-  // verdict under the harness's name, so the bySource counts already exclude
-  // flipped cells — a matrix the model cleared and the harness re-opened in
-  // full leaves nothing standing even though the model's activity was high.
-  const standingModelCells = bySource.model + bySource.modelVerified
-  if (standingModelCells === 0 && resolved === 0) {
+  // The audit floor asks whether any model read stands: a cell the model
+  // decided individually that the harness has not re-opened. A re-open
+  // appends the latest verdict under the harness's name, so the bySource
+  // counts already exclude flipped cells. A batch screen (`model-verified`)
+  // never counts — the model read none of those cells, and a silent grep is
+  // not an audit.
+  if (bySource.model === 0 && resolved === 0) {
     blockers.push('no model-audited coverage cell or resolved hypothesis exists yet')
   }
   return { complete: blockers.length === 0, blockers }

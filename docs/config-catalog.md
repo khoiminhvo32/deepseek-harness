@@ -1034,7 +1034,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:93`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:97`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1065,7 +1065,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-mission`
 
 - `inject`: `agents` · `goals` · `systemPrompt` · `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-mission/src/index.ts:107`](../packages/experimental/hard-mission/src/index.ts)
+- `source`: [`packages/experimental/hard-mission/src/index.ts:124`](../packages/experimental/hard-mission/src/index.ts)
 
 ```ts config-catalog
 /** Mission plugin config. */
@@ -1099,7 +1099,10 @@ export interface TargetConfig {
   commit?: string
   /** Directory segments per coverage module, 1 through 6. */
   moduleDepth?: number
-  /** Root-anchored globs excluded from the tracked-file enumeration. */
+  /**
+   * Root-anchored globs excluded from the tracked-file enumeration; empty by
+   * default. The arming record states what they removed.
+   */
   excludeGlobs?: string[]
 }
 ```

@@ -9,7 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, matrixBoardFromState, openWorkCountsFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -1122,6 +1122,58 @@ describe('hard ledger aggregates over folded state', () => {
     } as never)
     expect(blindClearsFromState(reopened)).toBe(1)
     expect(blindClearsFromState(emptyHardLedgerState())).toBe(0)
+  })
+
+  it('lays out the whole board: every matrix cell in matrix order with its state, repo classes last', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['notes', 'src', 'wp'], bugClasses: ['cmdi', 'dependencies'],
+          inertModules: ['notes'], unscreenedModules: ['wp'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'wp', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/a.php:run'] } },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'suspicious', declaredSinks: ['x'], source: 'harness' } },
+      // An off-matrix cell never reaches the board.
+      { type: 'hard/coverage/cell', data: { module: 'poc', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['p'] } },
+    ])
+    expect(matrixBoardFromState(state)).toEqual([
+      // The inert module's cell is the harness's screen, without an event.
+      { module: 'notes', bugClass: 'cmdi', scope: 'module', verdict: 'cleared', source: 'harness', blind: false },
+      { module: 'src', bugClass: 'cmdi', scope: 'module', verdict: 'suspicious', source: 'harness', blind: false },
+      { module: 'wp', bugClass: 'cmdi', scope: 'module', verdict: 'cleared', source: 'model', blind: true },
+      // A repository-scoped class without an event has no verdict yet.
+      { module: '.', bugClass: 'dependencies', scope: 'repo', blind: false },
+    ])
+    expect(matrixBoardFromState(emptyHardLedgerState())).toEqual([])
+  })
+
+  it('counts open work by kind with the same predicates the open-work list uses', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['src', 'web'], bugClasses: ['cmdi', 'sqli'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'suspicious', declaredSinks: [] } },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['p'], source: 'model-verified' } },
+      { type: 'hard/finding/proposed', data: { ...findingRequest(), id: 'F-1' } },
+      { type: 'hard/finding/proposed', data: { ...findingRequest(), id: 'F-2' } },
+      {
+        type: 'hard/finding/verdict',
+        data: { id: 'F-2', verdict: 'flaky', runs: 3, cvssComputed: 9.3, cvssMatch: true, reason: 'split', fingerprint: FINGERPRINT },
+      },
+      { type: 'hard/hypothesis/state', data: { id: 'H-1', statement: 's', status: 'testing' } },
+      { type: 'hard/hypothesis/state', data: { id: 'H-2', statement: 's', status: 'refuted', reason: 'r' } },
+    ])
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100 })).toEqual({
+      pendingFindings: 1, flakyFindings: 1, openHypotheses: 1, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 1,
+    })
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0 }).screenReReads).toBe(0)
   })
 
   it('carries screenability, exclusions, and blind clears through the client wire view', () => {

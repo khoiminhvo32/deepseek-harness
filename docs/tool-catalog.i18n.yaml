@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: c68dafd2b847e67f
-  zh: 4c8fea21b9275b24
+  en: 7af2c9575e64b877
+  zh: 9b1ed6acd249fdba
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -182,6 +182,9 @@
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-record-flow:
   en: f0ba66ed4deb5523
   zh: f0ba66ed4deb5523
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-status:
+  en: 0d9c8e3f073a6894
+  zh: 0d9c8e3f073a6894
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-submit-finding:
   en: 7a884dd91c476460
   zh: 7a884dd91c476460

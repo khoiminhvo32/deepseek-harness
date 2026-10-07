@@ -15,6 +15,7 @@
     { "path": "../../core/tools" },
     { "path": "../../llm/llm" },
     { "path": "../hard-ledger" },
-    { "path": "../hard-verifier" }
+    { "path": "../hard-verifier" },
+    { "path": "../../goal/goal" }
   ]
 }

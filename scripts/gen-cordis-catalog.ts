@@ -862,6 +862,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   CoverageBySource: 'coverage aggregate shape is owned by packages/experimental/hard-ledger/README.md',
   RefutationBreakdown: 'refutation aggregate shape is owned by packages/experimental/hard-ledger/README.md',
   CompletionAssessment: 'completion aggregate shape is owned by packages/experimental/hard-ledger/README.md',
+  OpenWorkCounts: 'open-work aggregate shape is owned by packages/experimental/hard-ledger/README.md',
+  HardMatrixBoardCell: 'coverage board shape is owned by packages/experimental/hard-ledger/README.md',
   FlowCitationEntry: 'flow citation input is owned by packages/experimental/hard-verifier/README.md',
   FlowCitationReject: 'flow citation rejection is owned by packages/experimental/hard-verifier/README.md',
   ProductEvent: 'Desktop event fields are owned by packages/client/product-analytics/README.md and src/events.ts',

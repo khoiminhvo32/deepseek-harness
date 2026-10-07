@@ -231,6 +231,114 @@ export function uncoveredCellsFromState(state: HardLedgerProjectionState): reado
 }
 
 /**
+ * One cell of the coverage board: a matrix cell with its current state. A
+ * cell without a verdict carries neither `verdict` nor `source`; an inert
+ * module's cell is the harness's screen; a repository-scoped class appears
+ * once under the `.` module.
+ */
+export interface HardMatrixBoardCell {
+  readonly module: string
+  readonly bugClass: string
+  readonly scope: 'module' | 'repo'
+  readonly verdict?: HardCoverageCellData['verdict']
+  readonly source?: HardCoverageSource
+  /** A model clear in a module the coverage cross-check cannot screen. */
+  readonly blind: boolean
+}
+
+/**
+ * Every matrix cell with its current state, in matrix order: sorted modules
+ * outer and the configured class order inner for module-scoped classes, then
+ * each repository-scoped class once under the `.` module. Off-matrix cells
+ * never appear. This is the board the model reads to see what it is being
+ * pushed through, so it lists every cell — the caller filters and bounds it.
+ * @param state - the folded ledger projection state.
+ * @returns one entry per matrix cell; empty without a matrix.
+ */
+export function matrixBoardFromState(state: HardLedgerProjectionState): readonly HardMatrixBoardCell[] {
+  const matrix = state.matrix
+  if (matrix === undefined) return []
+  const inert = new Set(matrix.inertModules ?? [])
+  const unscreened = new Set(matrix.unscreenedModules ?? [])
+  const latest = new Map<string, HardCoverageCellData>()
+  for (const cell of state.coverage) latest.set(`${cell.module}\u0000${cell.bugClass}`, cellData(cell))
+  const decided = (
+    module: string,
+    bugClass: string,
+    scope: 'module' | 'repo',
+    cell: HardCoverageCellData | undefined,
+  ): HardMatrixBoardCell => {
+    if (cell === undefined) return { module, bugClass, scope, blind: false }
+    const source = cell.source ?? 'model'
+    const blind = scope === 'module' && cell.verdict === 'cleared' && source !== 'harness' && unscreened.has(module)
+    return { module, bugClass, scope, verdict: cell.verdict, source, blind }
+  }
+  const board: HardMatrixBoardCell[] = []
+  for (const module of matrix.modules) {
+    for (const bugClass of matrix.bugClasses) {
+      if (classScope(bugClass) !== 'module') continue
+      const cell = latest.get(`${module}\u0000${bugClass}`)
+      board.push(cell === undefined && inert.has(module)
+        ? { module, bugClass, scope: 'module', verdict: 'cleared', source: 'harness', blind: false }
+        : decided(module, bugClass, 'module', cell))
+    }
+  }
+  for (const bugClass of matrix.bugClasses) {
+    if (classScope(bugClass) !== 'repo') continue
+    const folded = [...state.coverage].reverse().find(entry => entry.bugClass === bugClass)
+    board.push(decided('.', bugClass, 'repo', folded === undefined ? undefined : cellData(folded)))
+  }
+  return board
+}
+
+/** Open work counted by kind, for a summary that names how much remains without listing it. */
+export type OpenWorkCounts = {
+  /** Proposed findings the verifier has not decided. */
+  readonly pendingFindings: number
+  /** Findings whose runs split. */
+  readonly flakyFindings: number
+  /** Hypotheses still proposed, testing, or deferred. */
+  readonly openHypotheses: number
+  /** Matrix cells with no verdict yet. */
+  readonly uncoveredCells: number
+  /** Cells whose latest verdict is suspicious. */
+  readonly suspiciousCells: number
+  /** Batch-screened cells the spot-check sends back for a manual read. */
+  readonly screenReReads: number
+}
+
+/**
+ * Open work counted by kind, with the same predicates `openWorkFromState`
+ * lists items by, so the counts and the list never disagree.
+ * @param state - the folded ledger projection state.
+ * @param thresholds - the ledger's screen spot-check percent.
+ * @returns the per-kind counts; all zero when nothing is open.
+ */
+export function openWorkCountsFromState(
+  state: HardLedgerProjectionState,
+  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent'>,
+): OpenWorkCounts {
+  return {
+    pendingFindings: state.findings.filter(record => record.verdict === undefined).length,
+    flakyFindings: state.findings.filter(record => record.verdict?.verdict === 'flaky').length,
+    openHypotheses: state.hypotheses.filter(hypothesis => isOpenHypothesis(hypothesis.status)).length,
+    uncoveredCells: uncoveredCellsFromState(state).length,
+    suspiciousCells: state.coverage.filter(cell => cell.verdict === 'suspicious').length,
+    screenReReads: state.coverage.filter(cell => isScreenReRead(cell, thresholds.screenSpotCheckPercent)).length,
+  }
+}
+
+/** Whether a hypothesis status still owes work. */
+function isOpenHypothesis(status: HardLedgerProjectionState['hypotheses'][number]['status']): boolean {
+  return status === 'proposed' || status === 'testing' || status === 'deferred'
+}
+
+/** Whether the spot-check sends one batch-screened cell back for a manual read. */
+function isScreenReRead(cell: FoldedCoverageCell, percent: number): boolean {
+  return cell.source === 'model-verified' && cellSampledForPercent(cell, percent)
+}
+
+/**
  * Model-facing open work summary, identical to the service method's output:
  * pending verifications, unresolved states, coverage cells that still owe
  * work, and batch-cleared cells the deterministic screen spot-check sends
@@ -248,7 +356,7 @@ export function openWorkFromState(state: HardLedgerProjectionState, thresholds: 
     }
   }
   for (const hypothesis of state.hypotheses) {
-    if (hypothesis.status === 'proposed' || hypothesis.status === 'testing' || hypothesis.status === 'deferred') {
+    if (isOpenHypothesis(hypothesis.status)) {
       work.push(`hypothesis ${hypothesis.id} is ${hypothesis.status}`)
     }
   }
@@ -263,7 +371,7 @@ export function openWorkFromState(state: HardLedgerProjectionState, thresholds: 
     if (cell.verdict === 'suspicious') {
       work.push(`cell ${cell.module} × ${cell.bugClass} is suspicious: re-verify the declared sinks`)
     }
-    if (cell.source === 'model-verified' && cellSampledForPercent(cell, thresholds.screenSpotCheckPercent)) {
+    if (isScreenReRead(cell, thresholds.screenSpotCheckPercent)) {
       work.push(`cell ${cell.module} × ${cell.bugClass} was batch-cleared; verify the mechanical screen`)
     }
   }

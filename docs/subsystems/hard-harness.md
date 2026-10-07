@@ -284,6 +284,22 @@ blindClears(agent: Agent): number
  * @returns bounded human-readable work items, empty when nothing is open.
  */
 openWork(agent: Agent): string[]
+
+/**
+ * Open work counted by kind with the same predicates `openWork` lists by.
+ * The math lives in `openWorkCountsFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the per-kind counts.
+ */
+openWorkCounts(agent: Agent): OpenWorkCounts
+
+/**
+ * Every matrix cell with its current state, in matrix order — the board the
+ * model reads to see what remains. The math lives in `matrixBoardFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one entry per matrix cell; empty without a matrix.
+ */
+matrixBoard(agent: Agent): readonly HardMatrixBoardCell[]
 ```
 
 Types: [Agent](core.md)

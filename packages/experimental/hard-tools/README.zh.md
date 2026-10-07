@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-tools` 注册 hard harness 的六个面向模型工具：`hard_submit_finding` 提交 claim 并返回验证器执行后的结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_record_flow` 在钉住提交处的引用解析背后记录模块的深读 flow 文档；`hard_mark_coverage` 记录系统化扫描单元；`hard_clear_modules` 在一个只能拒绝的 grep 背后跨模块批量筛查一个类别，grep 沉默时记录为最弱的模型级别；`hard_sweep_summary` 记录完成的扫描过程，扫描未发现任何内容时引用已反驳的假设、模型已清除的单元格或已记录的 flow 文档。台账在记录时校验每项证明。
+`dsh-experimental-hard-tools` 注册 hard harness 的七个面向模型工具：`hard_submit_finding` 返回验证器对一项 claim 的执行结论；`hard_update_hypothesis` 驱动假设生命周期；`hard_record_flow` 在钉住提交处的引用解析背后记录模块的 flow 文档；`hard_mark_coverage` 记录一个覆盖单元；`hard_clear_modules` 在一个只能拒绝的 grep 背后批量筛查一个类别；`hard_sweep_summary` 记录一次扫描，未发现内容时引用证据；`hard_status` 回读棋盘与剩余工作。台账在记录时校验每项证明。
 
 ## 目录
 
@@ -31,7 +31,7 @@ kind: "package-reference"
   name: '@deepseek-ai/dsh-experimental-hard-tools'
 ```
 
-四个工具都要求存活代理并返回紧凑 JSON。提交结果携带 `verdict.verdict`、运行次数、重算分数、声称分数是否匹配以及有界的 reason；拒绝以 `HARD_VERIFIER_DUPLICATE` 等稳定代码浮现。生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools)是模型收到的确切 schema。
+七个工具都要求存活代理并返回紧凑 JSON。提交结果携带 `verdict.verdict`、运行次数、重算分数、声称分数是否匹配以及有界的 reason；拒绝以 `HARD_VERIFIER_DUPLICATE` 等稳定代码浮现。生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools)是模型收到的确切 schema。
 
 -----
 
@@ -63,11 +63,11 @@ kind: "package-reference"
 
 #### What the model sees
 
-The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_mark_coverage`, `hard_clear_modules`, and `hard_sweep_summary` schemas](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), or the recorded sweep summary.
+The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_record_flow`, `hard_mark_coverage`, `hard_clear_modules`, `hard_sweep_summary`, and `hard_status` schemas](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded flow document (or the rejected citations naming every failed cite), the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), the recorded sweep summary, or a status view: per-kind open-work counts, the gate, and the matrix axes — counts, never a ratio, so no progress number invites clearing for its own sake — a page of board cells with the total that matched, or a page of the open-work list.
 
 #### Token effect
 
-Fixed schema cost plus one compact result per call; submit results are the largest (finding plus verdict objects).
+Fixed schema cost plus one compact result per call; submit results and full `hard_status` pages are the largest, and a status page is held at 200 entries.
 
 #### KV Cache effect
 

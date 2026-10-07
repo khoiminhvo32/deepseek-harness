@@ -15,6 +15,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import HardVerifier from '@deepseek-ai/dsh-experimental-hard-verifier'
+import GoalService from '@deepseek-ai/dsh-goal'
 import type { Config as VerifierConfig } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import * as hardTools from '@deepseek-ai/dsh-experimental-hard-tools'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -144,13 +145,13 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('hard tools registration', () => {
-  it('registers the six tools and disposes them with the fiber', async () => {
+  it('registers the seven tools and disposes them with the fiber', async () => {
     const { ctx, fiber } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
-    expect(['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules']
-      .map(name => ctx.tools.get(name)?.name)).toHaveLength(6)
+    const names = ['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules', 'hard_status']
+    expect(names.map(name => ctx.tools.get(name)?.name)).toEqual(names)
     await fiber.dispose()
     expect(ctx.tools.get('hard_submit_finding')).toBeUndefined()
-    expect(ctx.tools.get('hard_sweep_summary')).toBeUndefined()
+    expect(ctx.tools.get('hard_status')).toBeUndefined()
   })
 
   it('has the Loader-safe namespace export shape', () => {
@@ -171,6 +172,7 @@ describe('hard tools agentless and presentation', () => {
       ['hard_mark_coverage', { module: 'm', bug_class: 'sqli', verdict: 'suspicious', declared_sinks: [] }],
       ['hard_record_flow', { module: 'm', entry_points: [], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] }],
       ['hard_sweep_summary', { phase: 'A', cells_touched: 1, new_findings: 1 }],
+      ['hard_status', { view: 'summary' }],
     ] as const) {
       const result = await ctx.tools.execute({
         signal: testSignal, callId: ToolCallId(`agentless-${name}`), name, arguments: args,
@@ -197,6 +199,10 @@ describe('hard tools agentless and presentation', () => {
     })).toMatchObject({ title: 'Flow doc m: 1 citations' })
     expect(ctx.tools.get('hard_sweep_summary')?.presentCall?.({ phase: 'B', cells_touched: 2, new_findings: 3 }))
       .toMatchObject({ title: 'Sweep B: 3 findings' })
+    expect(ctx.tools.get('hard_status')?.presentCall?.({ view: 'cells', filter: 'suspicious' }))
+      .toMatchObject({ title: 'Status: cells (suspicious)' })
+    expect(ctx.tools.get('hard_status')?.presentCall?.({ view: 'summary' }))
+      .toMatchObject({ title: 'Status: summary' })
   })
 })
 
@@ -617,6 +623,110 @@ describe('hard_update_hypothesis and methodology tools', () => {
     }, root.agent)
     expect(halfSpecified.isError).toBe(true)
     expect(halfSpecified.error?.message).toContain('empty_proof_bug_class is valid only with empty_proof_kind cell')
+  })
+})
+
+describe('hard_status', () => {
+  /** Arm a 3-module, 2-class matrix with one inert and one unscreened module and an exclusion. */
+  function armBoard(ctx: Context, agent: Agent): void {
+    ctx.hardLedger.recordMissionArmed(agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['docs', 'src/api', 'wp'],
+      bugClasses: ['cmdi', 'sqli'],
+      inertModules: ['docs'],
+      unscreenedModules: ['wp'],
+      exclusions: { globs: ['vendor/**'], fileCount: 9, sample: ['vendor/a.php'] },
+    })
+    ctx.hardLedger.markCoverage(agent, { module: 'wp', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['wp/a.php:run'] })
+    ctx.hardLedger.markCoverage(agent, { module: 'src/api', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: [] })
+  }
+
+  it('summarizes remaining work by kind, the gate, and the matrix — counts, never a ratio', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    armBoard(ctx, root.agent)
+    const status = resultJson(await execute(ctx, 'hard_status', { view: 'summary' }, root.agent))
+    const summary = status.summary as { gate: { complete: boolean; blockers: string[] } }
+    expect(summary.gate.blockers).toContain('2 coverage cell(s) have no verdict yet')
+    expect(summary).toEqual({
+      matrix: {
+        moduleCount: 3, bugClasses: ['cmdi', 'sqli'], inertModuleCount: 1,
+        unscreenedModules: ['wp'], unscreenedModuleCount: 1,
+        excludeGlobs: ['vendor/**'], excludedFileCount: 9,
+      },
+      openWork: { pendingFindings: 0, flakyFindings: 0, openHypotheses: 0, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 0 },
+      gate: { complete: false, blockers: summary.gate.blockers },
+    })
+    // No ratio or percentage reaches the model: a salient number invites clearing for the number's sake.
+    expect(JSON.stringify(status)).not.toMatch(/percent|ratio|verdicted|total/u)
+  })
+
+  it('names the goal round when the goal service is mounted', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    await ctx.plugin(GoalService)
+    armBoard(ctx, root.agent)
+    ctx.goals.create(root.agent, { objective: 'hunt bugs', maxGoalRounds: 9 })
+    const status = resultJson(await execute(ctx, 'hard_status', { view: 'summary' }, root.agent))
+    expect((status.summary as { goalRound: unknown }).goalRound).toEqual({ started: 0, max: 9 })
+  })
+
+  it('lists cells filtered by state and module prefix, paged with the total that matched', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    armBoard(ctx, root.agent)
+    // The default filter is the cells that still need a verdict.
+    const open = resultJson(await execute(ctx, 'hard_status', { view: 'cells' }, root.agent))
+    expect(open).toEqual({
+      cells: [
+        { module: 'src/api', bugClass: 'cmdi', scope: 'module', blind: false },
+        { module: 'wp', bugClass: 'sqli', scope: 'module', blind: false },
+      ],
+      totalMatching: 2,
+      offset: 0,
+    })
+    const cleared = resultJson(await execute(ctx, 'hard_status', { view: 'cells', filter: 'cleared' }, root.agent))
+    // The inert screen and the blind model clear are both cleared — told apart by source and the blind mark.
+    expect(cleared.cells).toEqual([
+      { module: 'docs', bugClass: 'cmdi', scope: 'module', verdict: 'cleared', source: 'harness', blind: false },
+      { module: 'docs', bugClass: 'sqli', scope: 'module', verdict: 'cleared', source: 'harness', blind: false },
+      { module: 'wp', bugClass: 'cmdi', scope: 'module', verdict: 'cleared', source: 'model', blind: true },
+    ])
+    const suspicious = resultJson(await execute(ctx, 'hard_status', { view: 'cells', filter: 'suspicious', module_prefix: 'src' }, root.agent))
+    expect(suspicious.cells).toEqual([{ module: 'src/api', bugClass: 'sqli', scope: 'module', verdict: 'suspicious', source: 'model', blind: false }])
+    const page = resultJson(await execute(ctx, 'hard_status', { view: 'cells', filter: 'all', limit: 2, offset: 4 }, root.agent))
+    expect(page.totalMatching).toBe(6)
+    expect(page.offset).toBe(4)
+    expect((page.cells as { module: string }[]).map(cell => cell.module)).toEqual(['wp', 'wp'])
+  })
+
+  it('pages the full open-work list and bounds every page hard', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: Array.from({ length: 150 }, (_, index) => `m${String(index).padStart(3, '0')}`),
+      bugClasses: ['cmdi', 'sqli'],
+    })
+    // 300 open cells: a limit above the ceiling is held at 200.
+    const capped = resultJson(await execute(ctx, 'hard_status', { view: 'cells', filter: 'all', limit: 5000 }, root.agent))
+    expect(capped.cells).toHaveLength(200)
+    expect(capped.totalMatching).toBe(300)
+    const work = resultJson(await execute(ctx, 'hard_status', { view: 'open-work' }, root.agent))
+    expect(work.openWork).toEqual(ctx.hardLedger.openWork(root.agent))
+    expect(work.totalMatching).toBe(ctx.hardLedger.openWork(root.agent).length)
+    for (const bad of [{ limit: 0 }, { limit: 1.5 }, { offset: -1 }]) {
+      const refused = await execute(ctx, 'hard_status', { view: 'cells', ...bad }, root.agent)
+      expect(refused.isError).toBe(true)
+    }
+  })
+
+  it('reports an unarmed ledger without a matrix and with an empty board', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    const status = resultJson(await execute(ctx, 'hard_status', { view: 'summary' }, root.agent))
+    expect(status.summary).not.toHaveProperty('matrix')
+    const cells = resultJson(await execute(ctx, 'hard_status', { view: 'cells', filter: 'all' }, root.agent))
+    expect(cells).toEqual({ cells: [], totalMatching: 0, offset: 0 })
   })
 })
 

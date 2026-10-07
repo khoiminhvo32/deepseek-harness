@@ -396,6 +396,49 @@
       }
     },
     {
+      "name": "hard_status",
+      "description": "Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "type": "string",
+            "description": "What to read.",
+            "enum": [
+              "summary",
+              "cells",
+              "open-work"
+            ]
+          },
+          "filter": {
+            "type": "string",
+            "description": "With view cells: which cells to list; uncovered by default.",
+            "enum": [
+              "uncovered",
+              "suspicious",
+              "cleared",
+              "all"
+            ]
+          },
+          "module_prefix": {
+            "type": "string",
+            "description": "With view cells: list only modules starting with this prefix."
+          },
+          "limit": {
+            "type": "number",
+            "description": "With view cells or open-work: page size, default 50, at most 200."
+          },
+          "offset": {
+            "type": "number",
+            "description": "With view cells or open-work: entries to skip, default 0."
+          }
+        },
+        "required": [
+          "view"
+        ]
+      }
+    },
+    {
       "name": "hard_submit_finding",
       "description": "Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself, passing the payload as the PoC's first argument ($1); read the payload from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is re-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints the exact line HARD-PASS claim-hash on stdout, and the benign run failed. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.",
       "parameters": {

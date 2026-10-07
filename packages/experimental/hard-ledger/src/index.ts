@@ -20,11 +20,20 @@ import {
   DEFAULT_EMPTY_SWEEPS_TO_FINISH,
   DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
   emptySweepRunFromState,
+  matrixBoardFromState,
+  openWorkCountsFromState,
   openWorkFromState,
   refutationBreakdownFromState,
   uncoveredCellsFromState,
 } from './aggregate.ts'
-import type { CompletionAssessment, CoverageBySource, CoverageProgress, RefutationBreakdown } from './aggregate.ts'
+import type {
+  CompletionAssessment,
+  CoverageBySource,
+  CoverageProgress,
+  HardMatrixBoardCell,
+  OpenWorkCounts,
+  RefutationBreakdown,
+} from './aggregate.ts'
 import type {
   HardCoverageCellData,
   HardCoverageSource,
@@ -77,13 +86,23 @@ export {
   coverageBySourceFromState,
   coverageProgressFromState,
   emptySweepRunFromState,
+  matrixBoardFromState,
   matrixCellsFromState,
+  openWorkCountsFromState,
   openWorkFromState,
   refutationBreakdownFromState,
   uncoveredCellsFromState,
 } from './aggregate.ts'
 export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
-export type { CompletionAssessment, CoverageBySource, CoverageProgress, LedgerThresholds, RefutationBreakdown } from './aggregate.ts'
+export type {
+  CompletionAssessment,
+  CoverageBySource,
+  CoverageProgress,
+  HardMatrixBoardCell,
+  LedgerThresholds,
+  OpenWorkCounts,
+  RefutationBreakdown,
+} from './aggregate.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -839,6 +858,26 @@ export class HardLedger extends Service {
    */
   openWork(agent: Agent): string[] {
     return openWorkFromState(this.state(agent.session), this.resolved)
+  }
+
+  /**
+   * Open work counted by kind with the same predicates `openWork` lists by.
+   * The math lives in `openWorkCountsFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the per-kind counts.
+   */
+  openWorkCounts(agent: Agent): OpenWorkCounts {
+    return openWorkCountsFromState(this.state(agent.session), this.resolved)
+  }
+
+  /**
+   * Every matrix cell with its current state, in matrix order — the board the
+   * model reads to see what remains. The math lives in `matrixBoardFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one entry per matrix cell; empty without a matrix.
+   */
+  matrixBoard(agent: Agent): readonly HardMatrixBoardCell[] {
+    return matrixBoardFromState(this.state(agent.session))
   }
 
   /** Read the projection state for one agent's session. */

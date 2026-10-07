@@ -1387,6 +1387,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
         returns: 'bounded human-readable work items, empty when nothing is open.',
       },
+      {
+        signature: 'openWorkCounts(agent: Agent): OpenWorkCounts',
+        description: 'Open work counted by kind with the same predicates `openWork` lists by. The math lives in `openWorkCountsFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the per-kind counts.',
+      },
+      {
+        signature: 'matrixBoard(agent: Agent): readonly HardMatrixBoardCell[]',
+        description: 'Every matrix cell with its current state, in matrix order — the board the model reads to see what remains. The math lives in `matrixBoardFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one entry per matrix cell; empty without a matrix.',
+      },
     ],
   },
   {
@@ -5663,6 +5675,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardLedgerProjectionState = zod.infer<typeof hardLedgerStateSchema>;',
   },
   {
+    name: 'HardMatrixBoardCell',
+    declaration: 'export interface HardMatrixBoardCell {\n    readonly module: string;\n    readonly bugClass: string;\n    readonly scope: \'module\' | \'repo\';\n    readonly verdict?: HardCoverageCellData[\'verdict\'];\n    readonly source?: HardCoverageSource;\n    readonly blind: boolean;\n}',
+  },
+  {
     name: 'HardMatrixExclusions',
     declaration: 'export interface HardMatrixExclusions {\n    readonly globs: readonly string[];\n    readonly fileCount: number;\n    readonly sample: readonly string[];\n}',
   },
@@ -6293,6 +6309,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'OneShotSubagentDescriptorData',
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
+  },
+  {
+    name: 'OpenWorkCounts',
+    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n};',
   },
   {
     name: 'OptionalSessionSeq',

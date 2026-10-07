@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-tools` registers the six model-facing tools of the hard harness: `hard_submit_finding` submits a claim and returns the verifier's executed verdict; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_record_flow` records a module's deep-reading flow document behind citation resolution at the pinned commit; `hard_mark_coverage` records systematic-pass cells; `hard_clear_modules` batch-screens one class across modules behind a grep that can only refuse, recording the weakest model tier when the grep is silent; `hard_sweep_summary` records completed passes, citing a refuted hypothesis, a model-cleared cell, or a recorded flow document when the pass found nothing. The ledger checks every proof at record time.
+`dsh-experimental-hard-tools` registers the seven model-facing tools of the hard harness: `hard_submit_finding` returns the verifier's executed verdict on a claim; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_record_flow` records a module's flow document behind citation resolution at the pinned commit; `hard_mark_coverage` records one coverage cell; `hard_clear_modules` batch-screens one class behind a grep that can only refuse; `hard_sweep_summary` records a pass, citing evidence when it found nothing; `hard_status` reads the board and the remaining work back. The ledger checks every proof at record time.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ Mount the plugin with the hard ledger and verifier.
   name: '@deepseek-ai/dsh-experimental-hard-tools'
 ```
 
-All six tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
+All seven tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
 
 -----
 
@@ -63,11 +63,11 @@ All six tools require a live agent and return compact JSON. Submit results carry
 
 #### What the model sees
 
-The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_record_flow`, `hard_mark_coverage`, `hard_clear_modules`, and `hard_sweep_summary` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded flow document (or the rejected citations naming every failed cite), the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), or the recorded sweep summary.
+The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_record_flow`, `hard_mark_coverage`, `hard_clear_modules`, `hard_sweep_summary`, and `hard_status` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded flow document (or the rejected citations naming every failed cite), the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), the recorded sweep summary, or a status view: per-kind open-work counts, the gate, and the matrix axes — counts, never a ratio, so no progress number invites clearing for its own sake — a page of board cells with the total that matched, or a page of the open-work list.
 
 #### Token effect
 
-Fixed schema cost plus one compact result per call; submit results are the largest (finding plus verdict objects).
+Fixed schema cost plus one compact result per call; submit results and full `hard_status` pages are the largest, and a status page is held at 200 entries.
 
 #### KV Cache effect
 

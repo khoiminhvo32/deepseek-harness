@@ -2,8 +2,9 @@
  * Model-facing hard-harness tools. A finding is only accepted through the
  * verifier's executed proof-of-effect contract; hypotheses, coverage cells,
  * and sweep summaries record the methodology state that the stop gate later
- * audits. The tools register no prompt sections; the mission contract owns
- * guidance.
+ * audits, and `hard_status` reads that state back so the model sees the work
+ * it is being pushed through. The tools register no prompt sections; the
+ * mission contract owns guidance.
  * @module @deepseek-ai/dsh-experimental-hard-tools
  */
 
@@ -12,7 +13,9 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
-import type { HardEmptySweepProof, HardHypothesisStatus } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardEmptySweepProof, HardHypothesisStatus, HardMatrixBoardCell } from '@deepseek-ai/dsh-experimental-hard-ledger'
+// Loads the declaration-merged `goals` Context key read through `ctx.get`.
+import type {} from '@deepseek-ai/dsh-goal'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 export const name = 'hard-tools'
@@ -59,6 +62,51 @@ const CLEAR_MODULES_DESCRIPTION = 'Batch-screen one bug class across several mod
   + 'those cells yourself with hard_mark_coverage. login-bypass is refused: its sinks are protective checks, so an '
   + 'empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations '
   + 'instead of sinks, and any match names an operation whose guard hard_mark_coverage must declare.'
+
+const STATUS_DESCRIPTION = 'Read the coverage board and the remaining work without changing anything. '
+  + 'view summary: how much work remains of each kind, the completion gate\'s blockers, the matrix axes, the '
+  + 'modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells '
+  + 'with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) '
+  + 'and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many '
+  + 'matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness '
+  + 'cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged '
+  + 'the same way.'
+
+/** Default page size of a `hard_status` listing. */
+const STATUS_DEFAULT_LIMIT = 50
+
+/** Page-size ceiling of a `hard_status` listing; a larger request is held here. */
+const STATUS_MAX_LIMIT = 200
+
+/** Unscreened module names one `hard_status` summary lists before it relies on the count. */
+const STATUS_UNSCREENED_LIST_LIMIT = 20
+
+/** The state filters a `hard_status` cell listing accepts. */
+const STATUS_FILTERS = ['uncovered', 'suspicious', 'cleared', 'all'] as const
+
+/** Whether one board cell passes a `hard_status` state filter. */
+function cellMatchesFilter(cell: HardMatrixBoardCell, filter: (typeof STATUS_FILTERS)[number]): boolean {
+  switch (filter) {
+    case 'uncovered': return cell.verdict === undefined || cell.verdict === 'uncovered'
+    case 'suspicious': return cell.verdict === 'suspicious'
+    case 'cleared': return cell.verdict === 'cleared'
+    case 'all': return true
+  }
+}
+
+/**
+ * Read and bound the page window of one `hard_status` listing: the limit
+ * defaults to 50 and is held at 200, the offset defaults to 0.
+ * @param args - the raw paging arguments.
+ * @returns the validated limit and offset.
+ */
+function statusPage(args: { limit?: number; offset?: number }): { limit: number; offset: number } {
+  const limit = args.limit ?? STATUS_DEFAULT_LIMIT
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('limit must be a positive integer')
+  const offset = args.offset ?? 0
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('offset must be a non-negative integer')
+  return { limit: Math.min(limit, STATUS_MAX_LIMIT), offset }
+}
 
 const SWEEP_DESCRIPTION = 'Record one completed sweep pass. When the pass found nothing, empty_proof is required: '
   + 'name the refuted hypothesis, the cleared coverage cell, or the recorded flow document that proves the sweep '
@@ -162,7 +210,7 @@ function readFlowSections(args: Record<FlowSectionKey, unknown>): Record<FlowSec
   return sections
 }
 
-/** Register the six hard-harness tools. */
+/** Register the seven hard-harness tools. */
 export function apply(ctx: Context, _config: Config): void {  const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
 
@@ -503,6 +551,130 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       })
     },
     presentCall: args => present(`Batch clear ${args.modules.length} module(s) x ${args.bug_class}`, args.bug_class),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'hard_status',
+    description: STATUS_DESCRIPTION,
+    parameters: {
+      view: { type: 'string', required: true, enum: ['summary', 'cells', 'open-work'], description: 'What to read.' },
+      filter: {
+        type: 'string', enum: [...STATUS_FILTERS],
+        description: 'With view cells: which cells to list; uncovered by default.',
+      },
+      module_prefix: { type: 'string', description: 'With view cells: list only modules starting with this prefix.' },
+      limit: { type: 'number', description: 'With view cells or open-work: page size, default 50, at most 200.' },
+      offset: { type: 'number', description: 'With view cells or open-work: entries to skip, default 0.' },
+    },
+    output: {
+      schema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          summary: {
+            type: 'object', additionalProperties: false,
+            properties: {
+              matrix: {
+                type: 'object', additionalProperties: false,
+                properties: {
+                  moduleCount: { type: 'integer', required: true },
+                  bugClasses: { type: 'array', required: true, items: { type: 'string' } },
+                  inertModuleCount: { type: 'integer', required: true },
+                  unscreenedModules: { type: 'array', required: true, items: { type: 'string' }, description: 'The first unscreened modules; the count covers the rest.' },
+                  unscreenedModuleCount: { type: 'integer', required: true },
+                  excludeGlobs: { type: 'array', items: { type: 'string' } },
+                  excludedFileCount: { type: 'integer' },
+                },
+              },
+              openWork: {
+                type: 'object', additionalProperties: false, required: true,
+                properties: {
+                  pendingFindings: { type: 'integer', required: true },
+                  flakyFindings: { type: 'integer', required: true },
+                  openHypotheses: { type: 'integer', required: true },
+                  uncoveredCells: { type: 'integer', required: true },
+                  suspiciousCells: { type: 'integer', required: true },
+                  screenReReads: { type: 'integer', required: true },
+                },
+              },
+              gate: {
+                type: 'object', additionalProperties: false, required: true,
+                properties: {
+                  complete: { type: 'boolean', required: true },
+                  blockers: { type: 'array', required: true, items: { type: 'string' } },
+                },
+              },
+              goalRound: {
+                type: 'object', additionalProperties: false,
+                properties: { started: { type: 'integer', required: true }, max: { type: 'integer', required: true } },
+              },
+            },
+          },
+          cells: {
+            type: 'array',
+            items: {
+              type: 'object', additionalProperties: false,
+              properties: {
+                module: { type: 'string', required: true },
+                bugClass: { type: 'string', required: true },
+                scope: { type: 'string', required: true, enum: ['module', 'repo'] },
+                verdict: { type: 'string', enum: ['cleared', 'suspicious', 'uncovered'] },
+                source: { type: 'string', enum: ['model', 'model-verified', 'harness'] },
+                blind: { type: 'boolean', required: true },
+              },
+            },
+          },
+          openWork: { type: 'array', items: { type: 'string' } },
+          totalMatching: { type: 'integer' },
+          offset: { type: 'integer' },
+        },
+      } as const,
+      render: renderJson,
+    },
+    execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_status requires a live agent')
+      if (args.view === 'summary') {
+        const matrix = ledger.coverageMatrix(agent)
+        const unscreened = matrix?.unscreenedModules ?? []
+        const goal = ctx.get('goals')?.get(agent)
+        const gate = ledger.completionAssessment(agent)
+        return Promise.resolve({
+          summary: {
+            ...(matrix === undefined ? {} : {
+              matrix: {
+                moduleCount: matrix.modules.length,
+                bugClasses: [...matrix.bugClasses],
+                inertModuleCount: (matrix.inertModules ?? []).length,
+                unscreenedModules: unscreened.slice(0, STATUS_UNSCREENED_LIST_LIMIT),
+                unscreenedModuleCount: unscreened.length,
+                ...(matrix.exclusions === undefined ? {} : {
+                  excludeGlobs: [...matrix.exclusions.globs],
+                  excludedFileCount: matrix.exclusions.fileCount,
+                }),
+              },
+            }),
+            openWork: ledger.openWorkCounts(agent),
+            gate: { complete: gate.complete, blockers: [...gate.blockers] },
+            ...(goal === undefined ? {} : { goalRound: { started: goal.roundsStarted, max: goal.maxGoalRounds } }),
+          },
+        })
+      }
+      const { limit, offset } = statusPage(args)
+      if (args.view === 'open-work') {
+        const work = ledger.openWork(agent)
+        return Promise.resolve({ openWork: work.slice(offset, offset + limit), totalMatching: work.length, offset })
+      }
+      const filter = args.filter ?? 'uncovered'
+      const prefix = args.module_prefix
+      const matching = ledger.matrixBoard(agent).filter(cell => cellMatchesFilter(cell, filter)
+        && (prefix === undefined || cell.module.startsWith(prefix)))
+      return Promise.resolve({
+        cells: matching.slice(offset, offset + limit).map(cell => ({ ...cell })),
+        totalMatching: matching.length,
+        offset,
+      })
+    },
+    presentCall: args => present(`Status: ${args.view}${args.filter === undefined ? '' : ` (${args.filter})`}`, args.view),
   }))
 
   ctx.tools.register(defineTool({

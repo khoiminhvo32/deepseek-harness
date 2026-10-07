@@ -383,8 +383,9 @@ export class HardLedger extends Service {
     const subject = blocked.length === 1
       ? `module "${blocked[0]}" is`
       : `modules ${blocked.map(entry => `"${entry}"`).join(', ')} are`
+    const pronoun = blocked.length === 1 ? 'it' : 'them'
     throw new HarnessError(
-      `${subject} inert — the harness already screened it as containing no code, so a cleared verdict `
+      `${subject} inert — the harness already screened ${pronoun} as containing no code, so a cleared verdict `
       + 'is redundant work; record suspicious instead if you actually found something there',
       'HARD_LEDGER_INERT_MODULE',
     )

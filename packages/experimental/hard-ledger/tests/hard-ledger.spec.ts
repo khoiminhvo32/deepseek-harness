@@ -678,7 +678,7 @@ describe('hard ledger coverage matrix', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(2)
     // A batch listing several inert modules names them all in the plural.
     expect(() => { ctx.hardLedger.assertClearableModules(root.agent, ['src', 'data/manuals', 'docs']) })
-      .toThrow('modules "data/manuals", "docs" are inert — the harness already screened it as containing no code')
+      .toThrow('modules "data/manuals", "docs" are inert — the harness already screened them as containing no code')
   })
 
   it('bounds the valid-rows list in the rejection message', async () => {
@@ -944,6 +944,54 @@ describe('hard ledger aggregates over folded state', () => {
       genuineRefutations: 0,
       infrastructure: 0,
     })
+  })
+
+  it('skips undecided and non-refuted findings in the refutation breakdown', () => {
+    const proposed = {
+      type: 'hard/finding/proposed',
+      data: {
+        id: 'F-1', title: 't', bugClass: 'cmdi', component: 'c', claim: 'k',
+        cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H',
+        cvssClaimed: 9.3, pocPath: 'poc.sh', payload: 'x',
+        claimHash: CLAIM_HASH, fingerprint: FINGERPRINT,
+      },
+    }
+    const confirmed = {
+      type: 'hard/finding/verdict',
+      data: {
+        id: 'F-1', verdict: 'confirmed', runs: 2, cvssComputed: 9.3, cvssMatch: true,
+        reason: 'both runs printed the marker', fingerprint: FINGERPRINT,
+        benignArm: 'failed', evidence: 'demonstrated',
+      },
+    }
+    // F-1 confirmed (verdict present, not refuted); F-2 proposed with no verdict at all.
+    const state = fold([proposed, confirmed, { ...proposed, data: { ...proposed.data, id: 'F-2' } }])
+    expect(refutationBreakdownFromState(state)).toEqual({
+      byCause: {}, protocolFailures: 0, genuineRefutations: 0, infrastructure: 0,
+    })
+  })
+
+  it('returns no matrix cells without an arming record, and skips event-less repo classes', () => {
+    // No matrix: no cells, whatever the coverage events carry; every by-source
+    // count reads zero for the same reason.
+    const unarced = fold([
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['lock'] } },
+    ])
+    expect(matrixCellsFromState(unarced)).toEqual([])
+    expect(coverageBySourceFromState(unarced)).toEqual({ model: 0, modelVerified: 0, harness: 0 })
+    // A repository-scoped class with no event-backed cell lists nothing —
+    // the harness cannot show a repo cell the log never decided.
+    const armed = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['src'], bugClasses: ['cmdi', 'dependencies'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] } },
+    ])
+    expect(matrixCellsFromState(armed).map(cell => `${cell.module}×${cell.bugClass}`)).toEqual(['src×cmdi'])
   })
 
   it('publishes the client wire view: schema-validated matrix, cells, aggregates, and gate', () => {

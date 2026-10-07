@@ -52,6 +52,7 @@ kind: "package-group"
 | [`hard-handoff`](hard-handoff/README.zh.md) | 在每次成功 compaction 后注入持久台账摘要 | — |
 | [`hard-rounds`](hard-rounds/README.zh.md) | 基于 goal-round driver 的轮次账目、A/B 轮换与每轮步数预算 | — |
 | [`hard-deepread`](hard-deepread/README.zh.md) | Phase B 深读契约：flow 文档与子代理扇出 | — |
+| [`hard-audit`](hard-audit/README.zh.md) | 可选的影子审计：全新的盲读者重读已清除单元的样本 | — |
 | [`hard-ledger`](hard-ledger/README.zh.md) | 通过 `hard/*` 会话事件记录持久的 findings、假设、覆盖与扫描状态 | `ctx.hardLedger` |
 | [`hard-verifier`](hard-verifier/README.zh.md) | 执行 findings 的效果证明并重算其 CVSS 4.0 分数 | `ctx.hardVerifier` |
 | [`hard-tools`](hard-tools/README.zh.md) | 面向模型的 finding、假设、覆盖与扫描工具 | 将工具注册到 `ctx.tools` |

@@ -1,0 +1,363 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/audit/requested",
+      "kind": "event",
+      "event": "hard/audit/requested",
+      "surface": false,
+      "digest": "6415d8462b85a55c3267e6d1412698543ff76974f098ec7ddd96c195904f741e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auditedSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bugClass",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "tier",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "batch"
+          },
+          {
+            "kind": "literal",
+            "value": "per-cell"
+          },
+          {
+            "kind": "literal",
+            "value": "unscreened"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/audit/requested"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/audit/result",
+      "kind": "event",
+      "event": "hard/audit/result",
+      "surface": false,
+      "digest": "13d18cc6c0d772d8e2d809e06721239716df321d0937b4a44df26eaa7d419333",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 21,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 22,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auditedSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "auditor",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "bugClass",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "cause",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "childSession",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "examined",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "locations",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "module",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 16,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "usage",
+                "type": 20,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "model",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "binary"
+          },
+          {
+            "kind": "literal",
+            "value": "budget"
+          },
+          {
+            "kind": "literal",
+            "value": "citation"
+          },
+          {
+            "kind": "literal",
+            "value": "contaminated"
+          },
+          {
+            "kind": "literal",
+            "value": "superseded"
+          },
+          {
+            "kind": "literal",
+            "value": "git"
+          },
+          {
+            "kind": "literal",
+            "value": "reader-failed"
+          },
+          {
+            "kind": "literal",
+            "value": "workspace-drift"
+          },
+          {
+            "kind": "array",
+            "element": 15
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "line",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 4,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              17,
+              18,
+              19
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "corroborated"
+          },
+          {
+            "kind": "literal",
+            "value": "flagged"
+          },
+          {
+            "kind": "literal",
+            "value": "unavailable"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cacheReadTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cacheWriteTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "inputTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "outputTokens",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/audit/result"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

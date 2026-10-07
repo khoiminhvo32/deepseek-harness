@@ -134,7 +134,7 @@ describe('the hard bundle boots the hard harness inside the Web composition', ()
       // covers the diagnostic text should the failure ever surface as a warning.
       expect(bootWarnings.filter(line => line.includes('cannot resolve profile bundle'))).toEqual([])
       // The Web composition carries the client kit the panel needs, so the
-      // ui-hard row mounts beside the nine hard plugins. Nested ids carry the
+      // ui-hard row mounts beside the ten hard plugins. Nested ids carry the
       // parent prefix, so the lookup reads the package name; `disabled`
       // evaluates the row's !!js expression against the launch context.
       const entries = [...ctx.loader.entries()]
@@ -182,13 +182,13 @@ describe('the hard bundle boots the hard harness inside the Web composition', ()
     try {
       const { ctx } = await bootHeadless(root)
       const entries = [...ctx.loader.entries()]
-      // The nine hard plugins mount; the client-UI row stays disabled — a
+      // The ten hard plugins mount; the client-UI row stays disabled — a
       // headless process never carries the client kit it would need.
       const panelRow = entries.find(entry => entry.options?.name === '@deepseek-ai/dsh-experimental-client-ui-hard')
       expect(panelRow?.disabled).toBe(true)
       expect(entries.filter(entry => typeof entry.options?.name === 'string'
         && entry.options.name.startsWith('@deepseek-ai/dsh-experimental-hard-')))
-        .toHaveLength(9)
+        .toHaveLength(10)
       await ctx.fiber.dispose()
     } finally {
       await rm(root, { recursive: true, force: true })

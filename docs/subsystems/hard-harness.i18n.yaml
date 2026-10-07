@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/hard-harness.md
 /hard-harness:
-  en: a1525df7a02c8d67
-  zh: f4c616ae68bc2174
+  en: e04e2b5fbee83201
+  zh: 95177d8de450b47b
 /hard-harness/running-the-bundle:
   en: 2298f19d135eebeb
   zh: 2298f19d135eebeb
@@ -17,6 +17,9 @@
 /hard-harness/step-budgets:
   en: 2200d9887b9c979c
   zh: 2200d9887b9c979c
+/hard-harness/independent-audit:
+  en: cf750a4b2919da1a
+  zh: 07eb8b2e57f161f8
 /hard-harness/design-rationale:
   en: cd29a71a7cc630f4
   zh: cd29a71a7cc630f4

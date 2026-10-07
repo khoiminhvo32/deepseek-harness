@@ -494,6 +494,7 @@
     { "path": "./packages/experimental/hard-handoff" },
     { "path": "./packages/experimental/hard-rounds" },
     { "path": "./packages/experimental/hard-deepread" },
+    { "path": "./packages/experimental/hard-audit" },
     { "path": "./apps/cli" },
     { "path": "./apps/desktop-host" },
     { "path": "./apps/desktop/tsconfig.host.json" }

@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-audit/README.md
+/:
+  en: d287658dcc3f3b6a
+  zh: f6ce58653e5f75a3
+/deepseek-ai-dsh-experimental-hard-audit:
+  en: 5132d5e01fe39371
+  zh: 65ae26a7787360dc
+/deepseek-ai-dsh-experimental-hard-audit/summary:
+  en: 807421505cbad249
+  zh: 8fb1a727b0e69ff8
+/deepseek-ai-dsh-experimental-hard-audit/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-audit/use-this-package:
+  en: 1d7f2a59466793cd
+  zh: da1ca3da66fbc2e2
+/deepseek-ai-dsh-experimental-hard-audit/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-audit/understand-the-implementation/design:
+  en: 5a5f6169f1350a14
+  zh: 13ee779b1e60f830
+/deepseek-ai-dsh-experimental-hard-audit/understand-the-implementation/source-map:
+  en: a3d1befe04f84f0f
+  zh: df83fa96c7070d55
+/deepseek-ai-dsh-experimental-hard-audit/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-audit/model-experience/reader-session:
+  en: 93d37fb0a8659e32
+  zh: 681d650c51aceade
+/deepseek-ai-dsh-experimental-hard-audit/model-experience/reader-session/what-the-model-sees:
+  en: fb6ab27fecdef0b7
+  zh: 3fe5891ef2527ae5
+/deepseek-ai-dsh-experimental-hard-audit/model-experience/reader-session/token-effect:
+  en: 6f039de8585ee857
+  zh: 139cd414c2af1d1a
+/deepseek-ai-dsh-experimental-hard-audit/model-experience/reader-session/kv-cache-effect:
+  en: 9e809920ab5dbd69
+  zh: 19eb971fe696b89f
+/deepseek-ai-dsh-experimental-hard-audit/known-limitations-and-deferred-work:
+  en: 04104f0cba51e43d
+  zh: 187c129f557e070e
+/deepseek-ai-dsh-experimental-hard-audit/known-limitations-and-deferred-work/dev-note:
+  en: 0a20d4926cdfec4d
+  zh: 9ce28d7dda88c417

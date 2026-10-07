@@ -321,13 +321,14 @@ interface WorkingTreeDrift {
  * target: the project-local `.dsh/` directory, and the resolved harness home
  * when it lies inside the repository. The harness writes there before the
  * first arming (identity, profile files), so those paths are its own state,
- * not target content the commit should hold.
- * @param target - the resolved target holding the repo path.
+ * not target content the commit should hold, and the session logs there are
+ * not target content an independent reader may open.
+ * @param repoPath - the absolute target repository path.
  * @returns the forward-slash prefixes, each ending in `/`.
  */
-function harnessStatePrefixes(target: ResolvedTarget): string[] {
+export function harnessStatePrefixes(repoPath: string): string[] {
   const prefixes = [`${DSH_HOME_DIR_NAME}/`]
-  const home = relative(target.repoPath, resolveDshHome())
+  const home = relative(repoPath, resolveDshHome())
   if (home !== '' && !home.startsWith('..') && !isAbsolute(home)) prefixes.push(`${home.split(sep).join('/')}/`)
   return prefixes
 }
@@ -345,7 +346,7 @@ function harnessStatePrefixes(target: ResolvedTarget): string[] {
  */
 async function workingTreeDrift(ctx: Context, target: ResolvedTarget, commit: string): Promise<WorkingTreeDrift> {
   const repo = shellQuote(target.repoPath)
-  const statePrefixes = harnessStatePrefixes(target)
+  const statePrefixes = harnessStatePrefixes(target.repoPath)
   const paths = (output: string): string[] => output.split('\0')
     .filter(path => path.length > 0 && !statePrefixes.some(prefix => path.startsWith(prefix)))
   const modified = paths(await gitOutput(

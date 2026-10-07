@@ -991,6 +991,64 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-audit -->
+<a id="deepseek-aidsh-experimental-hard-audit"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-audit`
+
+- `inject`: `agents` · `sessionProjections` · `subagents` · `shell` · `hardLedger` · `hardVerifier`
+- `source`: [`packages/experimental/hard-audit/src/index.ts:102`](../packages/experimental/hard-audit/src/index.ts)
+
+```ts config-catalog
+/** Audit plugin config. */
+export interface Config {
+  /**
+   * Master switch; `false` registers nothing. Audits spend model tokens on
+   * a cold context each, so a deployment opts in.
+   */
+  enabled?: boolean
+  /**
+   * The `ctx.subagents` provider that runs the reader. It must start a fresh
+   * child that never inherits the parent conversation — a fork provider
+   * would hand the reader every claim it must not see — and must run in
+   * process, so the reader's reads can be checked.
+   */
+  auditProvider?: string
+  /**
+   * Optional reader route. A different model family from the mission agent
+   * is the strongest independence; omitted, the reader uses the mission
+   * agent's route.
+   */
+  auditModel?: {
+    /** The reader's provider route; omitted keeps the mission agent's. */
+    provider?: string
+    /** The reader's model id; omitted keeps the mission agent's. */
+    model?: string
+  }
+  /**
+   * The global tools the reader keeps, as an allow-list: tools added to the
+   * composition later stay hidden from it. Ledger, session, and goal tools
+   * are refused because they expose the mission agent's claims.
+   */
+  readerTools?: string[]
+  /** Percent of model clears in modules the grep cross-check cannot screen to audit, 0 through 100. */
+  unscreenedAuditPercent?: number
+  /** Percent of batch-screen clears to audit, 0 through 100. */
+  batchAuditPercent?: number
+  /** Percent of screenable per-cell model clears to audit, 0 through 100. */
+  auditPercent?: number
+  /** Audits one mission may charge; a sampled clear past it is recorded as unavailable for budget. */
+  maxAuditsPerMission?: number
+  /** Readers running at once, across every mission in the process. */
+  maxConcurrentAudits?: number
+  /** Wall-clock budget of one reader in minutes; a reader past it is cancelled. */
+  auditTimeoutMinutes?: number
+  /** Wall-clock budget of one workspace git check in seconds. */
+  gitTimeoutSeconds?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-audit -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-deepread -->
 <a id="deepseek-aidsh-experimental-hard-deepread"></a>
 

@@ -11043,6 +11043,363 @@
       }
     },
     {
+      "key": "event:hard/audit/requested",
+      "kind": "event",
+      "event": "hard/audit/requested",
+      "surface": false,
+      "digest": "6415d8462b85a55c3267e6d1412698543ff76974f098ec7ddd96c195904f741e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auditedSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bugClass",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "module",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "tier",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "batch"
+          },
+          {
+            "kind": "literal",
+            "value": "per-cell"
+          },
+          {
+            "kind": "literal",
+            "value": "unscreened"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/audit/requested"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/audit/result",
+      "kind": "event",
+      "event": "hard/audit/result",
+      "surface": false,
+      "digest": "13d18cc6c0d772d8e2d809e06721239716df321d0937b4a44df26eaa7d419333",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 21,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 22,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auditedSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "auditor",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "bugClass",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "cause",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "childSession",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "examined",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "locations",
+                "type": 14,
+                "optional": true
+              },
+              {
+                "name": "module",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 16,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "usage",
+                "type": 20,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "model",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "binary"
+          },
+          {
+            "kind": "literal",
+            "value": "budget"
+          },
+          {
+            "kind": "literal",
+            "value": "citation"
+          },
+          {
+            "kind": "literal",
+            "value": "contaminated"
+          },
+          {
+            "kind": "literal",
+            "value": "superseded"
+          },
+          {
+            "kind": "literal",
+            "value": "git"
+          },
+          {
+            "kind": "literal",
+            "value": "reader-failed"
+          },
+          {
+            "kind": "literal",
+            "value": "workspace-drift"
+          },
+          {
+            "kind": "array",
+            "element": 15
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "line",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 4,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              17,
+              18,
+              19
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "corroborated"
+          },
+          {
+            "kind": "literal",
+            "value": "flagged"
+          },
+          {
+            "kind": "literal",
+            "value": "unavailable"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cacheReadTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cacheWriteTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "inputTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "outputTokens",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/audit/result"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:hard/coverage/cell",
       "kind": "event",
       "event": "hard/coverage/cell",
@@ -25608,6 +25965,7 @@
         "packages/subagent/tool-subagent/src/model-selection.ts#AllowedModelRoute"
       ],
       "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:84",
         "packages/session/session-title/src/types.ts:20",
         "packages/subagent/tool-subagent/src/model-selection.ts:9"
       ]
@@ -25791,6 +26149,11 @@
       "sources": []
     },
     {
+      "digest": "113b41f09d2824570abc5ffc66837c8fbacf5d1b7431d6eba477511d43e61bda",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "11638dc58a31496fb6706ced3e23e3a2db1f3b2a8845968c810827a72b5fc811",
       "names": [],
       "sources": []
@@ -25839,6 +26202,11 @@
       "sources": []
     },
     {
+      "digest": "13d18cc6c0d772d8e2d809e06721239716df321d0937b4a44df26eaa7d419333",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "13d3d180f977bf78081d487ffa0ecb75857349bcab29a5a3fb48189fca2a6176",
       "names": [],
       "sources": []
@@ -25882,6 +26250,11 @@
     },
     {
       "digest": "16d0507cb94b4cfc84a87446b1ba7652d6ec1d65ee1684789e747e30d542800e",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "171e0c667e86ed18d5386d6b3adad312f9265dd29a9fac2f120f7477601a607b",
       "names": [],
       "sources": []
     },
@@ -26297,6 +26670,15 @@
       ]
     },
     {
+      "digest": "2addc9baa622d232b3fdb4cda106c73e595d721d0dd4f9bc588d2aee70e75448",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditLocation"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:53"
+      ]
+    },
+    {
       "digest": "2aed07493b1c65b6d00de5586da1e743cf501684b9ad43a1765fb4007d4ea456",
       "names": [],
       "sources": []
@@ -26570,6 +26952,11 @@
       "sources": []
     },
     {
+      "digest": "3caee98ba2d2e35d7fa4dd49cdf17fe407bfd89021e1b731d7bb0d8c8a3316b1",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "3cfc3a56502da1f8c6153c2c56657bab4b749056968634dd0991d325ec1c919f",
       "names": [
         "packages/core/tools/src/index.ts#ToolRestriction"
@@ -26724,6 +27111,15 @@
       ]
     },
     {
+      "digest": "46b8a23af12a080c422a14c82043e282a5a797441e121d77a992175ed74ee4dc",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditOutcome"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:21"
+      ]
+    },
+    {
       "digest": "46da8e9d57fd5526420b53f5da29b089e6a9a932819fcf704cb9c7f5fe3b6597",
       "names": [],
       "sources": []
@@ -26763,6 +27159,11 @@
     },
     {
       "digest": "48f9c19417a1abbedfa59f4667bba36b93ac2db407adf5e84cb3ba0de30942cb",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "495dcf6734f08208a5a30ba10db156a1157d297ce7a5517c50582d6d5563e73c",
       "names": [],
       "sources": []
     },
@@ -27024,6 +27425,11 @@
       ]
     },
     {
+      "digest": "53561a22ec369a0190b2b8cfa158d509856f4ab54e7d232e24f52b20fe9c23a9",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "539702ecb130e299ea6c3e5801e0a5388860f6f3ee9419f38947dae51803f1de",
       "names": [],
       "sources": []
@@ -27260,6 +27666,11 @@
     },
     {
       "digest": "62ecb62dc0fe1b5e70217f8a80c39256a40ee3a1917be14e5ca899d20c35f7fd",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "6415d8462b85a55c3267e6d1412698543ff76974f098ec7ddd96c195904f741e",
       "names": [],
       "sources": []
     },
@@ -27610,6 +28021,15 @@
       ]
     },
     {
+      "digest": "76bf91742f1c0a66c68a957b96071bf804f3a51eb58f243606b29b0ff8cddde3",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditTier"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:18"
+      ]
+    },
+    {
       "digest": "7777f85ae019e4df8a2ddfc4bea98a9ddb6623dc8ef6ccc4f29a4068d5042e21",
       "names": [
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
@@ -27720,6 +28140,11 @@
       ]
     },
     {
+      "digest": "7d8e284a9338a4602f83cffc24a5b47ca3b0f5d69500d531a9e2fe156e7a22ae",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "7df62978a2b7de8540e714152297743e0a622209a46a5ac9513fc0fad73ca23b",
       "names": [],
       "sources": []
@@ -27796,6 +28221,11 @@
       "sources": [
         "packages/llm/llm/src/types.ts:68"
       ]
+    },
+    {
+      "digest": "81fe32fd66b1fc598661232624ef22a83a466bb2ec1972ccab166f22bf65e86e",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "821992815f9fbd3aa5ec4dd651b7717a2c761ee8724a64aa455da9df94eb8518",
@@ -27875,6 +28305,15 @@
       "digest": "84bbfdce7d2eab5b0c53e72ff7406db856c8bfd621b965b72fd86598ba493bf7",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "84cdd516babce69e89a543b1905f6e099cdc2a2c0899648c56b8c367d677da74",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditRequestedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:44"
+      ]
     },
     {
       "digest": "854db3efdfb0cd39d30953b28703e519c121f1115cebfffc40369fe86c406dd1",
@@ -27981,6 +28420,11 @@
     },
     {
       "digest": "8af841fc9b265ade3441caf9fe40dd24db24226befba48150e6d0eeccc1389c3",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "8b4f2b84ed53a337175f4bfc53de9017ef5c914f2e2507cce9373dda91bb67df",
       "names": [],
       "sources": []
     },
@@ -28408,9 +28852,23 @@
       ]
     },
     {
+      "digest": "a4b7c4a694550292e88d31116d3a958c9d503d59dbe82810e34a8a2dc4d2591f",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "a61e95ac9266c2fc8fdf0faaebbf45d0508fa36e50a9e4e8022e97245800f578",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditResultData"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:69"
+      ]
     },
     {
       "digest": "a6567ccb2e530606b775371eb4fa31468d72084339968e8b0440a516a23b39dc",
@@ -28509,6 +28967,11 @@
     },
     {
       "digest": "aa0957eca50aeb28bcd2e6930b95809926edacb550c8c340ba526ba6b861b3d8",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "aa2978515cbba718ecd6c60ac9a6750902731ba26f03426d7aabef72ffc2ef13",
       "names": [],
       "sources": []
     },
@@ -29152,6 +29615,11 @@
       "sources": []
     },
     {
+      "digest": "d12954880962924ea4478b20828bdda4249a3cc62c0cd480ae3c273f3e144bef",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "d133a5275d92abca83fc7123aadb6326bfd3a2b20dafa66b9278b227aee2956c",
       "names": [],
       "sources": []
@@ -29275,6 +29743,11 @@
       "sources": []
     },
     {
+      "digest": "dd71894f57c591dd5cab73f95a8dc171aae9b3802d7097634195dbf42a75ec4f",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "ddde3951effac3f1279db92473ad07b66f7b73af33d49d9b11b2332a96a15f23",
       "names": [],
       "sources": []
@@ -29319,7 +29792,17 @@
       ]
     },
     {
+      "digest": "dfd4f7323701d2f906e96e0739e65450d40051bbfb19674b3be6747fac692ced",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "e0a787e6ec76c7c94fecbc501b489164ab0293db05bc947914077ad01e674f05",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e0a9270a4c677f2f6678b2e5393ac061da56497f45d42cf026b7ae3f6afa2b69",
       "names": [],
       "sources": []
     },
@@ -29548,6 +30031,11 @@
       ]
     },
     {
+      "digest": "ef38d04f98bf19e3e7151a4633444bcc226c93f48f4eefadbcc43f8d4a418b70",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "ef4f00923b9edbae15c7ef05320280bf61147ca17146cf59690359bfd5e5da45",
       "names": [],
       "sources": []
@@ -29721,6 +30209,11 @@
       "sources": []
     },
     {
+      "digest": "f781623d8a08e013c0610a56084b645a2cf8cf218ea54d65df12ee53abb593a2",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "f789af5ab844827eb5a4f357c0afae1eeed108c6c22d8ca1a56e586b349a7c85",
       "names": [],
       "sources": []
@@ -29752,6 +30245,15 @@
       "digest": "f9cfc89e8fe085b4fcc9cd32b74b6f103608c54d7d8cd97b47c01de34f252ba3",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "fa80bf911cc0d0860b793055a3c9a23fb8c086c907112e60e8d76193c4b5c69d",
+      "names": [
+        "packages/experimental/hard-audit/src/domain.ts#HardAuditUsage"
+      ],
+      "sources": [
+        "packages/experimental/hard-audit/src/domain.ts:61"
+      ]
     },
     {
       "digest": "fa87537f4a9c1e25602990a8bf686b383e9e00352ec8946e16ae24ba7c1625be",
@@ -29799,6 +30301,11 @@
       "sources": [
         "packages/skill/tool-skill/src/index.ts:34"
       ]
+    },
+    {
+      "digest": "fc67b4c651603a44570bbf790f261ee4bf3d9517c70927efa11366d59c47c002",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "fcf427290c6213c2a7feb57492d832ce324f5b9737a759f424dab69e6bd101a0",

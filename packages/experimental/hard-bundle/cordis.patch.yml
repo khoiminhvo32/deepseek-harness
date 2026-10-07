@@ -23,6 +23,10 @@
       name: '@deepseek-ai/dsh-experimental-hard-rounds'
     - id: hard-deepread
       name: '@deepseek-ai/dsh-experimental-hard-deepread'
+    # Mounted off: each audit spends model tokens on a cold context, so a
+    # deployment opts in with `enabled: true`.
+    - id: hard-audit
+      name: '@deepseek-ai/dsh-experimental-hard-audit'
     # The browser coverage panel rides this same bundle: a Web composition
     # (base + web-app) mounts it, a headless one does not. The check reads the
     # launch-time startedBundles, so the panel follows the composition the

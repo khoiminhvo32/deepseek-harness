@@ -14,6 +14,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { HardEmptySweepProof, HardHypothesisStatus, HardMatrixBoardCell } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { classScope } from '@deepseek-ai/dsh-experimental-hard-ledger'
 // Loads the declaration-merged `goals` Context key read through `ctx.get`.
 import type {} from '@deepseek-ai/dsh-goal'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
@@ -65,7 +66,8 @@ const CLEAR_MODULES_DESCRIPTION = 'Batch-screen one bug class across several mod
   + 'screen are refused: any module holding a binary file or a language its fixed table was not written for — read '
   + 'those cells yourself with hard_mark_coverage. login-bypass is refused: its sinks are protective checks, so an '
   + 'empty grep is suspicious, not clean. For authz and authn-bypass the fixed table names the exported operations '
-  + 'instead of sinks, and any match names an operation whose guard hard_mark_coverage must declare.'
+  + 'instead of sinks, and any match names an operation whose guard hard_mark_coverage must declare. '
+  + 'Repository-wide classes (dependencies, misconfig) are one cell each: record them with hard_mark_coverage.'
 
 const STATUS_DESCRIPTION = 'Read the coverage board and the remaining work without changing anything. '
   + 'view summary: how much work remains of each kind, the completion gate\'s blockers, the matrix axes, the '
@@ -531,6 +533,10 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
         throw new Error(`hard_clear_modules refuses ${args.bug_class}: its sinks are protective checks, so an `
           + 'empty grep means no guard was found, which is suspicious rather than clean; verify its cells '
           + 'individually with hard_mark_coverage')
+      }
+      if (classScope(args.bug_class) === 'repo') {
+        throw new Error(`hard_clear_modules refuses ${args.bug_class}: it covers the whole repository in one cell, `
+          + 'which a module grep cannot screen; record that cell with hard_mark_coverage on module "."')
       }
       if (args.modules.some(entry => typeof entry !== 'string' || entry.trim().length === 0)) {
         throw new Error('modules entries must be non-empty strings')

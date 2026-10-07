@@ -536,6 +536,13 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(refused.content[0]).toMatchObject({ type: 'text' })
     const text = (refused.content[0] as { type: string; text: string }).text
     expect(text).toContain('protective checks')
+    // A repository class is one cell no module grep can screen.
+    const repoWide = await execute(ctx, 'hard_clear_modules', {
+      modules: ['.'], bug_class: 'dependencies', patterns: ['package\\.json'], rationale: 'r',
+    }, root.agent)
+    expect(repoWide.isError).toBe(true)
+    expect((repoWide.content[0] as { type: string; text: string }).text)
+      .toContain('hard_clear_modules refuses dependencies: it covers the whole repository in one cell')
     const unknown = await execute(ctx, 'hard_clear_modules', {
       modules: ['src', 'nope'], bug_class: 'sqli', patterns: ['SELECT'], rationale: 'r',
     }, root.agent)

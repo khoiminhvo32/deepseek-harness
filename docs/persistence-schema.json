@@ -26196,7 +26196,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingVerdictData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:98"
+        "packages/experimental/hard-ledger/src/types.ts:103"
       ]
     },
     {
@@ -26269,7 +26269,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:258"
+        "packages/experimental/hard-ledger/src/types.ts:263"
       ]
     },
     {
@@ -26413,7 +26413,7 @@
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:238"
+        "packages/experimental/hard-ledger/src/types.ts:243"
       ]
     },
     {
@@ -26425,7 +26425,7 @@
       "digest": "34f4bb46fdbad5deffd0d5e7f62d0546ee2073a81c752acb27279698874cdbbf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:233"
+        "packages/experimental/hard-ledger/src/types.ts:238"
       ]
     },
     {
@@ -26792,7 +26792,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:202"
+        "packages/experimental/hard-ledger/src/types.ts:207"
       ]
     },
     {
@@ -26988,7 +26988,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocSections"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:171"
+        "packages/experimental/hard-ledger/src/types.ts:176"
       ]
     },
     {
@@ -27482,7 +27482,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:146"
+        "packages/experimental/hard-ledger/src/types.ts:151"
       ]
     },
     {
@@ -27520,7 +27520,7 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:167"
+        "packages/experimental/hard-ledger/src/types.ts:172"
       ]
     },
     {
@@ -27593,7 +27593,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:137"
+        "packages/experimental/hard-ledger/src/types.ts:142"
       ]
     },
     {
@@ -27614,7 +27614,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:168"
+        "packages/experimental/hard-ledger/src/types.ts:173"
       ]
     },
     {
@@ -28091,7 +28091,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:244"
+        "packages/experimental/hard-ledger/src/types.ts:249"
       ]
     },
     {
@@ -28818,7 +28818,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingProposedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:35"
+        "packages/experimental/hard-ledger/src/types.ts:40"
       ]
     },
     {
@@ -28981,7 +28981,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:187"
+        "packages/experimental/hard-ledger/src/types.ts:192"
       ]
     },
     {
@@ -29304,7 +29304,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:228"
+        "packages/experimental/hard-ledger/src/types.ts:233"
       ]
     },
     {
@@ -29459,7 +29459,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:236"
+        "packages/experimental/hard-ledger/src/types.ts:241"
       ]
     },
     {

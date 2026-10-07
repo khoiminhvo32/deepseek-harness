@@ -18,6 +18,7 @@ import {
   DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
 } from './aggregate.ts'
 import type { LedgerThresholds } from './aggregate.ts'
+import { classScope } from './scope.ts'
 import type {
   HardEmptySweepProof,
   HardFindingProposedData,
@@ -223,6 +224,7 @@ const clientViewSchema = zod.object({
   matrix: zod.object({
     modules: zod.array(zod.string()),
     bugClasses: zod.array(zod.string()),
+    classScopes: zod.record(zod.string(), zod.enum(['module', 'repo'])),
     inertModules: zod.array(zod.string()).optional(),
     targetRepo: zod.string(),
     commit: zod.string(),
@@ -263,6 +265,7 @@ function buildHardLedgerView(state: HardLedgerProjectionState, thresholds: Ledge
       matrix: {
         modules: [...matrix.modules],
         bugClasses: [...matrix.bugClasses],
+        classScopes: Object.fromEntries(matrix.bugClasses.map(bugClass => [bugClass, classScope(bugClass)])),
         ...(matrix.inertModules === undefined ? {} : { inertModules: [...matrix.inertModules] }),
         targetRepo: matrix.targetRepo,
         commit: matrix.commit,

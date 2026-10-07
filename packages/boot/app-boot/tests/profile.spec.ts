@@ -19,6 +19,7 @@ import {
   initProfile,
   loadProfile,
   loadProfileDirectory,
+  OPTIONAL_BUNDLES,
   PROFILE_COMPATIBILITY_FILENAME,
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATES,
@@ -351,12 +352,11 @@ describe('loadProfile', () => {
     expect(PROFILE_TEMPLATES['sdk-minimal']).toEqual({
       bundles: ['@deepseek-ai/dsh-sdk-minimal'],
     })
-    expect(PROFILE_TEMPLATES.hard).toEqual({
-      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@deepseek-ai/dsh-experimental-hard-bundle'],
-    })
-    expect(PROFILE_TEMPLATES['hard-web']).toEqual({
-      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-experimental-hard-bundle'],
-    })
+    // The experimental hard bundle is an optional bundle switched on per
+    // profile, not a template: no profile name auto-initializes it.
+    expect(PROFILE_TEMPLATES.hard).toBeUndefined()
+    expect(PROFILE_TEMPLATES['hard-web']).toBeUndefined()
+    expect(OPTIONAL_BUNDLES).toContain('@deepseek-ai/dsh-experimental-hard-bundle')
     loadProfile('t', 'web', anchor, home)
     expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
       .toEqual([...PROFILE_TEMPLATES.web?.bundles ?? []])

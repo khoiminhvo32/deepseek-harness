@@ -25,7 +25,7 @@ This package adds a right-sidebar tab to the Web client for hard-harness session
 <a id="use-this-package"></a>
 ## Use this package
 
-Enable the `hard-web` profile: its hard bundle mounts this panel beside the nine hard plugins, and only for that composition — the headless `hard` profile disables the row. The Web Client loader mounts the `/client` export; the root Host export is inert, and the package has no user configuration fields.
+Switch the hard bundle on for a Web-composition profile: the bundle mounts this panel beside the nine hard plugins, and only there — a headless composition disables the row. The Web Client loader mounts the `/client` export; the root Host export is inert, and the package has no user configuration fields.
 
 ### Open the panel
 
@@ -61,7 +61,7 @@ The component derives everything from the `useSessions` seat: the view comes fro
 <a id="further-exploration"></a>
 ## Further Exploration
 
-- [Hard bundle](../hard-bundle/README.md) — the layer that mounts this panel for `hard-web`.
+- [Hard bundle](../hard-bundle/README.md) — the layer that mounts this panel on Web compositions.
 - [Hard ledger](../hard-ledger/README.md) — the projection and its client wire view.
 - [Right sidebar](../../client/ui-sidebar-right/README.md) — the tab registry and keyed tab-body seat.
 - [Experimental packages](../README.md) — incubation status and publication policy.
@@ -83,7 +83,7 @@ No direct effect; the hard tools own any later model-visible use.
 
 - **Coverage only** — findings, hypotheses, and round progress are later panels; the matrix is the first surface.
 - **No transcript cards** — the `hard/*` events stay out of the conversation; the panel is the reading surface.
-- **Late plugin activation** — after enabling `hard-web` in an already-open conversation, reload the page to receive its `hardLedger` projection.
+- **Late plugin activation** — after enabling the hard bundle in an already-open conversation, reload the page to receive its `hardLedger` projection.
 
 <a id="dev-note"></a>
 ### Dev Note

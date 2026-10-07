@@ -19,13 +19,24 @@ afterEach(() => {
 
 const SESSION = 'hard-session' as SessionId
 
-const MATRIX = {
+const MATRIX: HardLedgerClientView['matrix'] = {
   modules: ['data/manuals', 'src'],
   bugClasses: ['cmdi', 'sqli'],
+  classScopes: { cmdi: 'module', sqli: 'module' },
   inertModules: ['data/manuals'],
   targetRepo: '/tmp/pilot-target',
   commit: 'a'.repeat(40),
 }
+
+/** All six legend labels; the legend is complete exactly when every one appears. */
+const LEGEND_LABELS = [
+  '已清除 · 模型读码',
+  '已清除 · 批量验证',
+  '已清除 · 机器筛查',
+  '可疑 · 机器复核打回',
+  '可疑 · 模型自报',
+  '未覆盖',
+]
 
 /** The panel never reads tab chrome; the props type still carries the seat hook. */
 const unusedTabInfo = (): never => {
@@ -105,6 +116,39 @@ describe('CoverageMatrix', () => {
     expect(screen.getByText('data/manuals')).toBeTruthy()
     expect(screen.getByText('cmdi')).toBeTruthy()
     expect(screen.getByText('模块')).toBeTruthy()
+  })
+
+  it('legends all six faces so both suspicious sides are named', () => {
+    const { container } = render(<CoverageMatrix {...bench({ state: 'ready', view: view() })} />)
+    const legend = container.querySelector('[data-hard-legend]')
+    expect(legend).not.toBeNull()
+    for (const label of LEGEND_LABELS) expect(legend?.textContent).toContain(label)
+  })
+
+  it('renders repository-scoped classes once in a repo strip, not once per module', () => {
+    const { container } = render(<CoverageMatrix {...bench({ state: 'ready', view: view({
+      matrix: {
+        modules: ['src', 'lib'],
+        bugClasses: ['cmdi', 'dependencies'],
+        classScopes: { cmdi: 'module', dependencies: 'repo' },
+        targetRepo: '/tmp/pilot-target',
+        commit: 'a'.repeat(40),
+      },
+      cells: [
+        { module: 'src', bugClass: 'cmdi', verdict: 'cleared', source: 'model' },
+        { module: 'src', bugClass: 'dependencies', verdict: 'suspicious', source: 'harness' },
+      ],
+      progress: { verdicted: 3, total: 5 },
+    }) })} />)
+    const root = container.querySelector('[data-hard-coverage]')
+    // The repo-scoped column never appears in the grid: only cmdi does.
+    expect(container.querySelector('table')?.textContent).not.toContain('dependencies')
+    // The strip carries the single dependencies cell, its harness face, and the class name.
+    const repoRow = root?.querySelector('[data-hard-repo-row]')
+    expect(repoRow?.textContent).toContain('dependencies')
+    expect(repoRow?.querySelector('[data-hard-cell="suspicious-harness"]')).not.toBeNull()
+    // Two grid cells plus exactly one repository-scoped cell.
+    expect(root?.querySelectorAll('[data-hard-cell]')).toHaveLength(3)
   })
 
   it('distinguishes every decider face: model, batch-verified, harness, and both suspicious sides', () => {

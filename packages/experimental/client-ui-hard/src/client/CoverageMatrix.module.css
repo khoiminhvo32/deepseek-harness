@@ -118,7 +118,7 @@
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, transparent);
 }
 
-/* Harness screen (inert modules): the neutral fill. */
+/* Cleared without the model: the harness re-open audit or the inert-module screen. */
 .harness {
   background: color-mix(in srgb, var(--dsw-alias-state-idle-primary) 45%, transparent);
 }
@@ -148,12 +148,35 @@
   font-size: 11px;
 }
 
-.legend .cell {
-  width: 10px;
-  height: 10px;
-  margin-left: 8px;
+.legendItem {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
 
-.legend .cell:first-child {
-  margin-left: 0;
+.legendItem .cell {
+  width: 10px;
+  height: 10px;
+}
+
+/* Repository-scoped classes sweep the repo as a whole: one strip beside the grid. */
+.repoRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.repoLabel {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.repoCell {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
 }

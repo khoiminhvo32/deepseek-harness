@@ -1,6 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-hard-bundle",
   "description": "The hard harness bundle: ledger, verifier, tools, mission, stop gate, standby, handoff, rounds, and deep-read for persistent vulnerability research",
+  "icon": "./icon.svg",
   "version": "0.2.1-alpha.1",
   "publishConfig": {
     "access": "public"
@@ -19,10 +20,13 @@
       "default": "./lib/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
+    "icon.svg",
+    "locale/*.json",
     "lib/index.js",
     "cordis.patch.yml",
     "lib/types/**/*.d.ts"

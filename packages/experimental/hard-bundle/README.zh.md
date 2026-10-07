@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-启用这个可选组合包会以单一层挂载全部九个 hard 插件：`hard-ledger` 拥有持久的 findings、假设与覆盖记录，`hard-verifier` 执行 findings 的效果证明并重算其 CVSS 4.0 分数，`hard-tools` 是面向模型的外表，`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要，`hard-rounds` 以 A/B 轮换记录轮次账目，`hard-deepread` 拥有深读契约。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败。Web 覆盖面板随同层携带，在 `hard-web` 之外保持禁用。
+启用这个可选组合包会以单一层挂载全部九个 hard 插件：`hard-ledger` 拥有持久的 findings、假设与覆盖记录，`hard-verifier` 执行 findings 的效果证明并重算其 CVSS 4.0 分数，`hard-tools` 是面向模型的外表，`hard-mission` 将配置的目标武装为持久的会话目标，`hard-stopgate` 在该目标成立期间把回合边界重新推回工作，`hard-standby` 熬过终端配额失败并在重置时刻唤醒任务，`hard-handoff` 在每次成功 compaction 后注入持久台账摘要，`hard-rounds` 以 A/B 轮换记录轮次账目，`hard-deepread` 拥有深读契约。组合包默认携带空白目标，在部署通过自己的补丁提供真实目标之前会加载失败；Web 覆盖面板随同层携带，在 Web 组合上挂载。
 
 ## 目录
 
@@ -65,7 +65,7 @@ None; the bundle adds no request content of its own.
 <a id="known-limitations-and-deferred-work"></a>
 
 - **空白目标或目标仓库刻意导致加载失败** — 随附行携带 `objective: ''` 与 `target.repoPath: ''`；启用该组合包的部署必须通过自己的补丁提供两者。
-- **Headless 优先** — 该组合包面向 CLI、headless 与 `hard-web` profile 组合插件；hard 会话除通用工具卡以外的 Web 呈现将推迟。
+- **Headless 优先** — 该组合包面向 CLI 与 headless profile 组合插件，Web 组合挂载覆盖面板；覆盖面板之外的 Web 呈现将推迟。
 
 <a id="dev-note"></a>
 ### 开发备注

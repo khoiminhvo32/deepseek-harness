@@ -3,6 +3,8 @@
  * grid, the coverage ratio, the target, and the completion gate's state. Each
  * cell shows two facts in its face — the verdict and who decided it — because
  * a machine-screened clear is a different claim from a model's own read.
+ * Repository-scoped classes sweep the repo as a whole, so they render as one
+ * strip cell instead of one per module.
  */
 import type { ReactNode } from 'react'
 // The `hardLedger` key on SessionProjectionMap arrives through this merge.
@@ -15,6 +17,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { HardLedgerClientView } from '@deepseek-ai/dsh-experimental-hard-ledger/client'
 import { NS, type HardKey } from './locales.ts'
 import css from './CoverageMatrix.module.css'
 
@@ -24,29 +27,43 @@ export type CoverageMatrixProps = PropsRuntime<'sidebar.right.pane.tab'> & Props
 /** The visual face of one cell: verdict and decider together. */
 type CellFace = 'model' | 'model-verified' | 'harness' | 'suspicious-harness' | 'suspicious-model' | 'uncovered'
 
-/** Locale key of each cell face, for the tooltip and the legend. */
+/** All six faces, in legend order; the list keeps the legend exhaustive. */
+const FACES: readonly CellFace[] = [
+  'model', 'model-verified', 'harness', 'suspicious-harness', 'suspicious-model', 'uncovered',
+]
+
+/** Locale key of each cell face — the label names verdict and decider together. */
 const FACE_LABEL: Record<CellFace, HardKey> = {
-  model: 'verdict.cleared',
-  'model-verified': 'source.modelVerified',
-  harness: 'source.harness',
-  'suspicious-harness': 'verdict.suspicious',
-  'suspicious-model': 'verdict.suspicious',
+  model: 'face.model',
+  'model-verified': 'face.modelVerified',
+  harness: 'face.harness',
+  'suspicious-harness': 'face.suspiciousHarness',
+  'suspicious-model': 'face.suspiciousModel',
   uncovered: 'verdict.uncovered',
 }
 
 /** One grid cell: a colored square whose tooltip names the cell, verdict, and decider. */
-function MatrixCell({ face, module, bugClass, label, detail }: {
+function MatrixCell({ face, subject, label }: {
   face: CellFace
-  module: string
-  bugClass: string
+  /** Tooltip and aria subject: `module × class`, or the repository label. */
+  subject: string
   label: string
-  detail: string
 }): ReactNode {
   return (
-    <Tooltip label={`${module} × ${bugClass} — ${label}${detail === '' ? '' : ` (${detail})`}`} side="top" delayMs={300}>
-      <span className={`${css.cell} ${css[face]}`} data-hard-cell={face} role="img" aria-label={`${module} ${bugClass} ${label}`} />
+    <Tooltip label={`${subject} — ${label}`} side="top" delayMs={300}>
+      <span className={`${css.cell} ${css[face]}`} data-hard-cell={face} role="img" aria-label={`${subject} ${label}`} />
     </Tooltip>
   )
+}
+
+/** The face of one event-backed cell, falling back to the inert screen or uncovered. */
+function faceOf(cell: HardLedgerClientView['cells'][number] | undefined, inertModule: boolean): CellFace {
+  if (cell === undefined) return inertModule ? 'harness' : 'uncovered'
+  if (cell.verdict === 'suspicious') return cell.source === 'harness' ? 'suspicious-harness' : 'suspicious-model'
+  if (cell.verdict !== 'cleared') return 'uncovered'
+  if (cell.source === 'harness') return 'harness'
+  if (cell.source === 'model-verified') return 'model-verified'
+  return 'model'
 }
 
 /** Render the coverage panel from the session's `hardLedger` projection value. */
@@ -80,22 +97,11 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
 
   const byCell = new Map(view.cells.map(cell => [`${cell.module}\u0000${cell.bugClass}`, cell]))
   const inert = new Set(matrix.inertModules ?? [])
-  const faceOf = (module: string, bugClass: string): CellFace => {
-    const cell = byCell.get(`${module}\u0000${bugClass}`)
-    if (cell === undefined) return inert.has(module) ? 'harness' : 'uncovered'
-    if (cell.verdict === 'suspicious') return cell.source === 'harness' ? 'suspicious-harness' : 'suspicious-model'
-    if (cell.verdict !== 'cleared') return 'uncovered'
-    if (cell.source === 'harness') return 'harness'
-    if (cell.source === 'model-verified') return 'model-verified'
-    return 'model'
-  }
-  // Faces whose label names only one axis carry the other axis as the tooltip detail.
-  const faceDetail = (face: CellFace): string => {
-    if (face === 'model') return t('source.model')
-    if (face === 'suspicious-harness') return t('source.harness')
-    if (face === 'suspicious-model') return t('source.model')
-    return ''
-  }
+  // Repository-scoped classes sweep the repo as a whole; the grid stays module-scoped.
+  const scopeOf = (bugClass: string): 'module' | 'repo' => matrix.classScopes[bugClass] ?? 'module'
+  const moduleClasses = matrix.bugClasses.filter(bugClass => scopeOf(bugClass) === 'module')
+  const repoClasses = matrix.bugClasses.filter(bugClass => scopeOf(bugClass) === 'repo')
+  const byRepoClass = new Map(view.cells.map(cell => [cell.bugClass, cell]))
 
   return (
     <div className={css.root} data-hard-coverage>
@@ -122,18 +128,18 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
           <thead>
             <tr>
               <th scope="col" className={css.moduleHead}>{t('column.module')}</th>
-              {matrix.bugClasses.map(bugClass => <th key={bugClass} scope="col" className={css.classHead}>{bugClass}</th>)}
+              {moduleClasses.map(bugClass => <th key={bugClass} scope="col" className={css.classHead}>{bugClass}</th>)}
             </tr>
           </thead>
           <tbody>
             {matrix.modules.map(module => (
               <tr key={module}>
                 <th scope="row" className={css.moduleCell}>{module}</th>
-                {matrix.bugClasses.map((bugClass) => {
-                  const face = faceOf(module, bugClass)
+                {moduleClasses.map((bugClass) => {
+                  const face = faceOf(byCell.get(`${module}\u0000${bugClass}`), inert.has(module))
                   return (
                     <td key={bugClass} className={css.cellSlot}>
-                      <MatrixCell face={face} module={module} bugClass={bugClass} label={t(FACE_LABEL[face])} detail={faceDetail(face)} />
+                      <MatrixCell face={face} subject={`${module} × ${bugClass}`} label={t(FACE_LABEL[face])} />
                     </td>
                   )
                 })}
@@ -141,13 +147,27 @@ export function CoverageMatrix({ sessionId, useSessions, t }: CoverageMatrixProp
             ))}
           </tbody>
         </table>
+        {repoClasses.length > 0 && (
+          <div className={css.repoRow} data-hard-repo-row role="list" aria-label={t('scope.repo')}>
+            <span className={css.repoLabel}>{t('scope.repo')}</span>
+            {repoClasses.map((bugClass) => {
+              const face = faceOf(byRepoClass.get(bugClass), false)
+              return (
+                <span key={bugClass} className={css.repoCell} role="listitem">
+                  <MatrixCell face={face} subject={`${t('scope.repo')} × ${bugClass}`} label={t(FACE_LABEL[face])} />
+                  {bugClass}
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
       <footer className={css.legend} data-hard-legend>
-        <span className={`${css.cell} ${css.model}`} aria-hidden="true" /> {t('source.model')}
-        <span className={`${css.cell} ${css['model-verified']}`} aria-hidden="true" /> {t('source.modelVerified')}
-        <span className={`${css.cell} ${css.harness}`} aria-hidden="true" /> {t('source.harness')}
-        <span className={`${css.cell} ${css['suspicious-harness']}`} aria-hidden="true" /> {t('verdict.suspicious')}
-        <span className={`${css.cell} ${css.uncovered}`} aria-hidden="true" /> {t('verdict.uncovered')}
+        {FACES.map(face => (
+          <span key={face} className={css.legendItem}>
+            <span className={`${css.cell} ${css[face]}`} aria-hidden="true" /> {t(FACE_LABEL[face])}
+          </span>
+        ))}
       </footer>
     </div>
   )

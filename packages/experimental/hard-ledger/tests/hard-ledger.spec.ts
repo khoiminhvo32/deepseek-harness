@@ -9,7 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { applyHardLedgerProjection, coverageBySourceFromState, coverageProgressFromState, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, completionAssessmentFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -661,9 +661,9 @@ describe('hard ledger coverage matrix', () => {
       objective: 'hunt bugs in the target repository',
       targetRepo: '/tmp/hard-target',
       commit: 'c'.repeat(40),
-      modules: ['data/manuals', 'src'],
+      modules: ['data/manuals', 'docs', 'src'],
       bugClasses: ['cmdi', 'sqli'],
-      inertModules: ['data/manuals'],
+      inertModules: ['data/manuals', 'docs'],
     })
     // Cleared there duplicates the harness screen — the pilot's second run
     // burned four cells on exactly this.
@@ -676,6 +676,9 @@ describe('hard ledger coverage matrix', () => {
     // Non-inert modules clear normally.
     ctx.hardLedger.markCoverage(root.agent, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['exec'] })
     expect(ctx.hardLedger.coverage(root.agent)).toHaveLength(2)
+    // A batch listing several inert modules names them all in the plural.
+    expect(() => { ctx.hardLedger.assertClearableModules(root.agent, ['src', 'data/manuals', 'docs']) })
+      .toThrow('modules "data/manuals", "docs" are inert — the harness already screened it as containing no code')
   })
 
   it('bounds the valid-rows list in the rejection message', async () => {
@@ -864,6 +867,57 @@ describe('hard ledger aggregates over folded state', () => {
     expect(matrixCellsFromState(state).map(cell => `${cell.module}×${cell.verdict}`)).toEqual(['src×cleared'])
   })
 
+  it('lists a repository-scoped class once with the folded event, and re-opens with the harness name', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['src', 'lib'], bugClasses: ['cmdi', 'dependencies'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['lock'] } },
+      // The harness re-open appends a suspicious verdict under its own name,
+      // whatever module name the original model event carried.
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'dependencies', verdict: 'suspicious', declaredSinks: ['lock'], source: 'harness' } },
+      { type: 'hard/coverage/cell', data: { module: 'lib', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['exec'], source: 'model-verified' } },
+    ])
+    // The repo-scoped class appears once with the re-open verdict, not once per module;
+    // module-scoped cells come first, repository-scoped ones trail.
+    expect(matrixCellsFromState(state).map(cell => `${cell.module}×${cell.bugClass}×${cell.verdict}×${cell.source}`))
+      .toEqual(['lib×cmdi×cleared×model-verified', 'src×dependencies×suspicious×harness'])
+    // The model's dependency clear was flipped, so the model tally holds only
+    // the verified cmdi clear; the re-open counts as the harness.
+    expect(coverageBySourceFromState(state)).toEqual({ model: 0, modelVerified: 1, harness: 1 })
+    // Total = 2 module-scoped cmdi cells + 1 repository-scoped dependencies
+    // cell; verdicted are the lib cmdi clear and the dependencies re-open.
+    expect(coverageProgressFromState(state)).toEqual({ verdicted: 2, total: 3 })
+  })
+
+  it('keeps the audit floor closed when the harness re-opens every model clear', () => {
+    const state = fold([
+      {
+        type: 'hard/mission/armed',
+        data: {
+          objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+          modules: ['src'], bugClasses: ['cmdi', 'sqli'],
+        },
+      },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['s'] } },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'cleared', declaredSinks: ['s'] } },
+      // The harness audits and flips both: nothing the model decided stands.
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'cmdi', verdict: 'suspicious', declaredSinks: ['s'], source: 'harness' } },
+      { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: ['s'], source: 'harness' } },
+    ])
+    const assessment = completionAssessmentFromState(state, {
+      screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptySweepsToFinish: 0,
+    })
+    expect(assessment.complete).toBe(false)
+    // The re-opened cells are open work on their own; the floor blocker must
+    // stand too — the model's full-clear tally cannot satisfy it.
+    expect(assessment.blockers).toContain('no model-audited coverage cell or resolved hypothesis exists yet')
+  })
+
   it('decomposes refutations by cause from the folded findings', () => {
     const state = fold([
       {
@@ -910,7 +964,8 @@ describe('hard ledger aggregates over folded state', () => {
     // The view schema round-trips: the wire value is what the client store publishes.
     expect(definition.wire.viewSchema.parse(view)).toEqual(view)
     expect(view.matrix).toEqual({
-      modules: ['data/manuals', 'src'], bugClasses: ['cmdi'], inertModules: ['data/manuals'],
+      modules: ['data/manuals', 'src'], bugClasses: ['cmdi'], classScopes: { cmdi: 'module' },
+      inertModules: ['data/manuals'],
       targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
     })
     expect(view.cells).toEqual([{ module: 'src', bugClass: 'cmdi', verdict: 'cleared', source: undefined }])

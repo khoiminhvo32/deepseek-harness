@@ -26,8 +26,13 @@ export type HardCoverageVerdict = 'cleared' | 'suspicious' | 'uncovered'
 /**
  * Who decided one coverage cell's verdict. Absent means `model` — the
  * historical behavior — so older logs read back with unchanged meaning.
- * `model-verified` marks a batch clear the harness grep confirmed;
- * `harness` marks a purely mechanical screen the model took no part in.
+ * `model-verified` marks a batch clear the harness grep confirmed. `harness`
+ * names both ways the harness concludes without the model: a re-open, where
+ * the harness appends a suspicious verdict over a model decision it audited
+ * (an event-backed cell), and the mechanical inert-module screen (a cell
+ * with no event — the module was pre-screened as carrying no code). The two
+ * share the source because both are harness conclusions; a reader that must
+ * tell them apart uses the presence of an event, never the source value.
  */
 export type HardCoverageSource = 'model' | 'model-verified' | 'harness'
 
@@ -292,6 +297,8 @@ export interface HardLedgerClientView {
   readonly matrix?: {
     readonly modules: readonly string[]
     readonly bugClasses: readonly string[]
+    /** Sweep scope per bug class: repository-level classes render one cell, not one per module. */
+    readonly classScopes: Readonly<Record<string, 'module' | 'repo'>>
     readonly inertModules?: readonly string[]
     readonly targetRepo: string
     readonly commit: string

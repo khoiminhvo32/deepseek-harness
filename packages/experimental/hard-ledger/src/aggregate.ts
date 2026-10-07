@@ -112,9 +112,10 @@ export function coverageProgressFromState(state: HardLedgerProjectionState): Cov
 /**
  * Verdicted matrix cells partitioned by who decided them, exactly as the
  * `coverageBySource` service method reports it: the model's own reads,
- * batch clears the harness grep confirmed, and the purely mechanical
- * inert-module screen. A cell carrying no source reads as `model`, so older
- * logs partition unchanged.
+ * batch clears the harness grep confirmed, and every harness decision —
+ * both a re-open the harness appended over a model verdict and the purely
+ * mechanical inert-module screen. A cell carrying no source reads as
+ * `model`, so older logs partition unchanged.
  * @param state - the folded ledger projection state.
  * @returns the three counts; all zero without a matrix.
  */
@@ -131,7 +132,8 @@ export function coverageBySourceFromState(state: HardLedgerProjectionState): Cov
   const repoClasses = matrix.bugClasses.filter(bugClass => classScope(bugClass) === 'repo')
   const counts = { model: 0, modelVerified: 0, harness: 0 }
   const tally = (source: HardCoverageSource | undefined): void => {
-    if (source === 'model-verified') counts.modelVerified += 1
+    if (source === 'harness') counts.harness += 1
+    else if (source === 'model-verified') counts.modelVerified += 1
     else counts.model += 1
   }
   for (const module of matrix.modules) {
@@ -293,7 +295,13 @@ export function completionAssessmentFromState(state: HardLedgerProjectionState, 
   const bySource = coverageBySourceFromState(state)
   const resolved = state.hypotheses
     .filter(hypothesis => hypothesis.status === 'confirmed' || hypothesis.status === 'refuted').length
-  if (bySource.model === 0 && bySource.modelVerified === 0 && resolved === 0) {
+  // The audit floor asks whether any model decision stands: a cell the model
+  // decided that the harness has not re-opened. A re-open appends the latest
+  // verdict under the harness's name, so the bySource counts already exclude
+  // flipped cells — a matrix the model cleared and the harness re-opened in
+  // full leaves nothing standing even though the model's activity was high.
+  const standingModelCells = bySource.model + bySource.modelVerified
+  if (standingModelCells === 0 && resolved === 0) {
     blockers.push('no model-audited coverage cell or resolved hypothesis exists yet')
   }
   return { complete: blockers.length === 0, blockers }

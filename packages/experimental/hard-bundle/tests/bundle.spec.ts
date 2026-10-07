@@ -46,7 +46,7 @@ describe('Hard bundle', () => {
         id: 'ui-hard',
         name: '@deepseek-ai/dsh-experimental-client-ui-hard',
         // entryListSchema reads the !!js expression as a tagged literal.
-        disabled: { __jsExpr: "ctx.get('profileContext')?.name !== 'hard-web'" },
+        disabled: { __jsExpr: "!ctx.get('profileContext')?.startedBundles.includes('@deepseek-ai/dsh-web-app')" },
       },
     ] }])
   })

@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-启用 `hard-web` profile：其 hard bundle 会在九个 hard 插件旁挂载本面板，且仅在该组合下启用——headless 的 `hard` profile 会禁用该行。Web Client 加载器挂载 `/client` 导出；根 Host 导出为惰性，本包没有用户配置字段。
+为 Web 组合的 profile 开启 hard bundle：该组合包会在九个 hard 插件旁挂载本面板，且仅在那里挂载——headless 组合会禁用该行。Web Client 加载器挂载 `/client` 导出；根 Host 导出为惰性，本包没有用户配置字段。
 
 <a id="open-the-panel"></a>
 ### 打开面板
@@ -63,7 +63,7 @@ Client 导出通过 Cordis effect 注册语言字典、一个侧栏标签类型�
 <a id="further-exploration"></a>
 ## 延伸阅读
 
-- [Hard bundle](../hard-bundle/README.zh.md)——为 `hard-web` 挂载本面板的层。
+- [Hard bundle](../hard-bundle/README.zh.md)——在 Web 组合上挂载本面板的层。
 - [Hard ledger](../hard-ledger/README.zh.md)——投影及其客户端 wire 视图。
 - [右侧栏](../../client/ui-sidebar-right/README.zh.md)——标签注册表与键控标签主体座位。
 - [实验包](../README.zh.md)——孵化状态与发布策略。
@@ -85,7 +85,7 @@ Client 导出通过 Cordis effect 注册语言字典、一个侧栏标签类型�
 
 - **仅覆盖**——findings、hypotheses 与 round 进度是后续面板；矩阵是第一个界面。
 - **无会话卡片**——`hard/*` 事件不进入对话；面板才是阅读界面。
-- **延迟激活**——在已打开的对话中启用 `hard-web` 后，需刷新页面才能收到其 `hardLedger` 投影。
+- **延迟激活**——在已打开的对话中启用 hard bundle 后，需刷新页面才能收到其 `hardLedger` 投影。
 
 <a id="dev-note"></a>
 ### 开发备注

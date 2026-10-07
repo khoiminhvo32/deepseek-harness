@@ -30,7 +30,9 @@ export const Config: z<Config> = z.object({})
 const HYPOTHESIS_STATUSES: readonly HardHypothesisStatus[] = ['proposed', 'testing', 'confirmed', 'refuted', 'deferred']
 
 const SUBMIT_DESCRIPTION = 'Submit one vulnerability finding for harness verification. The harness executes '
-  + 'the proof of concept itself, passing the payload as the PoC\'s first argument ($1); read the payload '
+  + 'the proof of concept itself as bash poc_path payload from the target repository root, so the PoC must be a '
+  + 'bash script; a proof written in another language needs a bash script that invokes it. The payload is the '
+  + 'PoC\'s first argument ($1); read the payload '
   + 'from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is '
   + 're-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload '
   + 'actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints '
@@ -229,7 +231,8 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       cvss_score: { type: 'number', required: true, description: 'The score you believe the vector computes.' },
       poc_path: {
         type: 'string', required: true,
-        description: 'Target-repository-relative path of the PoC script. It must take the exploit input as $1, '
+        description: 'Target-repository-relative path of the PoC bash script, run as bash poc_path payload. '
+          + 'It must take the exploit input as $1, '
           + 'print HARD-PASS sha256-of-claim on stdout, and exit zero only when the payload causes the effect.',
       },
       payload: {

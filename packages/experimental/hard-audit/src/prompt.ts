@@ -77,7 +77,8 @@ export function readerPrompt(cell: ReaderCell): string {
     + 'repository root, one-based line, and the enclosing symbol when there is one. At least one location must lie in the '
     + 'audited code. If you read carefully and find none, report outcome "clean" and list in examined every function or '
     + 'other symbol you inspected as path relative to the repository root and symbol name; at least one must lie in the '
-    + 'audited code. Explain your conclusion in reason.'
+    + 'audited code. Every symbol must be one identifier copied exactly as it appears in that file, such as a function, '
+    + 'class, or constant name, never a description or a list. Explain your conclusion in reason.'
 }
 
 /** The structured report the reader must return. */

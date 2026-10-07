@@ -440,7 +440,7 @@
     },
     {
       "name": "hard_submit_finding",
-      "description": "Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself, passing the payload as the PoC's first argument ($1); read the payload from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is re-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints the exact line HARD-PASS claim-hash on stdout, and the benign run failed. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.",
+      "description": "Submit one vulnerability finding for harness verification. The harness executes the proof of concept itself as bash poc_path payload from the target repository root, so the PoC must be a bash script; a proof written in another language needs a bash script that invokes it. The payload is the PoC's first argument ($1); read the payload from $1, never hardcode it in the script. The harness runs the specificity check: the same PoC is re-run with a benign payload and MUST FAIL — only print HARD-PASS claim-hash when the real payload actually causes the effect. A finding only counts as confirmed when every exploit run exits zero, prints the exact line HARD-PASS claim-hash on stdout, and the benign run failed. Include a CVSS:4.0 vector and the score you believe it computes; the harness recomputes the score and records any mismatch.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -474,7 +474,7 @@
           },
           "poc_path": {
             "type": "string",
-            "description": "Target-repository-relative path of the PoC script. It must take the exploit input as $1, print HARD-PASS sha256-of-claim on stdout, and exit zero only when the payload causes the effect."
+            "description": "Target-repository-relative path of the PoC bash script, run as bash poc_path payload. It must take the exploit input as $1, print HARD-PASS sha256-of-claim on stdout, and exit zero only when the payload causes the effect."
           },
           "payload": {
             "type": "string",

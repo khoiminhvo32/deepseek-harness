@@ -40,18 +40,20 @@ function records(content: string) {
 }
 
 describe('dsh --profile hard independent audit', () => {
-  it('has a blind reader re-read a sampled clear and records its flag before the run exits', async () => {
+  it.each(['git', 'directory'] as const)('has a blind reader re-read a sampled clear of a %s target and records its flag before the run exits', async (kind) => {
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-hard-audit-'))
     try {
       await mkdir(join(cwd, 'src'), { recursive: true })
       await writeFile(join(cwd, 'src', 'reports.js'), REPORTS_SOURCE)
-      const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], {
-        encoding: 'utf8',
-        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
-      })
-      git('init', '--quiet')
-      git('add', '-A')
-      git('-c', 'user.name=hard-e2e', '-c', 'user.email=hard@e2e', 'commit', '--quiet', '-m', 'seed')
+      if (kind === 'git') {
+        const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], {
+          encoding: 'utf8',
+          env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+        })
+        git('init', '--quiet')
+        git('add', '-A')
+        git('-c', 'user.name=hard-e2e', '-c', 'user.email=hard@e2e', 'commit', '--quiet', '-m', 'seed')
+      }
 
       const home = join(cwd, '.dsh')
       const sessions = join(home, 'sessions')
@@ -127,6 +129,9 @@ describe('dsh --profile hard independent audit', () => {
         .map(async name => records(await readFile(join(sessions, name), 'utf8'))))
       const mission = logs.find(events => events.some(event => event.type === 'hard/mission/armed'))
       expect(mission).toBeDefined()
+      // Whatever the target is, the harness pinned its own snapshot of it.
+      const armed = mission?.find(event => event.type === 'hard/mission/armed')?.data as { snapshot?: { kind: string } } | undefined
+      expect(armed?.snapshot?.kind).toBe(kind)
       const clearSeq = mission?.find(event => event.type === 'hard/coverage/cell')?.seq
       const requested = mission?.filter(event => event.type === 'hard/audit/requested').map(event => event.data)
       expect(requested).toEqual([{ module: 'src', bugClass: 'cmdi', auditedSeq: clearSeq, tier: 'per-cell' }])

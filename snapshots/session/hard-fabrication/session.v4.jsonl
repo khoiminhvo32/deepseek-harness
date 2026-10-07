@@ -3,7 +3,7 @@
 {"type":"sandbox/mode","data":{"mode":"danger-full-access"}}
 {"type":"approval/policy","data":{"policy":"never"}}
 {"type":"goal/change","data":{"kind":"goal/change","version":1,"operation":"create","goal":{"id":"{{id:1}}","revision":1,"objective":"Hunt vulnerabilities in this repository; only verified findings count.","phase":"active","maxGoalRounds":64},"roundsStarted":0,"createdAt":1791263759885,"updatedAt":1791263759885}}
-{"type":"hard/mission/armed","data":{"objective":"Hunt vulnerabilities in this repository; only verified findings count.","targetRepo":"{{cwd}}","commit":"92ef6b456eedc4ac63e2b8ca454f8d86f33cf461","modules":["notes","src"],"bugClasses":["cmdi","sqli"],"inertModules":["notes"],"unscreenedModules":[],"ignoredEntryCount":2,"goalId":"{{id:1}}"}}
+{"type":"hard/mission/armed","data":{"objective":"Hunt vulnerabilities in this repository; only verified findings count.","targetRepo":"{{cwd}}","commit":"f78f346a1e4a8ce8e144dc32e37580380f350a88","modules":["notes","src"],"bugClasses":["cmdi","sqli"],"inertModules":["notes"],"unscreenedModules":[],"ignoredEntryCount":2,"goalId":"{{id:1}}","snapshot":{"gitDir":"{{cwd}}/.dsh/hard/snapshots/store.git","kind":"git","origin":{"commit":"92ef6b456eedc4ac63e2b8ca454f8d86f33cf461","dirty":false}}}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Hunt vulnerabilities in this repository; only verified findings count."}],"source":{"kind":"user"},"role":"user","id":"{{message:1}}"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

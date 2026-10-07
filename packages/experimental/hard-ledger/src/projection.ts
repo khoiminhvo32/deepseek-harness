@@ -127,6 +127,14 @@ const matrixSchema = zod.object({
     sample: zod.array(zod.string().min(1)),
   }).optional(),
   ignoredEntryCount: zod.number().int().min(0).optional(),
+  snapshot: zod.object({
+    gitDir: zod.string().min(1),
+    kind: zod.enum(['git', 'directory', 'file']),
+    origin: zod.object({
+      commit: zod.string().regex(/^[0-9a-f]{40}$|^[0-9a-f]{64}$/u),
+      dirty: zod.boolean(),
+    }).optional(),
+  }).optional(),
 })
 
 /** Validates persisted projection state before it seeds a fold. */
@@ -209,6 +217,13 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
             },
           }),
           ...(event.data.ignoredEntryCount === undefined ? {} : { ignoredEntryCount: event.data.ignoredEntryCount }),
+          ...(event.data.snapshot === undefined ? {} : {
+            snapshot: {
+              gitDir: event.data.snapshot.gitDir,
+              kind: event.data.snapshot.kind,
+              ...(event.data.snapshot.origin === undefined ? {} : { origin: { ...event.data.snapshot.origin } }),
+            },
+          }),
         },
       }
     default:

@@ -7,7 +7,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
+import HardLedger, { pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, matrixBoardFromState, openWorkCountsFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -786,13 +786,27 @@ describe('hard ledger coverage matrix', () => {
       .toThrow('ignoredEntryCount must be a non-negative safe integer')
     expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, ignoredEntryCount: 1.5 }) })
       .toThrow('ignoredEntryCount must be a non-negative safe integer')
+    const snapshot = { gitDir: '/tmp/dsh/hard/snapshots/x.git', kind: 'git' as const, origin: { commit: 'd'.repeat(40), dirty: true } }
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, snapshot: { ...snapshot, gitDir: 'relative.git' } }) })
+      .toThrow('snapshot.gitDir must be an absolute path')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, snapshot: { ...snapshot, kind: 'tarball' as 'git' } }) })
+      .toThrow('snapshot.kind must be git, directory, or file')
+    expect(() => { ctx.hardLedger.recordMissionArmed(root.agent, { ...armed, snapshot: { ...snapshot, origin: { commit: 'HEAD', dirty: false } } }) })
+      .toThrow('snapshot.origin.commit must be a full lowercase hex sha')
     ctx.hardLedger.recordMissionArmed(root.agent, {
-      ...armed, inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3,
+      ...armed, inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3, snapshot,
     })
     expect(ctx.hardLedger.coverageMatrix(root.agent)).toEqual({
       modules: ['docs', 'src'], bugClasses: ['cmdi'], targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
-      inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3,
+      inertModules: ['docs'], unscreenedModules: ['src'], exclusions, ignoredEntryCount: 3, snapshot,
     })
+    // The pinned commit is reached through the snapshot's git directory, or the target itself for older records.
+    expect(pinnedGitArgs({ snapshot })).toEqual(['--git-dir=/tmp/dsh/hard/snapshots/x.git'])
+    expect(pinnedGitArgs({})).toEqual([])
+    const plain = { gitDir: '/tmp/dsh/hard/snapshots/y.git', kind: 'file' as const }
+    const second = await harness()
+    second.ctx.hardLedger.recordMissionArmed(second.root.agent, { ...armed, snapshot: plain })
+    expect(second.ctx.hardLedger.coverageMatrix(second.root.agent)?.snapshot).toEqual(plain)
   })
 
   it('rejects invalid arming records with stable codes', async () => {

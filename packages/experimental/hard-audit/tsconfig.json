@@ -18,7 +18,6 @@
     { "path": "../../session/session-projection" },
     { "path": "../../shell/shell" },
     { "path": "../../subagent/subagent" },
-    { "path": "../../util/home-paths" },
     { "path": "../hard-ledger" },
     { "path": "../hard-mission" },
     { "path": "../hard-verifier" }

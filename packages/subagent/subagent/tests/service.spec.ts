@@ -25,7 +25,9 @@ function fakeParent(id = 'parent-1'): Agent {
   return { id: SessionId(id) } as unknown as Agent
 }
 
-const ALL_CAPS: SubagentCapabilities = { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true }
+const ALL_CAPS: SubagentCapabilities = {
+  agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true, cwd: true,
+}
 const NO_CAPS: SubagentCapabilities = { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false }
 
 function baseRequest(overrides: Partial<SubagentStartRequest> = {}): SubagentStartRequest {
@@ -189,6 +191,7 @@ describe('SubagentRuntime', () => {
     ['depthLimit', { maxDepth: 1 }],
     ['toolFilter', { toolFilter: { deny: ['bash'] } }],
     ['persona', { persona: 'reviewer' }],
+    ['cwd', { cwd: '/tmp/reader' }],
   ] as const)('rejects unsupported %s before provider startup', async (_capability, override) => {
     const { subagents } = await service()
     const provider = new StubProvider('weak', NO_CAPS)
@@ -206,6 +209,8 @@ describe('SubagentRuntime', () => {
       .rejects.toThrow('non-negative safe integer')
     await expect(subagents.start('strong', baseRequest({ outputSchema: { type: 'string' } as never })))
       .rejects.toThrow()
+    await expect(subagents.start('strong', baseRequest({ cwd: 'relative/dir' })))
+      .rejects.toMatchObject({ code: 'INVALID_CWD', message: 'subagent cwd must be an absolute path' })
     expect(provider.startCount).toBe(0)
     expect(() => { assertSubagentMaxDepth(undefined) }).not.toThrow()
   })

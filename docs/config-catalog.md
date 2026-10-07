@@ -1100,7 +1100,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:116`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:119`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1131,7 +1131,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-mission`
 
 - `inject`: `agents` · `goals` · `systemPrompt` · `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-mission/src/index.ts:124`](../packages/experimental/hard-mission/src/index.ts)
+- `source`: [`packages/experimental/hard-mission/src/index.ts:133`](../packages/experimental/hard-mission/src/index.ts)
 
 ```ts config-catalog
 /** Mission plugin config. */
@@ -1154,15 +1154,26 @@ export interface Config {
   target: TargetConfig
 }
 
-/** The pinned target repository the coverage matrix enumerates. */
+/** The pinned target the coverage matrix enumerates. */
 export interface TargetConfig {
   /**
-   * Absolute path of the target git repository. Required and non-blank: a
-   * mission without a target has no coverage denominator and fails loudly.
+   * Absolute path of the target: a git repository, a plain directory, or one
+   * file such as a shared library. Required and non-blank: a mission without
+   * a target has no coverage denominator and fails loudly.
    */
   repoPath: string
-  /** Ref or sha to pin; resolved to the full commit sha at arm time. */
+  /**
+   * Optional ref a git target's checked-out HEAD must resolve to; arming
+   * fails when it does not, and on a target that is not a git work tree.
+   * Omitted, the target is captured as it is.
+   */
   commit?: string
+  /**
+   * Absolute directory holding the harness-owned snapshot repositories,
+   * omitted for `hard/snapshots` under the DSH home. A root inside the target
+   * is kept out of the snapshot.
+   */
+  snapshotRoot?: string
   /** Directory segments per coverage module, 1 through 6. */
   moduleDepth?: number
   /**
@@ -3412,7 +3423,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ## `@deepseek-ai/dsh-subagent`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/subagent/subagent/src/index.ts:190`](../packages/subagent/subagent/src/index.ts)
+- `source`: [`packages/subagent/subagent/src/index.ts:191`](../packages/subagent/subagent/src/index.ts)
 
 ```ts config-catalog
 /** Host configuration for continuable subagent capacity. */

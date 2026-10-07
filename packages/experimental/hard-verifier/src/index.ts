@@ -16,7 +16,7 @@ import type {
   HardFindingRequest,
   HardFindingVerdictData,
 } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { cellSampledForPercent } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { cellSampledForPercent, pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
 import { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 import { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
@@ -114,6 +114,15 @@ function resolveConfig(config: Config): ResolvedConfig {
     ...config.pocWorkdir === undefined ? {} : { pocWorkdir: config.pocWorkdir },
     coverageSpotCheckPercent,
   }
+}
+
+/**
+ * The git command that addresses one armed matrix's pinned commit: the
+ * harness-owned snapshot, or, for older records, the target repository every
+ * command runs in.
+ */
+function pinnedGit(matrix: Parameters<typeof pinnedGitArgs>[0]): string {
+  return ['git', ...pinnedGitArgs(matrix).map(shellQuote)].join(' ')
 }
 
 /** POSIX-quote one path argument for the PoC command. */
@@ -449,6 +458,7 @@ export class HardVerifier extends Service {
       throw new HarnessError('hard flow citations: no armed coverage matrix pins a commit', 'HARD_VERIFIER_NO_MATRIX')
     }
     const { commit, targetRepo } = matrix
+    const git = pinnedGit(matrix)
     const config = this.resolved
     const rejected: FlowCitationReject[] = []
     // The tracked check separates "the model named a path the pinned tree
@@ -456,7 +466,7 @@ export class HardVerifier extends Service {
     // git failure is never a citation verdict.
     const tracked = new Map<string, boolean>()
     const trackedAt = (path: string): Promise<boolean> => this.trackedAtCommit(
-      tracked, targetRepo, commit, path, 'flow citations',
+      tracked, git, targetRepo, commit, path, 'flow citations',
     )
     for (const { cite, snippet } of citations) {
       const parsed = /^(?<path>.+):(?<start>\d{1,7})(?:-(?<end>\d{1,7}))?$/u.exec(cite.trim())
@@ -476,7 +486,7 @@ export class HardVerifier extends Service {
         continue
       }
       const spec = this.ctx.shell.resolve({
-        command: `set -o pipefail; git show ${shellQuote(`${commit}:${path}`)}`
+        command: `set -o pipefail; ${git} show ${shellQuote(`${commit}:${path}`)}`
           + ` | sed -n ${shellQuote(`${String(start)},${String(end)}p`)}`,
         timeoutMs: config.timeoutSeconds * 1000,
         stdoutMaxBytes: config.stdoutMaxBytes,
@@ -516,6 +526,7 @@ export class HardVerifier extends Service {
       throw new HarnessError('hard sink citations: no armed coverage matrix pins a commit', 'HARD_VERIFIER_NO_MATRIX')
     }
     const { commit, targetRepo } = matrix
+    const git = pinnedGit(matrix)
     const short = commit.slice(0, 7)
     const tracked = new Map<string, boolean>()
     const binary = new Map<string, boolean>()
@@ -528,7 +539,7 @@ export class HardVerifier extends Service {
         continue
       }
       const { path } = citation
-      if (!await this.trackedAtCommit(tracked, targetRepo, commit, path, 'sink citations')) {
+      if (!await this.trackedAtCommit(tracked, git, targetRepo, commit, path, 'sink citations')) {
         rejected.push({ sink, reason: `${path} is not tracked at commit ${short}` })
         continue
       }
@@ -536,7 +547,7 @@ export class HardVerifier extends Service {
       if (isBinary === undefined) {
         const numstat = await this.gitAt(
           targetRepo,
-          `git diff --numstat --no-renames --no-textconv --no-ext-diff "$(git hash-object -t tree /dev/null)" ${shellQuote(commit)} -- ${shellQuote(path)}`,
+          `${git} diff --numstat --no-renames --no-textconv --no-ext-diff "$(${git} hash-object -t tree /dev/null)" ${shellQuote(commit)} -- ${shellQuote(path)}`,
           `sink citations: numstat over ${path}`,
         )
         isBinary = numstat.startsWith('-\t-\t')
@@ -548,7 +559,7 @@ export class HardVerifier extends Service {
         if (count === undefined) {
           count = Number((await this.gitAt(
             targetRepo,
-            `set -o pipefail; git show ${shellQuote(`${commit}:${path}`)} | awk 'END { print NR }'`,
+            `set -o pipefail; ${git} show ${shellQuote(`${commit}:${path}`)} | awk 'END { print NR }'`,
             `sink citations: line count of ${path}`,
           )).trim())
           lineCounts.set(path, count)
@@ -558,7 +569,7 @@ export class HardVerifier extends Service {
       }
       const found = await this.gitAt(
         targetRepo,
-        `git grep -I -F -c -e ${shellQuote(citation.locator)} ${shellQuote(commit)} -- ${shellQuote(path)}`,
+        `${git} grep -I -F -c -e ${shellQuote(citation.locator)} ${shellQuote(commit)} -- ${shellQuote(path)}`,
         `sink citations: grep for ${citation.locator} in ${path}`,
       )
       if (found.trim().length === 0) rejected.push({ sink, reason: `${path} has no ${citation.locator} at commit ${short}` })
@@ -569,6 +580,7 @@ export class HardVerifier extends Service {
   /**
    * Whether one path is tracked at the pinned commit, memoized per call site.
    * @param memo - the caller's per-check cache.
+   * @param git - the quoted git command that addresses the pinned commit.
    * @param targetRepo - the pinned target repository.
    * @param commit - the pinned full commit sha.
    * @param path - the target-repo-relative path.
@@ -577,6 +589,7 @@ export class HardVerifier extends Service {
    */
   private async trackedAtCommit(
     memo: Map<string, boolean>,
+    git: string,
     targetRepo: string,
     commit: string,
     path: string,
@@ -586,7 +599,7 @@ export class HardVerifier extends Service {
     if (known !== undefined) return known
     const listed = await this.gitAt(
       targetRepo,
-      `git ls-tree --name-only ${shellQuote(commit)} -- ${shellQuote(path)}`,
+      `${git} ls-tree --name-only ${shellQuote(commit)} -- ${shellQuote(path)}`,
       `${what}: ls-tree over ${path}`,
     )
     const tracked = listed.split('\n').some(line => line.trim() === path)

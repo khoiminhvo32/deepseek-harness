@@ -241,8 +241,8 @@ describe('dsh-subagent-spawn-in-process', () => {
     await run.dispose()
   })
 
-  it('inherits the parent cwd into the child session', async () => {
-    const { ctx } = await setup([textResponse('x')])
+  it('inherits the parent cwd into the child session unless the request names one', async () => {
+    const { ctx } = await setup([textResponse('x'), textResponse('y')])
     // A parent WITH a cwd (config agents have none, so create one explicitly).
     const parentHandle = await ctx.agents.create({
       sessionId: SessionId('cwd-parent-session'),
@@ -254,6 +254,12 @@ describe('dsh-subagent-spawn-in-process', () => {
     const child = ctx.agents.get(run.id)!
     expect(child.session.header.cwd).toBe('/tmp/parent-workspace')
     await run.dispose()
+    // A requested cwd replaces the parent's for the child alone.
+    const moved = await start(ctx, 'spawn', { prompt: [{ type: 'text', text: 'p' }], parent: parentHandle.agent, cwd: '/tmp/reader-worktree' })
+    await moved.result
+    expect(ctx.agents.get(moved.id)?.session.header.cwd).toBe('/tmp/reader-worktree')
+    expect(parentHandle.agent.session.header.cwd).toBe('/tmp/parent-workspace')
+    await moved.dispose()
     await parentHandle.dispose()
   })
 
@@ -286,6 +292,7 @@ describe('dsh-subagent-spawn-in-process', () => {
       depthLimit: true,
       toolFilter: true,
       persona: true,
+      cwd: true,
     })
   })
 

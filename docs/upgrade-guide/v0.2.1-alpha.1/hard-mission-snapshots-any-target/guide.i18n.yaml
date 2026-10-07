@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/hard-mission-snapshots-any-target/guide.md
+/:
+  en: 49e7574aefd4dbbb
+  zh: f84753bbdc08aac2
+/hard-mission-pins-any-target-through-a-snapshot:
+  en: 7c97b183036545d8
+  zh: 929879a285316121
+/hard-mission-pins-any-target-through-a-snapshot/change:
+  en: 4f6d7b8890ca0e2b
+  zh: 8dbd99fc62e9a4e4
+/hard-mission-pins-any-target-through-a-snapshot/migration:
+  en: 65af517822871298
+  zh: 5398cfa829a2785e

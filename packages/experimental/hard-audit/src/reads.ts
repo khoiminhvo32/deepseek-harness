@@ -1,12 +1,13 @@
 /**
- * Contamination detection for the independent reader. The reader's tools can
- * open any path the process can, so blindness to the mission agent's claims
- * is checked after the fact: every path argument the reader passed to a read
- * tool must resolve inside the target repository and outside the harness's
- * own state, where session logs carry the mission agent's verdicts. A read
- * outside the target is still allowed when an earlier result of the reader's
- * own tools named that exact path — the spill file holding its own oversized
- * search result. The check voids a measurement; it does not prevent the read.
+ * Contamination detection for the independent reader. The reader works in a
+ * temporary worktree of the pinned commit, but its tools can open any path
+ * the process can — the live target with the mission agent's PoCs, or the
+ * session logs with its verdicts — so blindness is checked after the fact:
+ * every path argument the reader passed to a read tool must resolve inside
+ * its worktree. A read outside is still allowed when an earlier result of
+ * the reader's own tools named that exact path — the spill file holding its
+ * own oversized search result. The check voids a measurement; it does not
+ * prevent the read.
  * @module
  */
 
@@ -61,14 +62,12 @@ export function namedPaths(text: string): string[] {
   return [...text.matchAll(/(?:^|[\s'"`(])(\/[^\s'"`)]+)/gu)].map(match => match[1] as string)
 }
 
-/** Where the reader may read and what it may never touch. */
+/** Where the reader may read. */
 export interface ReadScope {
   /** The reader's session workspace, which relative paths resolve against. */
   readonly cwd: string
-  /** The pinned target repository. */
-  readonly targetRepo: string
-  /** Harness state directories: project `.dsh/` state and the DSH home. */
-  readonly stateDirs: readonly string[]
+  /** The only tree the reader may read: its worktree of the pinned commit. */
+  readonly root: string
   /** Absolute paths the reader's own earlier tool results named. */
   readonly ownOutputs: ReadonlySet<string>
 }
@@ -76,17 +75,15 @@ export interface ReadScope {
 /**
  * The first read that breaks the reader's blindness, if any.
  * @param accesses - the reader's read accesses in call order.
- * @param scope - the target, the harness state, and the reader's own outputs.
- * @returns the offending path as the reader wrote it (`.` for a workspace default), or undefined when every read stayed in scope.
+ * @param scope - the reader's workspace, its worktree, and its own outputs.
+ * @returns the offending path as the reader wrote it (`.` for a workspace default), or undefined when every read stayed in the worktree.
  */
 export async function firstContaminatingRead(accesses: readonly ReaderAccess[], scope: ReadScope): Promise<string | undefined> {
-  const target = await canonical(scope.targetRepo)
-  const stateDirs = await Promise.all(scope.stateDirs.map(canonical))
+  const root = await canonical(scope.root)
   for (const access of accesses) {
     const lexical = absolute(access.path, scope.cwd)
     const real = await canonical(lexical)
-    const inScope = isUnder(real, target) || scope.ownOutputs.has(lexical) || scope.ownOutputs.has(real)
-    if (!inScope || stateDirs.some(dir => isUnder(real, dir))) return access.path ?? '.'
+    if (!isUnder(real, root) && !scope.ownOutputs.has(lexical) && !scope.ownOutputs.has(real)) return access.path ?? '.'
   }
   return undefined
 }

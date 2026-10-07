@@ -3,23 +3,27 @@
  * teaches the mission contract through a `hard:mission` system-prompt section.
  * The plugin mounts beside the goal service: it arms fresh root agents on
  * `startup` and never touches restored, paused, or completed goal state.
- * Arming also pins the configured target repository — it resolves the
- * configured commit to its full sha, enumerates the files that commit tracks
- * through the shell seam, and appends the coverage matrix as
- * `hard/mission/armed`, recording which modules the coverage cross-check can
- * screen and what any configured exclusion removed.
+ * Arming also pins the configured target — a git repository, a plain
+ * directory, or one file — by capturing it into a git snapshot the harness
+ * owns outside the target, enumerates the snapshot's files through the shell
+ * seam, and appends the coverage matrix as `hard/mission/armed`, recording
+ * which modules the coverage cross-check can screen and what any configured
+ * exclusion removed.
  * @module @deepseek-ai/dsh-experimental-hard-mission
  */
 
-import { isAbsolute, relative, sep } from 'node:path'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { HardMissionArmedData } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import type { HardMissionArmedData, HardTargetSnapshot } from '@deepseek-ai/dsh-experimental-hard-ledger'
 // Loads the declaration-merged `Context` keys this plugin injects.
 import type {} from '@deepseek-ai/dsh-goal'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import { DSH_HOME_DIR_NAME, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { DSH_HOME_DIR_NAME, dshHomePath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { HARD_EXCLUDED_SAMPLE_LIMIT, HARD_MATRIX_MODULE_LIMIT } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { SCREENED_EXTENSIONS } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import {
@@ -78,9 +82,6 @@ export const DEFAULT_MAX_GOAL_ROUNDS = 64
 /** Default number of systematic passes between deep-reading passes. */
 export const DEFAULT_DEEP_READ_EVERY_N = 3
 
-/** Default target commit ref, resolved to its full sha at arm time. */
-export const DEFAULT_TARGET_COMMIT = 'HEAD'
-
 /** Default directory segments per coverage module. */
 export const DEFAULT_MODULE_DEPTH = 2
 
@@ -93,24 +94,32 @@ export const DEFAULT_MODULE_DEPTH = 2
  */
 export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = []
 
-/** Maximum drifted paths the first-arming refusal lists before it summarizes the rest. */
-const DRIFT_LIST_LIMIT = 12
-
 /** Wall-clock budget for one arming git command. */
 const ARM_GIT_TIMEOUT_MS = 60_000
 
 /** Stdout budget for the tracked-file listing; truncation fails the arm loudly. */
 const ARM_LS_FILES_MAX_BYTES = 1 << 25
 
-/** The pinned target repository the coverage matrix enumerates. */
+/** The pinned target the coverage matrix enumerates. */
 export interface TargetConfig {
   /**
-   * Absolute path of the target git repository. Required and non-blank: a
-   * mission without a target has no coverage denominator and fails loudly.
+   * Absolute path of the target: a git repository, a plain directory, or one
+   * file such as a shared library. Required and non-blank: a mission without
+   * a target has no coverage denominator and fails loudly.
    */
   repoPath: string
-  /** Ref or sha to pin; resolved to the full commit sha at arm time. */
+  /**
+   * Optional ref a git target's checked-out HEAD must resolve to; arming
+   * fails when it does not, and on a target that is not a git work tree.
+   * Omitted, the target is captured as it is.
+   */
   commit?: string
+  /**
+   * Absolute directory holding the harness-owned snapshot repositories,
+   * omitted for `hard/snapshots` under the DSH home. A root inside the target
+   * is kept out of the snapshot.
+   */
+  snapshotRoot?: string
   /** Directory segments per coverage module, 1 through 6. */
   moduleDepth?: number
   /**
@@ -148,7 +157,8 @@ export const Config: z<Config> = z.object({
   deepReadEveryN: z.number().step(1).min(1).default(DEFAULT_DEEP_READ_EVERY_N),
   target: z.object({
     repoPath: z.string().required(),
-    commit: z.string().default(DEFAULT_TARGET_COMMIT),
+    commit: z.string(),
+    snapshotRoot: z.string(),
     moduleDepth: z.number().step(1).min(1).max(6).default(DEFAULT_MODULE_DEPTH),
     excludeGlobs: z.array(z.string()).default([...DEFAULT_EXCLUDE_GLOBS]),
   }).required(),
@@ -166,7 +176,8 @@ interface ResolvedConfig {
 /** Fully materialized target-pinning inputs. */
 export interface ResolvedTarget {
   readonly repoPath: string
-  readonly commit: string
+  readonly commit: string | undefined
+  readonly snapshotRoot: string
   readonly moduleDepth: number
   readonly excludeGlobs: readonly string[]
 }
@@ -211,9 +222,13 @@ function resolveTarget(target: TargetConfig | undefined): ResolvedTarget {
   if (!isAbsolute(repoPath)) {
     throw new TypeError('target.repoPath must be an absolute path')
   }
-  const commit = target.commit ?? DEFAULT_TARGET_COMMIT
-  if (typeof commit !== 'string' || commit.trim().length === 0) {
-    throw new TypeError('target.commit must be a non-empty string')
+  const commit = target.commit
+  if (commit !== undefined && (typeof commit !== 'string' || commit.trim().length === 0)) {
+    throw new TypeError('target.commit must be a non-empty string when set')
+  }
+  const snapshotRoot = target.snapshotRoot ?? dshHomePath('hard', 'snapshots')
+  if (typeof snapshotRoot !== 'string' || !isAbsolute(snapshotRoot)) {
+    throw new TypeError('target.snapshotRoot must be an absolute path')
   }
   const moduleDepth = target.moduleDepth ?? DEFAULT_MODULE_DEPTH
   if (!Number.isSafeInteger(moduleDepth) || moduleDepth < 1 || moduleDepth > 6) {
@@ -224,7 +239,7 @@ function resolveTarget(target: TargetConfig | undefined): ResolvedTarget {
     || excludeGlobs.some(glob => typeof glob !== 'string' || glob.trim().length === 0)) {
     throw new TypeError('target.excludeGlobs must be an array of non-empty globs')
   }
-  return { repoPath, commit, moduleDepth, excludeGlobs }
+  return { repoPath, commit, snapshotRoot, moduleDepth, excludeGlobs }
 }
 
 /** POSIX-quote one argument of an arming git command. */
@@ -259,61 +274,183 @@ async function gitOutput(ctx: Context, target: ResolvedTarget, command: string, 
   return result.stdout.text
 }
 
-/**
- * Resolve the configured commit to the full sha the enumeration pins.
- * @param ctx - the context whose shell seam executes the command.
- * @param target - the resolved target holding the repo path and ref.
- * @returns the full lowercase hex commit sha.
- */
-async function pinnedCommit(ctx: Context, target: ResolvedTarget): Promise<string> {
-  const output = await gitOutput(
-    ctx,
-    target,
-    `git -C ${shellQuote(target.repoPath)} rev-parse ${shellQuote(target.commit)}`,
-    'rev-parse',
-  )
-  const sha = output.trim().split('\n')[0] ?? ''
-  if (!/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(sha)) {
-    throw new Error(`hard mission: target.commit ${target.commit} did not resolve to a full sha in ${target.repoPath}`)
-  }
-  return sha
+/** A target resolved for capture: what it is, its work tree, and the paths a single-file target keeps. */
+interface TargetShape {
+  readonly kind: HardTargetSnapshot['kind']
+  /** The directory the snapshot's paths are relative to and PoCs run in. */
+  readonly workTree: string
+  /** The one file a single-file target captures; absent for directories. */
+  readonly file?: string
 }
 
 /**
- * List the files the pinned commit tracks, with git's binary classification:
- * a numstat diff of the commit's tree against the empty tree marks binary
- * content `-`, the same content test `grep -I` applies. The listing reads the
- * commit, not the index or the working tree. External diff drivers and
- * textconv filters stay off, so a target repository cannot run commands
- * through its attributes during arming.
- * @param ctx - the context whose shell seam executes the command.
- * @param target - the resolved target holding the repo path.
- * @param commit - the pinned full commit sha.
- * @returns one entry per tracked file, in git's output order.
+ * Classify the target path: one file, a git work tree (it holds `.git`), or
+ * a plain directory. A path that does not exist fails loudly.
+ * @param repoPath - the configured absolute target path.
+ * @returns the target's kind, work tree, and file.
  */
-async function trackedFiles(ctx: Context, target: ResolvedTarget, commit: string): Promise<TrackedFile[]> {
-  const repo = shellQuote(target.repoPath)
+async function targetShape(repoPath: string): Promise<TargetShape> {
+  let info
+  try {
+    info = await stat(repoPath)
+  } catch {
+    // ENOENT or EACCES: a target the harness cannot stat cannot be pinned.
+    throw new Error(`hard mission: target ${repoPath} does not exist or cannot be read`)
+  }
+  if (info.isFile()) return { kind: 'file', workTree: dirname(repoPath), file: basename(repoPath) }
+  if (!info.isDirectory()) throw new Error(`hard mission: target ${repoPath} is neither a file nor a directory`)
+  return { kind: existsSync(join(repoPath, '.git')) ? 'git' : 'directory', workTree: repoPath }
+}
+
+/**
+ * The harness-owned git directory every snapshot under one root accumulates
+ * in. A snapshot commit is a function of its content alone, so one store
+ * serves every target: identical files share objects, and each snapshot
+ * commit keeps its own ref so it outlives later snapshots.
+ * @param snapshotRoot - the configured snapshot root.
+ * @returns the absolute git directory path.
+ */
+export function snapshotGitDir(snapshotRoot: string): string {
+  return join(snapshotRoot, 'store.git')
+}
+
+/**
+ * Git with the developer's global and system configuration switched off, so
+ * a snapshot of the same content is the same commit on every machine.
+ */
+const HERMETIC_GIT = 'GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -c core.autocrlf=false -c core.safecrlf=false'
+
+/** The fixed identity and time that make a snapshot commit a function of its tree alone. */
+const SNAPSHOT_IDENTITY = 'GIT_AUTHOR_NAME=dsh-hard GIT_AUTHOR_EMAIL=hard@dsh.invalid GIT_AUTHOR_DATE="@0 +0000" '
+  + 'GIT_COMMITTER_NAME=dsh-hard GIT_COMMITTER_EMAIL=hard@dsh.invalid GIT_COMMITTER_DATE="@0 +0000"'
+
+/** A captured target: the snapshot record and the paths outside it. */
+interface CapturedTarget {
+  readonly snapshot: HardTargetSnapshot
+  readonly commit: string
+  readonly workTree: string
+  readonly ignoredEntryCount: number
+}
+
+/**
+ * Capture the target into the harness-owned snapshot repository and return
+ * its commit. A git work tree contributes its tracked files plus the
+ * untracked files its ignore rules keep, with working-tree content; a plain
+ * directory contributes every file its ignore files keep; a single file
+ * contributes itself. The harness's own state directories and the target's
+ * `.git` never enter. Nothing is written inside the target: the index and
+ * the objects live in the snapshot repository.
+ * @param ctx - the context whose shell seam executes the commands.
+ * @param target - the resolved target.
+ * @returns the snapshot record, its commit, the work tree, and the ignored-entry count.
+ */
+async function captureTarget(ctx: Context, target: ResolvedTarget): Promise<CapturedTarget> {
+  const shape = await targetShape(target.repoPath)
+  if (target.commit !== undefined && shape.kind !== 'git') {
+    throw new Error(`hard mission: target.commit applies to a git work tree, and ${target.repoPath} is not one`)
+  }
+  // The canonical spelling: the record names the store the way every later reader resolves it.
+  await mkdir(target.snapshotRoot, { recursive: true })
+  const gitDir = snapshotGitDir(await realpath(target.snapshotRoot))
+  const git = `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} --work-tree=${shellQuote(shape.workTree)}`
+  // A private index per capture: concurrent missions share the store, never an index.
+  const scratch = await mkdtemp(join(tmpdir(), 'dsh-hard-snapshot-'))
+  try {
+    return await captureInto(ctx, target, shape, gitDir, git, join(scratch, 'index'), join(scratch, 'pathspec'))
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
+
+/** Capture the target with one private index and pathspec file; the body of {@link captureTarget}. */
+async function captureInto(
+  ctx: Context,
+  target: ResolvedTarget,
+  shape: TargetShape,
+  gitDir: string,
+  git: string,
+  index: string,
+  pathspec: string,
+): Promise<CapturedTarget> {
+  const statePrefixes = [...harnessStatePrefixes(shape.workTree), ...insidePrefix(shape.workTree, target.snapshotRoot)]
+  const kept = (output: string): string[] => output.split('\0')
+    .filter(path => path.length > 0 && !statePrefixes.some(prefix => path.startsWith(prefix)))
+  if (!existsSync(gitDir)) await gitOutput(ctx, target, `${HERMETIC_GIT} init --bare --quiet ${shellQuote(gitDir)}`, 'init')
+  let origin: HardTargetSnapshot['origin']
+  let ignored: string[]
+  let paths: string[]
+  const repo = `git -C ${shellQuote(shape.workTree)}`
+  if (shape.kind === 'git') {
+    const head = (await gitOutput(ctx, target, `${repo} rev-parse --verify -q HEAD || true`, 'rev-parse HEAD')).trim()
+    if (target.commit !== undefined) {
+      const wanted = (await gitOutput(ctx, target, `${repo} rev-parse --verify ${shellQuote(`${target.commit}^{commit}`)}`, 'rev-parse')).trim()
+      if (wanted !== head) {
+        throw new Error(`hard mission: target.commit ${target.commit} is ${wanted}, but ${target.repoPath} has ${head} checked out`)
+      }
+    }
+    const listed = kept(await gitOutput(ctx, target, `${repo} ls-files -z --cached --others --exclude-standard`, 'ls-files'))
+    paths = listed.filter(path => existsSync(join(shape.workTree, path)))
+    ignored = kept(await gitOutput(ctx, target, `${repo} ls-files -z --others --ignored --exclude-standard --directory`, 'ls-files --ignored'))
+    if (head.length > 0) {
+      const status = kept((await gitOutput(ctx, target, `${repo} status --porcelain -z --untracked-files=all`, 'status'))
+        .split('\0').map(entry => entry.slice(3)).join('\0'))
+      origin = { commit: head, dirty: status.length > 0 }
+    }
+  } else if (shape.kind === 'directory') {
+    const excludes = statePrefixes.map(prefix => shellQuote(`:(exclude)${prefix.slice(0, -1)}`)).join(' ')
+    paths = kept(await gitOutput(ctx, target,
+      `rm -f ${shellQuote(index)} && GIT_INDEX_FILE=${shellQuote(index)} ${git} ls-files -z --others --exclude-standard -- . ${excludes}`, 'ls-files'))
+    ignored = kept(await gitOutput(ctx, target,
+      `GIT_INDEX_FILE=${shellQuote(index)} ${git} ls-files -z --others --ignored --exclude-standard --directory -- . ${excludes}`, 'ls-files --ignored'))
+  } else {
+    paths = [shape.file as string]
+    ignored = []
+  }
+  if (paths.length === 0) throw new Error(`hard mission: target ${target.repoPath} holds no file to capture`)
+  await writeFile(pathspec, paths.join('\0') + '\0')
+  const commit = (await gitOutput(ctx, target, [
+    'set -e',
+    `rm -f ${shellQuote(index)}`,
+    `export GIT_INDEX_FILE=${shellQuote(index)}`,
+    `GIT_LITERAL_PATHSPECS=1 ${git} add -f --pathspec-from-file=${shellQuote(pathspec)} --pathspec-file-nul`,
+    `tree=$(${git} write-tree)`,
+    `commit=$(${SNAPSHOT_IDENTITY} ${git} commit-tree "$tree" -m 'hard target snapshot')`,
+    `${git} update-ref "refs/hard/snapshots/$commit" "$commit"`,
+    'echo "$commit"',
+  ].join('\n'), 'snapshot')).trim()
+  /* v8 ignore next -- defensive: the script runs under set -e, so a failed commit-tree fails the command first. */
+  if (!/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(commit)) throw new Error(`hard mission: the snapshot of ${target.repoPath} produced no commit`)
+  return {
+    snapshot: { gitDir, kind: shape.kind, ...(origin === undefined ? {} : { origin }) },
+    commit,
+    workTree: shape.workTree,
+    ignoredEntryCount: ignored.length,
+  }
+}
+
+/**
+ * List the files the snapshot commit holds, with git's binary
+ * classification: a numstat diff of the commit's tree against the empty tree
+ * marks binary content `-`, the same content test `grep -I` applies.
+ * External diff drivers and textconv filters stay off.
+ * @param ctx - the context whose shell seam executes the command.
+ * @param target - the resolved target, for diagnostics.
+ * @param gitDir - the snapshot repository.
+ * @param commit - the snapshot commit.
+ * @returns one entry per file, in git's output order.
+ */
+async function trackedFiles(ctx: Context, target: ResolvedTarget, gitDir: string, commit: string): Promise<TrackedFile[]> {
+  const git = `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)}`
   const output = await gitOutput(
     ctx,
     target,
-    `git -C ${repo} diff --numstat -z --no-renames --no-textconv --no-ext-diff`
-      + ` "$(git -C ${repo} hash-object -t tree /dev/null)" ${shellQuote(commit)}`,
+    `${git} diff --numstat -z --no-renames --no-textconv --no-ext-diff "$(${git} hash-object -t tree /dev/null)" ${shellQuote(commit)}`,
     'diff --numstat',
   )
   return output.split('\0').filter(record => record.length > 0).map((record) => {
     const [added = '', deleted = '', ...rest] = record.split('\t')
     return { path: rest.join('\t'), binary: added === '-' && deleted === '-' }
   })
-}
-
-/** How the target working tree departs from the pinned commit at load. */
-interface WorkingTreeDrift {
-  /** Tracked files whose working-tree content differs from the pinned commit. */
-  readonly modified: readonly string[]
-  /** Files git neither tracks nor ignores. */
-  readonly untracked: readonly string[]
-  /** Untracked paths git ignores, one entry per ignored directory. */
-  readonly ignoredEntryCount: number
 }
 
 /**
@@ -327,60 +464,13 @@ interface WorkingTreeDrift {
  * @returns the forward-slash prefixes, each ending in `/`.
  */
 export function harnessStatePrefixes(repoPath: string): string[] {
-  const prefixes = [`${DSH_HOME_DIR_NAME}/`]
-  const home = relative(repoPath, resolveDshHome())
-  if (home !== '' && !home.startsWith('..') && !isAbsolute(home)) prefixes.push(`${home.split(sep).join('/')}/`)
-  return prefixes
+  return [`${DSH_HOME_DIR_NAME}/`, ...insidePrefix(repoPath, resolveDshHome())]
 }
 
-/**
- * Measure how the target working tree departs from the pinned commit. The
- * model reads and runs the working tree while the matrix and every citation
- * resolve against the commit, so a first arming over modified or untracked
- * files would audit a tree the model never sees. Paths under the harness's
- * own state directories are not drift.
- * @param ctx - the context whose shell seam executes the commands.
- * @param target - the resolved target holding the repo path.
- * @param commit - the pinned full commit sha.
- * @returns the modified and untracked paths and the ignored-entry count.
- */
-async function workingTreeDrift(ctx: Context, target: ResolvedTarget, commit: string): Promise<WorkingTreeDrift> {
-  const repo = shellQuote(target.repoPath)
-  const statePrefixes = harnessStatePrefixes(target.repoPath)
-  const paths = (output: string): string[] => output.split('\0')
-    .filter(path => path.length > 0 && !statePrefixes.some(prefix => path.startsWith(prefix)))
-  const modified = paths(await gitOutput(
-    ctx, target, `git -C ${repo} diff --name-only -z --no-ext-diff ${shellQuote(commit)} --`, 'diff --name-only',
-  ))
-  const untracked = paths(await gitOutput(
-    ctx, target, `git -C ${repo} ls-files --others --exclude-standard -z`, 'ls-files --others',
-  ))
-  const ignored = paths(await gitOutput(
-    ctx, target, `git -C ${repo} ls-files --others --ignored --exclude-standard --directory -z`, 'ls-files --ignored',
-  ))
-  return { modified, untracked, ignoredEntryCount: ignored.length }
-}
-
-/**
- * The first-arming refusal over a drifted working tree, naming the bounded
- * set of offending paths.
- * @param target - the resolved target holding the repo path.
- * @param commit - the pinned full commit sha.
- * @param drift - the measured drift; at least one path is present.
- * @returns the error to throw.
- */
-function driftError(target: ResolvedTarget, commit: string, drift: WorkingTreeDrift): Error {
-  const entries = [
-    ...drift.modified.map(path => `${path} (modified)`),
-    ...drift.untracked.map(path => `${path} (untracked)`),
-  ].sort()
-  const listed = entries.length > DRIFT_LIST_LIMIT
-    ? [...entries.slice(0, DRIFT_LIST_LIMIT), `…and ${entries.length - DRIFT_LIST_LIMIT} more`]
-    : entries
-  return new Error(
-    `hard mission: target working tree differs from the pinned commit ${commit} in ${target.repoPath}: `
-    + `${listed.join(', ')}; commit or remove them — the harness audits only what the pinned commit holds`,
-  )
+/** The repo-relative prefix of one directory when it lies inside the work tree, else nothing. */
+function insidePrefix(repoPath: string, directory: string): string[] {
+  const inside = relative(repoPath, directory)
+  return inside !== '' && !inside.startsWith('..') && !isAbsolute(inside) ? [`${inside.split(sep).join('/')}/`] : []
 }
 
 /** Render the model-facing mission contract from the resolved config. */
@@ -402,34 +492,26 @@ function missionContract(resolved: ResolvedConfig): string {
     + 'Ending a turn does not end the mission.'
 }
 
-/** The pinned matrix plus the working-tree drift the first arming checks. */
-interface PinnedTarget {
-  readonly armed: Omit<HardMissionArmedData, 'objective'>
-  readonly drift: WorkingTreeDrift
-}
-
 /**
- * Pin the target once at load: resolve the commit, list the files it tracks,
- * filter them through the configured exclusion globs, group them into
- * modules, and classify which modules the cross-check can screen. Every
- * structural failure is loud here — a mission without a verified matrix must
- * not load at all. Working-tree drift is only measured: a resumed session
- * loads over the files its own run created, so the drift refusal belongs to
- * the first arming.
+ * Pin the target once at load: capture it into the harness-owned snapshot,
+ * list the snapshot's files, filter them through the configured exclusion
+ * globs, group them into modules, and classify which modules the
+ * cross-check can screen. Every structural failure is loud here — a mission
+ * without a verified matrix must not load at all.
  * @param ctx - the context whose shell seam and ledger the pinning uses.
  * @param resolved - the validated mission config.
- * @returns the armed payload every fresh root agent records, minus the objective, and the measured drift.
+ * @returns the armed payload every fresh root agent records, minus the objective.
  */
-async function pinTarget(ctx: Context, resolved: ResolvedConfig): Promise<PinnedTarget> {
+async function pinTarget(ctx: Context, resolved: ResolvedConfig): Promise<Omit<HardMissionArmedData, 'objective'>> {
   const target = resolved.target
-  const commit = await pinnedCommit(ctx, target)
-  const tracked = await trackedFiles(ctx, target, commit)
+  const captured = await captureTarget(ctx, target)
+  const tracked = await trackedFiles(ctx, target, captured.snapshot.gitDir, captured.commit)
   const keptPaths = new Set(filterExcludedPaths(tracked.map(file => file.path), target.excludeGlobs))
   const kept = tracked.filter(file => keptPaths.has(file.path))
   const keptList = kept.map(file => file.path)
   const modules = modulesFromPaths(keptList, target.moduleDepth)
   if (modules.length === 0) {
-    throw new Error(`hard mission: no tracked modules survived the exclusion globs in ${target.repoPath}`)
+    throw new Error(`hard mission: no modules survived the exclusion globs in ${target.repoPath}`)
   }
   if (modules.length > HARD_MATRIX_MODULE_LIMIT) {
     const advice = target.moduleDepth > 1
@@ -442,25 +524,22 @@ async function pinTarget(ctx: Context, resolved: ResolvedConfig): Promise<Pinned
     throw new Error(`hard mission: target has no code modules — every module in ${target.repoPath} holds only inert files`)
   }
   const excluded = tracked.filter(file => !keptPaths.has(file.path)).map(file => file.path).sort()
-  const drift = await workingTreeDrift(ctx, target, commit)
   return {
-    armed: {
-      targetRepo: target.repoPath,
-      commit,
-      modules,
-      bugClasses: [...resolved.bugClasses],
-      inertModules,
-      unscreenedModules: unscreenedModulesFromFiles(kept, target.moduleDepth, INERT_EXTENSIONS, SCREENED_EXTENSIONS),
-      ...(target.excludeGlobs.length === 0 ? {} : {
-        exclusions: {
-          globs: [...target.excludeGlobs],
-          fileCount: excluded.length,
-          sample: excluded.slice(0, HARD_EXCLUDED_SAMPLE_LIMIT),
-        },
-      }),
-      ignoredEntryCount: drift.ignoredEntryCount,
-    },
-    drift,
+    targetRepo: captured.workTree,
+    commit: captured.commit,
+    modules,
+    bugClasses: [...resolved.bugClasses],
+    inertModules,
+    unscreenedModules: unscreenedModulesFromFiles(kept, target.moduleDepth, INERT_EXTENSIONS, SCREENED_EXTENSIONS),
+    ...(target.excludeGlobs.length === 0 ? {} : {
+      exclusions: {
+        globs: [...target.excludeGlobs],
+        fileCount: excluded.length,
+        sample: excluded.slice(0, HARD_EXCLUDED_SAMPLE_LIMIT),
+      },
+    }),
+    ignoredEntryCount: captured.ignoredEntryCount,
+    snapshot: captured.snapshot,
   }
 }
 
@@ -472,14 +551,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     order: ctx.systemPrompt.getSectionOrder('HARD_MISSION'),
     text: missionContract(resolved),
   })
-  const { armed, drift } = await pinTarget(ctx, resolved)
+  const armed = await pinTarget(ctx, resolved)
   ctx.on('agent/created', ({ agent, source }) => {
     if (source !== 'startup') return
     if (!ctx.agents.roots().includes(agent)) return
     if (ctx.goals.get(agent) !== undefined) return
-    // The first arming fails loud over drift; throwing here rejects the root
-    // agent's registration before any goal or ledger record exists.
-    if (drift.modified.length > 0 || drift.untracked.length > 0) throw driftError(resolved.target, armed.commit, drift)
     const goal = ctx.goals.create(agent, {
       objective: resolved.objective,
       maxGoalRounds: resolved.maxGoalRounds,

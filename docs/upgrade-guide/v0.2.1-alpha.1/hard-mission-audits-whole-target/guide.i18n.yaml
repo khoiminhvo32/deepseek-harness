@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/hard-mission-audits-whole-target/guide.md
 /:
-  en: 8adc4ebb3957cd9b
-  zh: 90e7a3f76cc11562
+  en: 52195538506fd0b9
+  zh: f934bd15e111aa32
 /hard-mission-audits-the-whole-pinned-commit:
   en: 3ce294f98479df3c
   zh: e22437a6e5d23fe4
 /hard-mission-audits-the-whole-pinned-commit/change:
-  en: 78408d56a4ec7b07
-  zh: e5416d763b6e03ea
+  en: b0e04557d3807308
+  zh: a86684cb6fbf1580
 /hard-mission-audits-the-whole-pinned-commit/migration:
-  en: dce27d06c2f8b7f0
-  zh: 39fb9b57532bf7b4
+  en: f0d26afcfbaa6ce2
+  zh: 94b10895ba338412

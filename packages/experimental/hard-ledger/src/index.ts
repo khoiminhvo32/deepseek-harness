@@ -49,6 +49,7 @@ import type {
   HardHypothesisStatus,
   HardMatrixExclusions,
   HardMissionArmedData,
+  HardTargetSnapshot,
   HardSweepSummaryData,
 } from './types.ts'
 import type { HardCoverageMatrix, HardLedgerFindingEntry, HardLedgerProjectionState } from './projection.ts'
@@ -75,6 +76,7 @@ export type {
   HardLedgerClientView,
   HardMatrixExclusions,
   HardMissionArmedData,
+  HardTargetSnapshot,
   HardSweepSummaryData,
   HardVerdict,
 } from './types.ts'
@@ -104,6 +106,7 @@ export type {
   RefutationBreakdown,
 } from './aggregate.ts'
 export { cellSampledForPercent, CLASS_SCOPE, classScope } from './scope.ts'
+export { pinnedGitArgs } from './pin.ts'
 
 declare module '@deepseek-ai/cordis' {
   /** The log-derived hard-harness ledger service. */
@@ -237,6 +240,7 @@ export class HardLedger extends Service {
     }
     for (const bugClass of data.bugClasses) this.assertText('bugClasses[]', bugClass)
     if (data.goalId !== undefined) this.assertText('goalId', data.goalId)
+    const snapshot = data.snapshot === undefined ? undefined : this.snapshotRecord(data.snapshot)
     agent.session.append('hard/mission/armed', {
       objective: data.objective,
       targetRepo: data.targetRepo,
@@ -248,7 +252,32 @@ export class HardLedger extends Service {
       ...(exclusions === undefined ? {} : { exclusions }),
       ...(data.ignoredEntryCount === undefined ? {} : { ignoredEntryCount: data.ignoredEntryCount }),
       ...(data.goalId === undefined ? {} : { goalId: data.goalId }),
+      ...(snapshot === undefined ? {} : { snapshot }),
     })
+  }
+
+  /**
+   * Validate the snapshot an arming record names: an absolute git directory,
+   * a known target kind, and a full origin sha when present.
+   * @param snapshot - the snapshot the caller supplied.
+   * @returns a detached copy of the snapshot.
+   */
+  private snapshotRecord(snapshot: HardTargetSnapshot): HardTargetSnapshot {
+    this.assertText('snapshot.gitDir', snapshot.gitDir)
+    if (!snapshot.gitDir.startsWith('/')) {
+      throw new HarnessError('snapshot.gitDir must be an absolute path', 'HARD_LEDGER_INVALID_SNAPSHOT')
+    }
+    if (!['git', 'directory', 'file'].includes(snapshot.kind)) {
+      throw new HarnessError('snapshot.kind must be git, directory, or file', 'HARD_LEDGER_INVALID_SNAPSHOT')
+    }
+    if (snapshot.origin !== undefined && !/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(snapshot.origin.commit)) {
+      throw new HarnessError('snapshot.origin.commit must be a full lowercase hex sha', 'HARD_LEDGER_INVALID_SNAPSHOT')
+    }
+    return {
+      gitDir: snapshot.gitDir,
+      kind: snapshot.kind,
+      ...(snapshot.origin === undefined ? {} : { origin: { commit: snapshot.origin.commit, dirty: snapshot.origin.dirty } }),
+    }
   }
 
   /**

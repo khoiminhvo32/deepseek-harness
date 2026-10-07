@@ -2,7 +2,7 @@
  * result beside the clear without touching anything the mission agent sees. */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -71,6 +71,15 @@ const plainSha: string = await (async () => {
   git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
   return git('rev-parse', 'HEAD').trim()
 })()
+
+/** A harness-owned snapshot of one repository: a bare clone, so the pinned commit is the repository's own. */
+function snapshotOf(repo: string, name: string): string {
+  const gitDir = join(suiteRoot, `${name}.git`)
+  execFileSync('git', ['clone', '--quiet', '--bare', repo, gitDir], { env: GIT_ENV })
+  return gitDir
+}
+const targetSnapshot = snapshotOf(targetRepo, 'target')
+const plainSnapshot = snapshotOf(plainRepo, 'plain')
 
 afterAll(async () => {
   await rm(suiteRoot, { recursive: true, force: true })
@@ -228,7 +237,7 @@ class ScriptedSubagents extends Service {
     if (this.startError !== undefined) throw this.startError
     const script = this.scripts.shift() ?? {}
     const id = SessionId(`reader-${Math.random()}`)
-    const child = this.host.sessions.create(id, { meta: { cwd: script.cwd ?? targetRepo } })
+    const child = this.host.sessions.create(id, { meta: { cwd: script.cwd ?? request.cwd ?? targetRepo } })
     child.append('subagent/descriptor', { version: 3, mode: 'one-shot', provider: name, ...request.label === undefined ? {} : { label: request.label } })
     const agent = stubAgent(this.host, child, { provider: 'test-provider', model: 'reader-model' })
     const result = (async (): Promise<SubagentResult> => {
@@ -260,8 +269,8 @@ const MATRIX: Omit<HardMissionArmedData, 'objective' | 'targetRepo' | 'commit'> 
   bugClasses: ['cmdi', 'dependencies'],
 }
 
-/** The unscreened rows of the shared repository's arming record. */
-const UNSCREENED = { unscreenedModules: ['bin'] }
+/** The unscreened rows and the snapshot of the shared repository's arming record. */
+const UNSCREENED = { unscreenedModules: ['bin'], snapshot: { gitDir: targetSnapshot, kind: 'git' as const } }
 
 /** Boot one audit harness with a live root agent armed over the shared repository. */
 async function harness(config: hardAudit.Config = {}, matrix: Partial<HardMissionArmedData> = UNSCREENED) {
@@ -333,7 +342,12 @@ describe('hard-audit sampling and request', () => {
     expect(result?.childSession).toBe(subagents.disposed[0])
     const start = subagents.starts[0]
     const prompt = start?.prompt[0]?.type === 'text' ? start.prompt[0].text : ''
-    expect(prompt).toContain(`Target: the git repository at ${targetRepo}, whose working tree matches commit ${targetSha}.`)
+    // The reader works in a worktree of the snapshot, never in the live target, and the worktree is gone afterwards.
+    expect(start?.cwd).toMatch(/dsh-hard-audit-[^/]+\/tree$/)
+    expect(start?.cwd).not.toBe(targetRepo)
+    expect(existsSync(start?.cwd ?? '')).toBe(false)
+    expect(prompt).toContain(`Target: the git repository at ${start?.cwd ?? ''}, whose working tree matches commit ${targetSha}.`)
+    expect(prompt).not.toContain(targetRepo)
     expect(prompt).toContain('Find one vulnerability of the class "cmdi" (untrusted input reaches an operating-system command, shell, or process invocation) in the module src/.')
     // Blind to the claim: the declared site and the verdict never reach the reader.
     expect(prompt).not.toContain('unguarded')
@@ -452,53 +466,74 @@ describe('hard-audit unavailable results', () => {
     expect(subagents.starts).toHaveLength(1)
   })
 
-  it('reports drift before the read without spawning, and drift after the read with the reader recorded', async () => {
+  it('shows the reader the pinned content only: edits and PoCs in the live target stay out of its worktree', async () => {
     const { ctx, root, subagents } = await harness()
-    const stray = join(targetRepo, 'lib', 'stray.js')
-    await writeFile(stray, 'x\n')
-    try {
-      clear(ctx, root, 'lib')
-      const [before] = await results(root, 1)
-      expect(before).toMatchObject({ outcome: 'unavailable', cause: 'workspace-drift', reason: 'module differs from pinned commit before the read' })
-      expect(subagents.starts).toHaveLength(0)
-    } finally {
-      await rm(stray)
-    }
     const edited = join(targetRepo, 'src', 'app.js')
-    subagents.scripts.push({ structured: CLEAN_SRC, during: () => writeFile(edited, `${APP_SOURCE}// edited\n`) })
+    const poc = join(targetRepo, 'poc')
+    await writeFile(edited, `${APP_SOURCE}// edited by the mission agent\n`)
+    await mkdir(poc, { recursive: true })
+    await writeFile(join(poc, 'cmdi.sh'), 'echo claimed\n')
+    let seen: { app: string; poc: boolean } | undefined
+    subagents.scripts.push({
+      structured: CLEAN_SRC,
+      during: () => {
+        const tree = subagents.starts[0]?.cwd ?? ''
+        seen = { app: readFileSync(join(tree, 'src', 'app.js'), 'utf8'), poc: existsSync(join(tree, 'poc')) }
+      },
+    })
     try {
       clear(ctx, root, 'src')
-      const [, after] = await results(root, 2)
-      expect(after).toMatchObject({ outcome: 'unavailable', cause: 'workspace-drift', reason: 'module differs from pinned commit after the read' })
-      expect(after?.childSession).toBeDefined()
+      expect((await results(root, 1))[0]).toMatchObject({ outcome: 'corroborated' })
+      expect(seen).toEqual({ app: APP_SOURCE, poc: false })
     } finally {
       await writeFile(edited, APP_SOURCE)
+      await rm(poc, { recursive: true, force: true })
     }
   })
 
-  it('reports a commit made after the pin as drift', async () => {
+  it('reports a record without a snapshot, and a worktree that cannot be added or removed', async () => {
+    const legacy = await harness({}, { unscreenedModules: ['bin'] })
+    clear(legacy.ctx, legacy.root, 'src')
+    expect((await results(legacy.root, 1))[0]).toMatchObject({
+      outcome: 'unavailable',
+      cause: 'git',
+      reason: 'the arming record predates harness snapshots, so no pristine copy of the target exists to read',
+    })
+    expect(legacy.subagents.starts).toHaveLength(0)
+
     const { ctx, root, subagents } = await harness()
-    const git = (...args: string[]) => execFileSync('git', ['-C', targetRepo, ...args], { encoding: 'utf8', env: GIT_ENV })
-    await writeFile(join(targetRepo, 'lib', 'util.js'), 'module.exports = {}\n')
-    git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-am', 'after the pin')
-    try {
-      clear(ctx, root, 'lib')
-      expect((await results(root, 1))[0]).toMatchObject({ cause: 'workspace-drift', reason: 'module differs from pinned commit before the read' })
-      expect(subagents.starts).toHaveLength(0)
-    } finally {
-      git('reset', '--quiet', '--hard', targetSha)
-    }
+    const real = ctx.shell.execute.bind(ctx.shell)
+    const refused = { exitCode: 2, timedOut: false, aborted: false, stdout: { text: '', truncated: false }, stderr: { text: '', truncated: false } }
+    const execute = vi.spyOn(ctx.shell, 'execute').mockImplementation(spec => spec.command.includes('worktree add')
+      ? Promise.resolve({ result: () => Promise.resolve(refused) } as never)
+      : real(spec))
+    clear(ctx, root, 'src')
+    expect((await results(root, 1))[0]).toMatchObject({ cause: 'git', reason: 'hard audit worktree add failed with exit 2' })
+    expect(subagents.starts).toHaveLength(0)
+    execute.mockImplementation(spec => spec.command.includes('worktree remove')
+      ? Promise.resolve({ result: () => Promise.resolve({ ...refused, timedOut: true }) } as never)
+      : real(spec))
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    subagents.scripts.push({ structured: CLEAN_SRC })
+    clear(ctx, root, 'src')
+    expect((await results(root, 2))[1]).toMatchObject({ outcome: 'corroborated' })
+    const removal = /^hard-audit: could not remove the reader worktree .*: hard audit worktree remove did not settle/
+    expect(warn.mock.calls.some(([line]) => removal.test(String(line)))).toBe(true)
+    // The temporary directory is removed even when git could not unregister the worktree.
+    expect(existsSync(subagents.starts[0]?.cwd ?? '')).toBe(false)
   })
 
-  it('voids a reader that read outside the target or into harness state, and keeps its own spill reads', async () => {
+  it('voids a reader that read outside its worktree, such as the live target, and keeps its own spill reads', async () => {
     const { ctx, root, subagents } = await harness()
     subagents.scripts.push({ calls: [{ name: 'read', args: { file_path: '../outside.txt' } }], structured: CLEAN_SRC })
     clear(ctx, root, 'src')
-    expect((await results(root, 1))[0]).toMatchObject({ outcome: 'unavailable', cause: 'contaminated', reason: 'the reader read ../outside.txt, outside the target or inside harness state' })
+    expect((await results(root, 1))[0]).toMatchObject({ outcome: 'unavailable', cause: 'contaminated', reason: 'the reader read ../outside.txt, outside its worktree of the pinned commit' })
 
-    subagents.scripts.push({ calls: [{ name: 'read', args: { file_path: '.dsh/sessions/mission.jsonl' } }], structured: CLEAN_SRC })
+    // The live target holds the mission agent's PoCs and edits: reading it breaks blindness.
+    const live = join(targetRepo, 'src', 'app.js')
+    subagents.scripts.push({ calls: [{ name: 'read', args: { file_path: live } }], structured: CLEAN_SRC })
     clear(ctx, root, 'src')
-    expect((await results(root, 2))[1]).toMatchObject({ cause: 'contaminated', reason: 'the reader read .dsh/sessions/mission.jsonl, outside the target or inside harness state' })
+    expect((await results(root, 2))[1]).toMatchObject({ cause: 'contaminated', reason: `the reader read ${live}, outside its worktree of the pinned commit` })
 
     subagents.scripts.push({
       calls: [
@@ -512,7 +547,7 @@ describe('hard-audit unavailable results', () => {
 
     subagents.scripts.push({ cwd: suiteRoot, calls: [{ name: 'glob', args: { pattern: '**/*' } }], structured: CLEAN_SRC })
     clear(ctx, root, 'src')
-    expect((await results(root, 4))[3]).toMatchObject({ cause: 'contaminated', reason: 'the reader read ., outside the target or inside harness state' })
+    expect((await results(root, 4))[3]).toMatchObject({ cause: 'contaminated', reason: 'the reader read ., outside its worktree of the pinned commit' })
   })
 
   it('refuses reports whose cited code does not resolve or lies outside the cell', async () => {
@@ -554,7 +589,7 @@ describe('hard-audit unavailable results', () => {
     const prompts = subagents.starts.map(start => start.prompt[0]?.type === 'text' ? start.prompt[0].text : '')
     expect(prompts[0]).toContain('in the files at the repository root (not its subdirectories).')
 
-    const plain = await harness({}, { targetRepo: plainRepo, commit: plainSha, modules: ['.', 'src'] })
+    const plain = await harness({}, { targetRepo: plainRepo, commit: plainSha, modules: ['.', 'src'], snapshot: { gitDir: plainSnapshot, kind: 'git' } })
     plain.subagents.scripts.push({ cwd: plainRepo, structured: { outcome: 'flagged', locations: [{ path: 'src/app.js', line: 3, symbol: 'runShell' }], examined: [], reason: 'repository-wide' } })
     clear(plain.ctx, plain.root, '.', 'dependencies')
     expect((await results(plain.root, 1))[0]).toMatchObject({ outcome: 'flagged', reason: 'repository-wide' })
@@ -594,21 +629,23 @@ describe('hard-audit unavailable results', () => {
   })
 
   it('reports a git failure as unavailable', async () => {
-    const { ctx, root } = await harness({}, { ...UNSCREENED, targetRepo: join(suiteRoot, 'missing') })
+    const { ctx, root } = await harness({}, { ...UNSCREENED, snapshot: { gitDir: join(suiteRoot, 'missing.git'), kind: 'git' } })
     clear(ctx, root, 'src')
     expect((await results(root, 1))[0]).toMatchObject({ outcome: 'unavailable', cause: 'git' })
   })
 
-  it('fails a truncated or unsettled workspace check closed', async () => {
+  it('fails a truncated or unsettled snapshot check closed', async () => {
     const { ctx, root, subagents } = await harness()
     const unsettled = { exitCode: 0, timedOut: false, aborted: false, stdout: { text: '', truncated: true }, stderr: { text: 'cut', truncated: false } }
     vi.spyOn(ctx.shell, 'execute').mockResolvedValueOnce({ result: () => Promise.resolve(unsettled) } as never)
     clear(ctx, root, 'src')
     expect((await results(root, 1))[0]).toMatchObject({ cause: 'git', reason: 'hard audit binary check did not settle: cut' })
     vi.restoreAllMocks()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     subagents.scripts.push({ structured: CLEAN_SRC, during: () => { vi.spyOn(ctx.shell, 'execute').mockRejectedValue(new Error('shell gone')) } })
     clear(ctx, root, 'src')
     expect((await results(root, 2))[1]).toMatchObject({ cause: 'git', reason: 'shell gone' })
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/could not remove the reader worktree .*: shell gone$/))
     vi.restoreAllMocks()
     subagents.scripts.push({ structured: CLEAN_SRC })
     vi.spyOn(ctx.hardVerifier, 'checkSinkCitations').mockRejectedValueOnce(new Error('citation git failed'))
@@ -892,19 +929,18 @@ describe('hard-audit reads', () => {
     expect(hardAudit.namedPaths('relative a/b only')).toEqual([])
   })
 
-  it('finds the first read outside the target, through symlinks and the home directory', async () => {
+  it('finds the first read outside the worktree, through symlinks and the home directory', async () => {
     const escape = join(targetRepo, 'escape-link')
     await symlink(suiteRoot, escape)
     try {
-      const scope = { cwd: targetRepo, targetRepo, stateDirs: [join(targetRepo, '.dsh')], ownOutputs: new Set<string>() }
+      const scope = { cwd: targetRepo, root: targetRepo, ownOutputs: new Set<string>() }
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: 'src/app.js' }, { tool: 'grep' }], scope)).toBeUndefined()
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: `${targetRepo}/src/app.js` }, { tool: 'read', path: 'escape-link/outside.txt' }], scope)).toBe('escape-link/outside.txt')
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: '~' }], scope)).toBe('~')
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: '~/x' }], scope)).toBe('~/x')
-      expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: '.dsh' }], scope)).toBe('.dsh')
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: outsideFile }], { ...scope, ownOutputs: new Set([outsideFile]) })).toBeUndefined()
       expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: 'missing/x' }], { ...scope, cwd: join(targetRepo, 'src') })).toBeUndefined()
-      expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: outsideFile }], { ...scope, targetRepo: '/' })).toBeUndefined()
+      expect(await hardAudit.firstContaminatingRead([{ tool: 'read', path: outsideFile }], { ...scope, root: '/' })).toBeUndefined()
     } finally {
       await rm(escape)
     }

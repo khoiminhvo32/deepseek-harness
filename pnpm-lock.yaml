@@ -8115,9 +8115,6 @@ importers:
       '@deepseek-ai/dsh-experimental-hard-verifier':
         specifier: workspace:*
         version: link:../hard-verifier
-      '@deepseek-ai/dsh-home-paths':
-        specifier: workspace:*
-        version: link:../../util/home-paths
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm

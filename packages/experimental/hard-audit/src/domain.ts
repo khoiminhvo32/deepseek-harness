@@ -23,11 +23,13 @@ export type HardAuditOutcome = 'corroborated' | 'flagged' | 'unavailable'
 /**
  * Why an audit produced no measurement: `budget` (the mission's audit budget
  * was spent), `superseded` (the cell was re-marked before the reader started),
- * `binary` (the module holds a binary the reader cannot read), `workspace-drift`
- * (the module differed from the pinned commit before or after the read),
- * `git` (a workspace check did not settle), `reader-failed` (the reader ended
- * without a structured report), `contaminated` (the reader read outside the
- * target or into harness state), and `citation` (the report cited code that
+ * `binary` (the module holds a binary the reader cannot read),
+ * `workspace-drift` (written only by builds whose reader shared the live
+ * target, which its edits could change during the read; never written now),
+ * `git` (the arming record names no harness snapshot, or a snapshot command
+ * did not settle), `reader-failed` (the reader ended
+ * without a structured report), `contaminated` (the reader read outside its
+ * worktree of the pinned commit), and `citation` (the report cited code that
  * does not exist at the pinned commit, or no code inside the cell).
  */
 export type HardAuditUnavailableCause =

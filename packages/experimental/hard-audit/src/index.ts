@@ -12,6 +12,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -23,18 +25,16 @@ import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-shell'
 import type { SubagentRun } from '@deepseek-ai/dsh-subagent'
-import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { cellSampledForPercent, classScope } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardCoverageMatrix } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type {} from '@deepseek-ai/dsh-experimental-hard-verifier'
-import { extensionOf, harnessStatePrefixes, INERT_EXTENSIONS } from '@deepseek-ai/dsh-experimental-hard-mission'
+import { extensionOf, INERT_EXTENSIONS } from '@deepseek-ai/dsh-experimental-hard-mission'
 import type {
   HardAuditLocation,
   HardAuditRequestedData,
   HardAuditResultData,
   HardAuditTier,
   HardAuditUnavailableCause,
-  HardAuditUsage,
 } from './domain.ts'
 import { auditCellKey, chargedAudits, hardAuditProjectionDefinition } from './projection.ts'
 import { parseReaderReport, READER_PERSONA, READER_REPORT_SCHEMA, readerPrompt } from './prompt.ts'
@@ -252,17 +252,20 @@ function shellQuote(value: string): string {
 }
 
 /**
- * The git pathspec covering one audited cell: the whole repository minus the
- * harness's own state for a repository-scoped class, the root files for the
- * root module, and the module directory otherwise.
+ * The git pathspec covering one audited cell: the whole snapshot for a
+ * repository-scoped class, the root files for the root module, and the
+ * module directory otherwise.
  */
-function cellPathspec(module: string, repoScoped: boolean, targetRepo: string): string {
-  if (repoScoped) {
-    return ['.', ...harnessStatePrefixes(targetRepo).map(prefix => `:(exclude)${prefix.slice(0, -1)}`)]
-      .map(shellQuote).join(' ')
-  }
+function cellPathspec(module: string, repoScoped: boolean): string {
+  if (repoScoped) return shellQuote('.')
   return shellQuote(module === '.' ? ':(glob)*' : module)
 }
+
+/**
+ * Git with the developer's global and system configuration switched off, so
+ * no user hook or attribute runs while the harness reads its snapshot.
+ */
+const HERMETIC_GIT = 'GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -c core.autocrlf=false'
 
 /** Whether one cited path names code inside the audited cell. */
 function inCell(path: string, module: string, repoScoped: boolean): boolean {
@@ -360,8 +363,8 @@ export function apply(ctx: Context, config: Config): void {
     return state
   }
 
-  /** Run one read-only git command in the target; a timeout, abort, or truncation throws. */
-  async function git(targetRepo: string, command: string, what: string): Promise<{ exitCode: number; stdout: string }> {
+  /** Run one git command in the target directory; a timeout, abort, or truncation throws. */
+  async function runGit(targetRepo: string, command: string, what: string): Promise<{ exitCode: number; stdout: string }> {
     const spec = ctx.shell.resolve({ command, timeoutMs: resolved.gitTimeoutMs, stdoutMaxBytes: GIT_STDOUT_MAX_BYTES, workdir: targetRepo })
     const result = await (await ctx.shell.execute(spec)).result()
     if (result.timedOut || result.aborted || result.exitCode === null || result.stdout.truncated) {
@@ -371,11 +374,11 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   /** The binary files of one cell at the pinned commit that are not inert. */
-  async function binaryFiles(matrix: HardCoverageMatrix, pathspec: string): Promise<string[]> {
-    const repo = shellQuote(matrix.targetRepo)
-    const { exitCode, stdout } = await git(
+  async function binaryFiles(matrix: HardCoverageMatrix, gitDir: string, pathspec: string): Promise<string[]> {
+    const git = `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)}`
+    const { exitCode, stdout } = await runGit(
       matrix.targetRepo,
-      `git -C ${repo} diff --numstat --no-renames --no-textconv --no-ext-diff "$(git -C ${repo} hash-object -t tree /dev/null)" ${shellQuote(matrix.commit)} -- ${pathspec}`,
+      `${git} diff --numstat --no-renames --no-textconv --no-ext-diff "$(${git} hash-object -t tree /dev/null)" ${shellQuote(matrix.commit)} -- ${pathspec}`,
       'binary check',
     )
     if (exitCode !== 0) throw new HarnessError(`hard audit binary check failed with exit ${exitCode}`, 'HARD_AUDIT_GIT_FAILED')
@@ -385,17 +388,34 @@ export function apply(ctx: Context, config: Config): void {
       .filter(path => !INERT_EXTENSIONS.has(extensionOf(path)))
   }
 
-  /** Whether the working tree of one cell differs from the pinned commit, untracked files included. */
-  async function cellDrifted(matrix: HardCoverageMatrix, pathspec: string): Promise<boolean> {
-    const repo = shellQuote(matrix.targetRepo)
-    const status = await git(matrix.targetRepo, `git -C ${repo} status --porcelain --untracked-files=all -- ${pathspec}`, 'status check')
-    /* v8 ignore next -- defensive: the binary check already read this repository; status fails only on a repository fault. */
-    if (status.exitCode !== 0) throw new HarnessError(`hard audit status check failed with exit ${status.exitCode}`, 'HARD_AUDIT_GIT_FAILED')
-    if (status.stdout.trim().length > 0) return true
-    const diff = await git(matrix.targetRepo, `git -C ${repo} diff --quiet ${shellQuote(matrix.commit)} -- ${pathspec}`, 'diff check')
-    /* v8 ignore next -- defensive: the binary check already read this commit; diff fails only on a repository fault. */
-    if (diff.exitCode !== 0 && diff.exitCode !== 1) throw new HarnessError(`hard audit diff check failed with exit ${diff.exitCode}`, 'HARD_AUDIT_GIT_FAILED')
-    return diff.exitCode === 1
+  /**
+   * Check the pinned commit out of the snapshot into a fresh temporary
+   * worktree: the reader's whole world, holding exactly the pinned content —
+   * no PoC, no later edit, no harness state.
+   */
+  async function addWorktree(matrix: HardCoverageMatrix, gitDir: string): Promise<string> {
+    const parent = await mkdtemp(join(tmpdir(), 'dsh-hard-audit-'))
+    const tree = join(parent, 'tree')
+    const { exitCode } = await runGit(
+      matrix.targetRepo,
+      `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} worktree add --detach --quiet ${shellQuote(tree)} ${shellQuote(matrix.commit)}`,
+      'worktree add',
+    )
+    if (exitCode !== 0) {
+      await rm(parent, { recursive: true, force: true })
+      throw new HarnessError(`hard audit worktree add failed with exit ${exitCode}`, 'HARD_AUDIT_GIT_FAILED')
+    }
+    return tree
+  }
+
+  /** Remove one reader worktree and its registration; a failure is reported, never raised. */
+  async function removeWorktree(matrix: HardCoverageMatrix, gitDir: string, tree: string): Promise<void> {
+    try {
+      await runGit(matrix.targetRepo, `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} worktree remove --force ${shellQuote(tree)}`, 'worktree remove')
+    } catch (error: unknown) {
+      ctx.logger.warn(`hard-audit: could not remove the reader worktree ${tree}: ${errorText(error)}`)
+    }
+    await rm(join(tree, '..'), { recursive: true, force: true })
   }
 
   /** Spawn the reader and wait for it to settle, cancelling it at the time budget. */
@@ -403,6 +423,7 @@ export function apply(ctx: Context, config: Config): void {
     agent: Agent,
     request: HardAuditRequestedData,
     matrix: HardCoverageMatrix,
+    tree: string,
     observation: ReaderObservation,
     signal: AbortSignal,
   ): Promise<{ run: SubagentRun; result: Awaited<SubagentRun['result']> }> {
@@ -419,7 +440,7 @@ export function apply(ctx: Context, config: Config): void {
             module: request.module,
             bugClass: request.bugClass,
             repoScoped: classScope(request.bugClass) === 'repo',
-            targetRepo: matrix.targetRepo,
+            targetRepo: tree,
             commit: matrix.commit,
           }),
         }],
@@ -431,6 +452,7 @@ export function apply(ctx: Context, config: Config): void {
         maxDepth: 1,
         toolFilter: { allow: [...resolved.readerTools] },
         persona: READER_PERSONA,
+        cwd: tree,
       })
       try {
         return { run, result: await run.result }
@@ -475,11 +497,16 @@ export function apply(ctx: Context, config: Config): void {
     const matrix = ctx.hardLedger.coverageMatrix(agent)
     /* v8 ignore next -- defensive: a request is only recorded over an armed matrix, and arming is never undone. */
     if (matrix === undefined) return unavailable('git', 'no armed coverage matrix pins the target')
-    const pathspec = cellPathspec(request.module, classScope(request.bugClass) === 'repo', matrix.targetRepo)
+    const snapshot = matrix.snapshot
+    if (snapshot === undefined) {
+      return unavailable('git', 'the arming record predates harness snapshots, so no pristine copy of the target exists to read')
+    }
+    const pathspec = cellPathspec(request.module, classScope(request.bugClass) === 'repo')
+    let tree: string
     try {
-      const binaries = await binaryFiles(matrix, pathspec)
+      const binaries = await binaryFiles(matrix, snapshot.gitDir, pathspec)
       if (binaries.length > 0) return unavailable('binary', `binary module, no decompiler tool: ${binaries.slice(0, 5).join(', ')}`)
-      if (await cellDrifted(matrix, pathspec)) return unavailable('workspace-drift', 'module differs from pinned commit before the read')
+      tree = await addWorktree(matrix, snapshot.gitDir)
     } catch (error: unknown) {
       return unavailable('git', errorText(error))
     }
@@ -490,48 +517,41 @@ export function apply(ctx: Context, config: Config): void {
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     }
     let reader: Awaited<ReturnType<typeof runReader>>
+    let contaminating: string | undefined
     try {
-      reader = await runReader(agent, request, matrix, observation, signal)
-    } catch (error: unknown) {
+      try {
+        reader = await runReader(agent, request, matrix, tree, observation, signal)
+      } catch (error: unknown) {
+        if (signal.aborted) return undefined
+        return unavailable('reader-failed', `the reader could not run: ${errorText(error)}`)
+      }
+      try {
+        await reader.run.dispose()
+      } finally {
+        readers.delete(reader.run.id)
+      }
       if (signal.aborted) return undefined
-      return unavailable('reader-failed', `the reader could not run: ${errorText(error)}`)
+      // Checked while the worktree exists, so symlinks inside it still resolve.
+      contaminating = await firstContaminatingRead(observation.accesses, {
+        cwd: reader.run.localAgent?.session.header.cwd ?? tree,
+        root: tree,
+        ownOutputs: observation.ownOutputs,
+      })
+    } finally {
+      await removeWorktree(matrix, snapshot.gitDir, tree)
     }
     const { run, result } = reader
     const child = run.localAgent
-    const cwd = child?.session.header.cwd
-    try {
-      await run.dispose()
-    } finally {
-      readers.delete(run.id)
-    }
-    if (signal.aborted) return undefined
-    const usage: HardAuditUsage = { ...observation.usage }
     const ran: Partial<HardAuditResultData> = {
       auditor: { provider: child?.options.provider ?? 'default', model: child?.options.model ?? 'default' },
       childSession: run.id,
-      usage,
+      usage: { ...observation.usage },
     }
-
-    try {
-      if (await cellDrifted(matrix, pathspec)) return unavailable('workspace-drift', 'module differs from pinned commit after the read', ran)
-    } catch (error: unknown) {
-      return unavailable('git', errorText(error), ran)
-    }
-    if (child === undefined || cwd === undefined) {
+    if (child === undefined) {
       return unavailable('reader-failed', 'the reader ran outside this process, so its reads cannot be checked', ran)
     }
-    const stateDirs = [
-      ...harnessStatePrefixes(matrix.targetRepo).map(prefix => join(matrix.targetRepo, prefix)),
-      resolveDshHome(),
-    ]
-    const contaminating = await firstContaminatingRead(observation.accesses, {
-      cwd,
-      targetRepo: matrix.targetRepo,
-      stateDirs,
-      ownOutputs: observation.ownOutputs,
-    })
     if (contaminating !== undefined) {
-      return unavailable('contaminated', `the reader read ${contaminating}, outside the target or inside harness state`, ran)
+      return unavailable('contaminated', `the reader read ${contaminating}, outside its worktree of the pinned commit`, ran)
     }
     const report = result.stopReason === 'completed' ? parseReaderReport(result.structured) : undefined
     if (report === undefined) {

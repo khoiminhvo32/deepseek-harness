@@ -12320,7 +12320,7 @@
       "kind": "event",
       "event": "hard/mission/armed",
       "surface": false,
-      "digest": "b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6",
+      "digest": "bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517",
       "schema": {
         "root": 0,
         "nodes": [
@@ -12334,7 +12334,7 @@
               },
               {
                 "name": "ignorable",
-                "type": 6,
+                "type": 13,
                 "optional": true
               },
               {
@@ -12349,7 +12349,7 @@
               },
               {
                 "name": "type",
-                "type": 7,
+                "type": 14,
                 "optional": false
               }
             ],
@@ -12399,6 +12399,11 @@
                 "optional": false
               },
               {
+                "name": "snapshot",
+                "type": 6,
+                "optional": true
+              },
+              {
                 "name": "targetRepo",
                 "type": 3,
                 "optional": false
@@ -12443,6 +12448,67 @@
           {
             "kind": "primitive",
             "type": "number"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "gitDir",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "origin",
+                "type": 11,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              8,
+              9,
+              10
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "directory"
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "literal",
+            "value": "git"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "commit",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "dirty",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
           },
           {
             "kind": "literal",
@@ -25965,7 +26031,7 @@
         "packages/subagent/tool-subagent/src/model-selection.ts#AllowedModelRoute"
       ],
       "sources": [
-        "packages/experimental/hard-audit/src/domain.ts:84",
+        "packages/experimental/hard-audit/src/domain.ts:86",
         "packages/session/session-title/src/types.ts:20",
         "packages/subagent/tool-subagent/src/model-selection.ts:9"
       ]
@@ -25982,6 +26048,11 @@
     },
     {
       "digest": "085fbb015287e092e87ab58e64685fe2d574000277c58ee647ca54f04d4fcc8f",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "0936a3285c037f8ca4b1ae50aba7f8b83bdc9f8539cced11ae239df11a8baf8c",
       "names": [],
       "sources": []
     },
@@ -26587,6 +26658,11 @@
       "sources": []
     },
     {
+      "digest": "2632bbc6025296d835e448b4f0f5c956c3ecbd747cc86cf7bffc3cf14f2b40f0",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "2666f151867f2f5ff5b8a6f41129f4c2eb73568e0dad8e6065b72796d8d78ab8",
       "names": [],
       "sources": []
@@ -26675,7 +26751,7 @@
         "packages/experimental/hard-audit/src/domain.ts#HardAuditLocation"
       ],
       "sources": [
-        "packages/experimental/hard-audit/src/domain.ts:53"
+        "packages/experimental/hard-audit/src/domain.ts:55"
       ]
     },
     {
@@ -28030,15 +28106,6 @@
       ]
     },
     {
-      "digest": "7777f85ae019e4df8a2ddfc4bea98a9ddb6623dc8ef6ccc4f29a4068d5042e21",
-      "names": [
-        "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
-      ],
-      "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:290"
-      ]
-    },
-    {
       "digest": "77f83914f9fe917b255099fd191f39b898cd9231b02612a5a7b1fa2bc04ecf1d",
       "names": [],
       "sources": []
@@ -28312,7 +28379,14 @@
         "packages/experimental/hard-audit/src/domain.ts#HardAuditRequestedData"
       ],
       "sources": [
-        "packages/experimental/hard-audit/src/domain.ts:44"
+        "packages/experimental/hard-audit/src/domain.ts:46"
+      ]
+    },
+    {
+      "digest": "84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:306"
       ]
     },
     {
@@ -28867,7 +28941,7 @@
         "packages/experimental/hard-audit/src/domain.ts#HardAuditResultData"
       ],
       "sources": [
-        "packages/experimental/hard-audit/src/domain.ts:69"
+        "packages/experimental/hard-audit/src/domain.ts:71"
       ]
     },
     {
@@ -29016,6 +29090,15 @@
       "digest": "aba175fb20ffc71112c55efe70458ff5d7dbfb83501892b4ba8d077f0ea5d7ba",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "ac21a9facd8522b678b0d130c362a1e5a267695b3e2aaf93153d3d9409be4498",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:315"
+      ]
     },
     {
       "digest": "ad0c38a0adb82a94c925456df41586d9b5f9202fca18593eae2213d4445b4585",
@@ -29287,11 +29370,6 @@
       ]
     },
     {
-      "digest": "b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "b8fc636a2121df9d8423c242e03c9d23b7ab7c6fdce00e45746932c60b730f97",
       "names": [
         "packages/deliverables/tool-present/src/types.ts#PresentedFile"
@@ -29351,6 +29429,11 @@
     },
     {
       "digest": "bb1ab3d08f49a9f3b265f844cd78d5c49813062a7b34b54904b426f85d0ff6e3",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517",
       "names": [],
       "sources": []
     },
@@ -29633,6 +29716,15 @@
       "digest": "d3132fc64b2234ebffeaa5c4d09e5e19f994ecccd1e87a150849f26967fa2d4f",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "d47ad4a8dc92359da3b9df16b5bafb57b7f2df030c5f27f4c3d023ababbdf089",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardTargetSnapshot"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:296"
+      ]
     },
     {
       "digest": "d4b739491689cc6bb13d07ffac1a32239875abda364c0d5edd8f74faf5e9c00d",
@@ -30252,7 +30344,7 @@
         "packages/experimental/hard-audit/src/domain.ts#HardAuditUsage"
       ],
       "sources": [
-        "packages/experimental/hard-audit/src/domain.ts:61"
+        "packages/experimental/hard-audit/src/domain.ts:63"
       ]
     },
     {

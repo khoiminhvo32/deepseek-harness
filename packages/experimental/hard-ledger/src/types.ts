@@ -286,14 +286,52 @@ export interface HardMatrixExclusions {
   readonly sample: readonly string[]
 }
 
+/**
+ * The harness-owned snapshot the pinned commit lives in. Every target — a git
+ * repository, a plain directory, or one file such as a shared library — is
+ * captured into a git repository the harness owns outside the target, so the
+ * matrix, citations, and the independent reader resolve against content
+ * nobody can change after arming, whatever the target is.
+ */
+export interface HardTargetSnapshot {
+  /** Absolute path of the harness-owned git directory holding the snapshot commit. */
+  readonly gitDir: string
+  /**
+   * What the target was: a git work tree (tracked files plus untracked files
+   * its ignore rules keep), a plain directory (everything its ignore files
+   * keep), or one file.
+   */
+  readonly kind: 'git' | 'directory' | 'file'
+  /** The target's own HEAD at arm time, when the target is a git work tree with commits. */
+  readonly origin?: {
+    /** Full sha of the target's HEAD. */
+    readonly commit: string
+    /** Whether the work tree differed from HEAD, so the snapshot holds changes HEAD lacks. */
+    readonly dirty: boolean
+  }
+}
+
 /** Mission arming record: the pinned target and the coverage matrix axes. */
 export interface HardMissionArmedData {
   /** The durable objective the armed goal carries. */
   readonly objective: string
-  /** Absolute path of the target repository the modules enumerate. */
+  /**
+   * Absolute path of the directory the modules enumerate and PoCs run in: the
+   * target itself, or the directory holding a single-file target.
+   */
   readonly targetRepo: string
-  /** Full commit sha the enumeration pinned at arm time, never a ref. */
+  /**
+   * Full commit sha the enumeration pinned at arm time, never a ref: the
+   * snapshot commit when `snapshot` is present, otherwise a commit of the
+   * target repository itself.
+   */
   readonly commit: string
+  /**
+   * Where the pinned commit lives. Optional so the change is additive;
+   * absent, the commit belongs to the target repository's own git, which is
+   * how older records were pinned.
+   */
+  readonly snapshot?: HardTargetSnapshot
   /** Sorted, deduplicated module names — the coverage matrix rows. */
   readonly modules: readonly string[]
   /** Bug class names swept in the systematic pass — the coverage matrix columns. */

@@ -47,7 +47,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:hard/flow/doc` | event | `01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5` | [`{ type: "hard/flow/doc" }`](#persistence-type-sha256-01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5) |
 | `event:hard/gate/decision` | event | `73c3f056eb86f03647a688becfbfd75a3976b31a6faf98077b23005e14256e82` | [`{ type: "hard/gate/decision" }`](#persistence-type-sha256-73c3f056eb86f03647a688becfbfd75a3976b31a6faf98077b23005e14256e82) |
 | `event:hard/hypothesis/state` | event | `b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1` | [`{ type: "hard/hypothesis/state" }`](#persistence-type-sha256-b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1) |
-| `event:hard/mission/armed` | event | `b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6` | [`{ type: "hard/mission/armed" }`](#persistence-type-sha256-b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6) |
+| `event:hard/mission/armed` | event | `bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517` | [`{ type: "hard/mission/armed" }`](#persistence-type-sha256-bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517) |
 | `event:hard/round/end` | event | `9c8583a2e073f7ddb70f3ae373b1916e1c75f9c7e338078bd09b3a59df203cfc` | [`{ type: "hard/round/end" }`](#persistence-type-sha256-9c8583a2e073f7ddb70f3ae373b1916e1c75f9c7e338078bd09b3a59df203cfc) |
 | `event:hard/round/start` | event | `ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c` | [`{ type: "hard/round/start" }`](#persistence-type-sha256-ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c) |
 | `event:hard/standby/scheduled` | event | `7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f` | [`{ type: "hard/standby/scheduled" }`](#persistence-type-sha256-7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f) |
@@ -584,7 +584,7 @@ Source: [`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain
 'hard/audit/requested': HardAuditRequestedData
 ```
 
-Source: [`packages/experimental/hard-audit/src/domain.ts:97`](../packages/experimental/hard-audit/src/domain.ts)
+Source: [`packages/experimental/hard-audit/src/domain.ts:99`](../packages/experimental/hard-audit/src/domain.ts)
 
 <a id="hardauditresult--log-only"></a>
 
@@ -595,7 +595,7 @@ Source: [`packages/experimental/hard-audit/src/domain.ts:97`](../packages/experi
 'hard/audit/result': HardAuditResultData
 ```
 
-Source: [`packages/experimental/hard-audit/src/domain.ts:99`](../packages/experimental/hard-audit/src/domain.ts)
+Source: [`packages/experimental/hard-audit/src/domain.ts:101`](../packages/experimental/hard-audit/src/domain.ts)
 
 <a id="hardcoveragecell--log-only"></a>
 
@@ -2032,6 +2032,14 @@ SHA-256: `589d0d91239681f89ee485459dc8c2f73ea47183b5534289d966637024a2c35d`
 SHA-256: `1379f0b72275994d20f1ddca2d60a96ab16ec80397ca9f1af21bdc67ba5c269c`
 
 `"developer/message"`
+
+<a id="persistence-type-sha256-2632bbc6025296d835e448b4f0f5c956c3ecbd747cc86cf7bffc3cf14f2b40f0"></a>
+
+### `"directory"`
+
+SHA-256: `2632bbc6025296d835e448b4f0f5c956c3ecbd747cc86cf7bffc3cf14f2b40f0`
+
+`"directory"`
 
 <a id="persistence-type-sha256-26c879bdd130e8b8683a6ce588414fad2244783d6573ca399fa0de184a2b0bb1"></a>
 
@@ -4218,7 +4226,7 @@ Sources: [`packages/goal/goal/src/domain.ts:24`](../packages/goal/goal/src/domai
 
 SHA-256: `2addc9baa622d232b3fdb4cda106c73e595d721d0dd4f9bc588d2aee70e75448`
 
-Sources: [`packages/experimental/hard-audit/src/domain.ts:53`](../packages/experimental/hard-audit/src/domain.ts)
+Sources: [`packages/experimental/hard-audit/src/domain.ts:55`](../packages/experimental/hard-audit/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4262,7 +4270,7 @@ One of:
 
 SHA-256: `84cdd516babce69e89a543b1905f6e099cdc2a2c0899648c56b8c367d677da74`
 
-Sources: [`packages/experimental/hard-audit/src/domain.ts:44`](../packages/experimental/hard-audit/src/domain.ts)
+Sources: [`packages/experimental/hard-audit/src/domain.ts:46`](../packages/experimental/hard-audit/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4281,7 +4289,7 @@ Sources: [`packages/experimental/hard-audit/src/domain.ts:44`](../packages/exper
 
 SHA-256: `a61e95ac9266c2fc8fdf0faaebbf45d0508fa36e50a9e4e8022e97245800f578`
 
-Sources: [`packages/experimental/hard-audit/src/domain.ts:69`](../packages/experimental/hard-audit/src/domain.ts)
+Sources: [`packages/experimental/hard-audit/src/domain.ts:71`](../packages/experimental/hard-audit/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4325,7 +4333,7 @@ One of:
 
 SHA-256: `fa80bf911cc0d0860b793055a3c9a23fb8c086c907112e60e8d76193c4b5c69d`
 
-Sources: [`packages/experimental/hard-audit/src/domain.ts:61`](../packages/experimental/hard-audit/src/domain.ts)
+Sources: [`packages/experimental/hard-audit/src/domain.ts:63`](../packages/experimental/hard-audit/src/domain.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4543,7 +4551,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:280`](../packages/expe
 | `globs` | required | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
 | `sample` | required | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
 
-<a id="persistence-type-sha256-7777f85ae019e4df8a2ddfc4bea98a9ddb6623dc8ef6ccc4f29a4068d5042e21"></a>
+<a id="persistence-type-sha256-ac21a9facd8522b678b0d130c362a1e5a267695b3e2aaf93153d3d9409be4498"></a>
 
 <a id="persistence-type-hardmissionarmeddata"></a>
 
@@ -4551,9 +4559,9 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:280`](../packages/expe
 
 ### `HardMissionArmedData`
 
-SHA-256: `7777f85ae019e4df8a2ddfc4bea98a9ddb6623dc8ef6ccc4f29a4068d5042e21`
+SHA-256: `ac21a9facd8522b678b0d130c362a1e5a267695b3e2aaf93153d3d9409be4498`
 
-Sources: [`packages/experimental/hard-ledger/src/types.ts:290`](../packages/experimental/hard-ledger/src/types.ts)
+Sources: [`packages/experimental/hard-ledger/src/types.ts:315`](../packages/experimental/hard-ledger/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4565,6 +4573,7 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:290`](../packages/expe
 | `inertModules` | optional | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
 | `modules` | required | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
 | `objective` | required | `string` |
+| `snapshot` | optional | [`HardTargetSnapshot`](#persistence-type-sha256-d47ad4a8dc92359da3b9df16b5bafb57b7f2df030c5f27f4c3d023ababbdf089) |
 | `targetRepo` | required | `string` |
 | `unscreenedModules` | optional | [`string[]`](#persistence-type-sha256-93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2) |
 
@@ -4714,6 +4723,24 @@ Sources: [`packages/experimental/hard-ledger/src/types.ts:211`](../packages/expe
 | `emptyProofRef` | optional | [`union (2 variants)`](#persistence-type-sha256-0eecb2e0ecda7b6a0db8ce559417539f478306554212de072aaab4f8d51a8ab9) |
 | `newFindings` | required | `number` |
 | `phase` | required | [`HardRoundPhase`](#persistence-type-sha256-a9b6d36aad467449d95bb0a233117a294225a32085503d2bbc1c353e391663d1) |
+
+<a id="persistence-type-sha256-d47ad4a8dc92359da3b9df16b5bafb57b7f2df030c5f27f4c3d023ababbdf089"></a>
+
+<a id="persistence-type-hardtargetsnapshot"></a>
+
+<a id="persistence-type-packagesexperimentalhard-ledgersrctypestshardtargetsnapshot"></a>
+
+### `HardTargetSnapshot`
+
+SHA-256: `d47ad4a8dc92359da3b9df16b5bafb57b7f2df030c5f27f4c3d023ababbdf089`
+
+Sources: [`packages/experimental/hard-ledger/src/types.ts:296`](../packages/experimental/hard-ledger/src/types.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `gitDir` | required | `string` |
+| `kind` | required | [`union (3 variants)`](#persistence-type-sha256-0936a3285c037f8ca4b1ae50aba7f8b83bdc9f8539cced11ae239df11a8baf8c) |
+| `origin` | optional | [`{ commit, dirty }`](#persistence-type-sha256-84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557) |
 
 <a id="persistence-type-sha256-6b31cdcac586a23663ae42cbadfab0862ae3d64f020099fb945d09975c7804ca"></a>
 
@@ -5736,7 +5763,7 @@ Sources: [`packages/session/session-title-llm/src/index.ts:34`](../packages/sess
 
 SHA-256: `07e1a58c58b593f507b8e7f25723bb0aa42baae6e00f5ecfddf28cb1e64d3235`
 
-Sources: [`packages/experimental/hard-audit/src/domain.ts:84`](../packages/experimental/hard-audit/src/domain.ts) · [`packages/session/session-title/src/types.ts:20`](../packages/session/session-title/src/types.ts) · [`packages/subagent/tool-subagent/src/model-selection.ts:9`](../packages/subagent/tool-subagent/src/model-selection.ts)
+Sources: [`packages/experimental/hard-audit/src/domain.ts:86`](../packages/experimental/hard-audit/src/domain.ts) · [`packages/session/session-title/src/types.ts:20`](../packages/session/session-title/src/types.ts) · [`packages/subagent/tool-subagent/src/model-selection.ts:9`](../packages/subagent/tool-subagent/src/model-selection.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6734,6 +6761,18 @@ One of:
 - `"closed"`
 - `"step-cap"`
 
+<a id="persistence-type-sha256-0936a3285c037f8ca4b1ae50aba7f8b83bdc9f8539cced11ae239df11a8baf8c"></a>
+
+### `union (3 variants)`
+
+SHA-256: `0936a3285c037f8ca4b1ae50aba7f8b83bdc9f8539cced11ae239df11a8baf8c`
+
+One of:
+
+- `"directory"`
+- `"file"`
+- `"git"`
+
 <a id="persistence-type-sha256-21fea18c367d0e2e0e4b20622f4db712235ad63e8dbb228ffd0400a78d863bf3"></a>
 
 ### `union (3 variants)`
@@ -7103,6 +7142,19 @@ Sources: [`packages/interaction/commands/src/types.ts:112`](../packages/interact
 | `kind` | required | [`union (2 variants)`](#persistence-type-sha256-1ab2ef1296f157ba96998f179bb5daa9d21a82480da2901127aeab2730797c92) |
 | `sourceEventSeq` | optional | `number` |
 | `text` | optional | `string` |
+
+<a id="persistence-type-sha256-84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557"></a>
+
+### `{ commit, dirty }`
+
+SHA-256: `84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557`
+
+Sources: [`packages/experimental/hard-ledger/src/types.ts:306`](../packages/experimental/hard-ledger/src/types.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `commit` | required | `string` |
+| `dirty` | required | `boolean` |
 
 <a id="persistence-type-sha256-ca59530d1a4f3e191b4032bc4a20eded0d827db8b5a7efb27b3af9e9b456c6f2"></a>
 
@@ -9875,17 +9927,17 @@ SHA-256: `b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1`
 | `time` | required | `number` |
 | `type` | required | `"hard/hypothesis/state"` |
 
-<a id="persistence-type-sha256-b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6"></a>
+<a id="persistence-type-sha256-bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517"></a>
 
 <a id="persistence-type-eventhardmissionarmed"></a>
 
 ### `{ type: "hard/mission/armed" }`
 
-SHA-256: `b849266f726df8bf4c85bf3443d3f695d1dcc9da8aaec961419bfe36d3c7ced6`
+SHA-256: `bb1d804db3f09ab543cf85193e4d0634cec45e5c001d1973900ea52b9b873517`
 
 | Property | Presence | Type |
 |---|---|---|
-| `data` | required | [`HardMissionArmedData`](#persistence-type-sha256-7777f85ae019e4df8a2ddfc4bea98a9ddb6623dc8ef6ccc4f29a4068d5042e21) |
+| `data` | required | [`HardMissionArmedData`](#persistence-type-sha256-ac21a9facd8522b678b0d130c362a1e5a267695b3e2aaf93153d3d9409be4498) |
 | `ignorable` | optional | `true` |
 | `seq` | required | `number` |
 | `time` | required | `number` |

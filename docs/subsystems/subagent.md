@@ -24,7 +24,8 @@ A provider advertises its **start-time** features on a static descriptor the ser
  * continuable children are composed by the continuation manager itself and are
  * gated by {@link SubagentProvider.prepareContinuable} instead. Each flag
  * corresponds one-to-one to a {@link SubagentStartRequest} option: `depthLimit`
- * to `maxDepth`; the other names match.
+ * to `maxDepth`; the other names match. `cwd` is optional so providers that
+ * predate it need no change: absent means unsupported.
  */
 interface SubagentCapabilities {
   readonly agentOptions: boolean
@@ -32,12 +33,13 @@ interface SubagentCapabilities {
   readonly depthLimit: boolean
   readonly toolFilter: boolean
   readonly persona: boolean
+  readonly cwd?: boolean
 }
 ```
 
 ## The one-shot start request
 
-The tool layer builds this request from the model input and its own config; the service validates it against the named provider before `start`. Required `parent` supplies the session cwd, lineage, and delegation depth. Optional Agent provider, model, reasoning-effort, and token overrides, output schema, depth, tool filter, and persona require matching capability flags. In-process backends merge `agentOptions` over the parent Agent's options, scope filters and personas to child creation, and implement the supported object-rooted schema with a forced capture tool. The DSH SDK backend merges the four Agent route fields over its instance defaults and validates them in the child runtime's initialization; ACP, Codex, and Claude Code reject `agentOptions` before starting their transports.
+The tool layer builds this request from the model input and its own config; the service validates it against the named provider before `start`. Required `parent` supplies the session cwd, lineage, and delegation depth. Optional Agent provider, model, reasoning-effort, and token overrides, output schema, depth, tool filter, persona, and an absolute `cwd` replacing the parent's working directory require matching capability flags; `cwd` is an optional flag, so a provider that predates it refuses the option. In-process backends merge `agentOptions` over the parent Agent's options, scope filters and personas to child creation, and implement the supported object-rooted schema with a forced capture tool. The DSH SDK backend merges the four Agent route fields over its instance defaults and validates them in the child runtime's initialization; ACP, Codex, and Claude Code reject `agentOptions` before starting their transports.
 
 ```ts type-equiv
 /**
@@ -103,6 +105,15 @@ interface SubagentStartRequest {
    * persona (strict `{{…}}` interpolation against the registered variables).
    */
   readonly persona?: string
+  /**
+   * Optional absolute working directory for the child, replacing the parent
+   * session's. Requires {@link SubagentCapabilities.cwd}; rejected at start
+   * otherwise. In-process backends record it as the child session's cwd, so
+   * the child's relative paths, file tools, and prompt resolve against it.
+   * The child still runs in the parent's process and sandbox; the directory
+   * changes where it reads, not what it may reach.
+   */
+  readonly cwd?: string
 }
 ```
 

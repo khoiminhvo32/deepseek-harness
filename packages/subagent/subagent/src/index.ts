@@ -28,6 +28,7 @@
  *
  * @module @deepseek-ai/dsh-subagent
  */
+import { isAbsolute } from 'node:path'
 import type { Volatile } from '@deepseek-ai/cordis'
 
 import { Context } from '@deepseek-ai/cordis'
@@ -558,6 +559,9 @@ export class SubagentRuntime extends TypertRemoteService {
     const provider = this.expectProvider(name)
     this.assertCapabilities(provider, request)
     assertSubagentMaxDepth(request.maxDepth)
+    if (request.cwd !== undefined && !isAbsolute(request.cwd)) {
+      throw new SubagentError('subagent cwd must be an absolute path', 'INVALID_CWD')
+    }
     if (request.outputSchema !== undefined) assertObjectJsonSchema(request.outputSchema)
     const descriptor = snapshotSubagentDescriptor({
       mode: 'one-shot',
@@ -646,6 +650,7 @@ export class SubagentRuntime extends TypertRemoteService {
       { when: request.maxDepth !== undefined, cap: 'depthLimit' },
       { when: request.toolFilter !== undefined, cap: 'toolFilter' },
       { when: request.persona !== undefined, cap: 'persona' },
+      { when: request.cwd !== undefined, cap: 'cwd' },
     ]
     for (const { when, cap } of needs) {
       if (when && !provider.capabilities[cap]) {

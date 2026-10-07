@@ -5691,11 +5691,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardMissionArmedData',
-    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly unscreenedModules?: readonly string[];\n    readonly exclusions?: HardMatrixExclusions;\n    readonly ignoredEntryCount?: number;\n    readonly goalId?: string;\n}',
+    declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly snapshot?: HardTargetSnapshot;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly unscreenedModules?: readonly string[];\n    readonly exclusions?: HardMatrixExclusions;\n    readonly ignoredEntryCount?: number;\n    readonly goalId?: string;\n}',
   },
   {
     name: 'HardSweepSummaryData',
     declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n    readonly emptyProofRef?: HardEmptySweepProof;\n    readonly emptyProofFlowDoc?: string;\n}',
+  },
+  {
+    name: 'HardTargetSnapshot',
+    declaration: 'export interface HardTargetSnapshot {\n    readonly gitDir: string;\n    readonly kind: \'git\' | \'directory\' | \'file\';\n    readonly origin?: {\n        readonly commit: string;\n        readonly dirty: boolean;\n    };\n}',
   },
   {
     name: 'HardVerdict',
@@ -7727,7 +7731,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentCapabilities',
-    declaration: 'export interface SubagentCapabilities {\n    readonly agentOptions: boolean;\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n}',
+    declaration: 'export interface SubagentCapabilities {\n    readonly agentOptions: boolean;\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n    readonly cwd?: boolean;\n}',
   },
   {
     name: 'SubagentCatalogEntry',
@@ -7807,7 +7811,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentStartRequest',
-    declaration: 'export interface SubagentStartRequest {\n    readonly label?: string;\n    readonly prompt: ContentBlock[];\n    readonly parent: Agent;\n    readonly signal: AbortSignal;\n    readonly agentOptions?: AgentOptions;\n    readonly outputSchema?: ObjectJsonSchema;\n    readonly maxDepth?: number;\n    readonly toolFilter?: ToolRestriction;\n    readonly persona?: string;\n}',
+    declaration: 'export interface SubagentStartRequest {\n    readonly label?: string;\n    readonly prompt: ContentBlock[];\n    readonly parent: Agent;\n    readonly signal: AbortSignal;\n    readonly agentOptions?: AgentOptions;\n    readonly outputSchema?: ObjectJsonSchema;\n    readonly maxDepth?: number;\n    readonly toolFilter?: ToolRestriction;\n    readonly persona?: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'SubagentStopReason',

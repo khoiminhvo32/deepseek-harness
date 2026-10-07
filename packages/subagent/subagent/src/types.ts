@@ -125,7 +125,8 @@ export interface SubagentRunEndInfo {
  * continuable children are composed by the continuation manager itself and are
  * gated by {@link SubagentProvider.prepareContinuable} instead. Each flag
  * corresponds one-to-one to a {@link SubagentStartRequest} option: `depthLimit`
- * to `maxDepth`; the other names match.
+ * to `maxDepth`; the other names match. `cwd` is optional so providers that
+ * predate it need no change: absent means unsupported.
  */
 export interface SubagentCapabilities {
   readonly agentOptions: boolean
@@ -133,6 +134,7 @@ export interface SubagentCapabilities {
   readonly depthLimit: boolean
   readonly toolFilter: boolean
   readonly persona: boolean
+  readonly cwd?: boolean
 }
 
 /**
@@ -198,6 +200,15 @@ export interface SubagentStartRequest {
    * persona (strict `{{…}}` interpolation against the registered variables).
    */
   readonly persona?: string
+  /**
+   * Optional absolute working directory for the child, replacing the parent
+   * session's. Requires {@link SubagentCapabilities.cwd}; rejected at start
+   * otherwise. In-process backends record it as the child session's cwd, so
+   * the child's relative paths, file tools, and prompt resolve against it.
+   * The child still runs in the parent's process and sandbox; the directory
+   * changes where it reads, not what it may reach.
+   */
+  readonly cwd?: string
 }
 
 /**

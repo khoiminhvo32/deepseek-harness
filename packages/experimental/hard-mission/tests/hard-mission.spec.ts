@@ -2,10 +2,11 @@
  * and enumerates the deterministic coverage matrix through the shell seam. */
 
 import { execFileSync } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
@@ -133,6 +134,16 @@ class GitShell extends Service {
 
 /** One seeded target git repository; created once per suite run. */
 const targetRoot = await mkdtemp(join(tmpdir(), 'hard-mission-target-'))
+// Snapshots live under the DSH home: keep them out of the developer's real home.
+const previousDshHome = process.env.DSH_HOME
+process.env.DSH_HOME = join(targetRoot, 'dsh-home')
+/** Where snapshots land by default under the suite's DSH home. */
+const SNAPSHOT_ROOT = join(realpathSync(targetRoot), 'dsh-home', 'hard', 'snapshots')
+
+/** Run git against one snapshot repository. */
+function snapshotGit(gitDir: string, ...args: string[]): string {
+  return execFileSync('git', [`--git-dir=${gitDir}`, ...args], { encoding: 'utf8', env: { ...process.env, ...GIT_CONFIG_ISOLATION } })
+}
 const targetRepo = join(targetRoot, 'repo')
 const targetSha: string = await (async () => {
   await mkdir(join(targetRepo, 'src', 'parser'), { recursive: true })
@@ -153,6 +164,8 @@ const targetSha: string = await (async () => {
 })()
 
 afterAll(async () => {
+  if (previousDshHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = previousDshHome
   await rm(targetRoot, { recursive: true, force: true })
 })
 
@@ -231,21 +244,31 @@ describe('hard mission arming', () => {
 })
 
 describe('hard mission target pinning', () => {
-  it('records the armed matrix: pinned sha, grouped modules, and the class columns', async () => {
+  it('records the armed matrix over a harness-owned snapshot of the target', async () => {
     const { ctx, root } = await harness(missionConfig())
-    expect(ctx.hardLedger.coverageMatrix(root.agent)).toEqual({
+    const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+    expect(matrix?.commit).toMatch(/^[0-9a-f]{40}$/)
+    expect({ ...matrix, commit: 'pinned' }).toEqual({
       // Nothing is excluded by default: the vendored tree is audited like the rest.
       modules: ['.', 'src', 'src/parser', 'vendor/lib'],
       bugClasses: [...hardMission.DEFAULT_BUG_CLASSES],
       targetRepo,
-      commit: targetSha,
+      commit: 'pinned',
       // The root module holds only README.md, so the inert screen screens it.
       inertModules: ['.'],
       // Every code file is TypeScript or JavaScript, which the pattern tables cover.
       unscreenedModules: [],
       ignoredEntryCount: 0,
+      snapshot: { gitDir: hardMission.snapshotGitDir(SNAPSHOT_ROOT), kind: 'git', origin: { commit: targetSha, dirty: false } },
     })
     expect(ctx.goals.get(root.agent)?.revision).toBe(1)
+    // The snapshot is a function of the content: a second load pins the same commit, kept alive by a ref.
+    const again = await harness(missionConfig())
+    expect(again.ctx.hardLedger.coverageMatrix(again.root.agent)?.commit).toBe(matrix?.commit)
+    const gitDir = hardMission.snapshotGitDir(SNAPSHOT_ROOT)
+    expect(snapshotGit(gitDir, 'rev-parse', `refs/hard/snapshots/${matrix?.commit ?? ''}`).trim()).toBe(matrix?.commit)
+    expect(snapshotGit(gitDir, 'ls-tree', '-r', '--name-only', matrix?.commit ?? '').trim().split('\n'))
+      .toEqual(['README.md', 'src/main.ts', 'src/parser/lexer.ts', 'src/parser/token.ts', 'vendor/lib/vendored.js'])
   })
 
   it('fails loud when every module is inert — the target has no code modules', async () => {
@@ -264,14 +287,31 @@ describe('hard mission target pinning', () => {
     }
   })
 
-  it('honors an explicit commit ref and module depth', async () => {
+  it('honors an explicit commit check and module depth, and refuses a commit that is not checked out', async () => {
     const { ctx, root } = await harness(missionConfig({
       target: { commit: targetSha, moduleDepth: 1 },
     }))
     expect(ctx.hardLedger.coverageMatrix(root.agent)).toMatchObject({
       modules: ['.', 'src', 'vendor'],
-      commit: targetSha,
+      snapshot: { origin: { commit: targetSha } },
     })
+    const ctx2 = await baseHarness()
+    await expect(ctx2.plugin(hardMission, missionConfig({ target: { commit: 'no-such-ref' } })))
+      .rejects.toThrow(/git rev-parse failed/)
+    const moved = await mkdtemp(join(tmpdir(), 'hard-mission-moved-'))
+    try {
+      const repo = join(moved, 'repo')
+      await mkdir(repo, { recursive: true })
+      await writeFile(join(repo, 'a.js'), 'x\n')
+      seedGitRepo(repo)
+      const first = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+      await writeFile(join(repo, 'a.js'), 'y\n')
+      seedGitRepo(repo)
+      await expect(ctx2.plugin(hardMission, missionConfig({ target: { repoPath: repo, commit: first } })))
+        .rejects.toThrow(`target.commit ${first} is ${first}, but ${repo} has`)
+    } finally {
+      await rm(moved, { recursive: true, force: true })
+    }
   })
 
   it('excludes configured trees before grouping and records what the exclusion removed', async () => {
@@ -339,39 +379,98 @@ describe('hard mission target pinning', () => {
     }
   })
 
-  it('refuses the first arming over files the pinned commit does not hold, and never re-checks on resume', async () => {
+  it('captures a dirty git target as the model sees it: modified content, untracked files, never ignored ones', async () => {
     const dirty = await mkdtemp(join(tmpdir(), 'hard-mission-dirty-'))
     try {
       const repo = join(dirty, 'repo')
       await mkdir(join(repo, 'src'), { recursive: true })
       await writeFile(join(repo, 'src', 'app.ts'), 'export {}\n')
+      await writeFile(join(repo, 'src', 'gone.ts'), 'export {}\n')
       await writeFile(join(repo, '.gitignore'), 'build/\n')
       seedGitRepo(repo)
+      const head = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
       await mkdir(join(repo, 'build'), { recursive: true })
       await writeFile(join(repo, 'build', 'out.js'), 'x\n')
       await writeFile(join(repo, 'src', 'new.ts'), 'export {}\n')
       await writeFile(join(repo, 'src', 'app.ts'), 'export const changed = 1\n')
-      // Loading never fails on dirt: a resumed session must still load.
-      const ctx = await baseHarness()
-      await ctx.plugin(hardMission, missionConfig({ target: { repoPath: repo } }))
-      const resumed = stubAgent(`hard-mission-resumed-${Math.random()}`, undefined, ctx)
-      ctx.agents.enter(resumed.agent, undefined)
-      await ctx.agents.announce(resumed.agent, 'resume')
-      expect(ctx.goals.get(resumed.agent)).toBeUndefined()
-      // The first arming names the untracked and the modified file. The agent
-      // loop announces a created root directly, so the refusal fails its creation.
-      const fresh = stubAgent(`hard-mission-fresh-${Math.random()}`, undefined, ctx)
-      ctx.agents.enter(fresh.agent, undefined)
-      await expect(ctx.agents.announce(fresh.agent, 'startup')).rejects.toThrow(
-        /target working tree differs from the pinned commit .*: src\/app\.ts \(modified\), src\/new\.ts \(untracked\)/,
-      )
-      expect(ctx.goals.get(fresh.agent)).toBeUndefined()
+      await rm(join(repo, 'src', 'gone.ts'))
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
+      const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+      expect(matrix?.snapshot).toEqual({ gitDir: hardMission.snapshotGitDir(SNAPSHOT_ROOT), kind: 'git', origin: { commit: head, dirty: true } })
+      expect(matrix?.ignoredEntryCount).toBe(1)
+      const gitDir = hardMission.snapshotGitDir(SNAPSHOT_ROOT)
+      expect(snapshotGit(gitDir, 'ls-tree', '-r', '--name-only', matrix?.commit ?? '').trim().split('\n'))
+        .toEqual(['.gitignore', 'src/app.ts', 'src/new.ts'])
+      expect(snapshotGit(gitDir, 'show', `${matrix?.commit ?? ''}:src/app.ts`)).toBe('export const changed = 1\n')
+      // Nothing was written into the target's own git.
+      expect(execFileSync('git', ['-C', repo, 'status', '--porcelain'], { encoding: 'utf8' })).not.toContain('hard')
     } finally {
       await rm(dirty, { recursive: true, force: true })
     }
   })
 
-  it('treats the harness state directory inside the target as its own, not as drift', async () => {
+  it('captures a plain directory and a single file, which hold no git at all', async () => {
+    const plain = await mkdtemp(join(tmpdir(), 'hard-mission-plain-'))
+    try {
+      const dir = join(plain, 'dir')
+      await mkdir(join(dir, 'lib'), { recursive: true })
+      await mkdir(join(dir, 'cache'), { recursive: true })
+      await writeFile(join(dir, 'lib', 'tool.py'), 'import os\n')
+      await writeFile(join(dir, 'lib', 'native.so'), Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0, 0, 1, 2]))
+      await writeFile(join(dir, '.gitignore'), 'cache/\n')
+      await writeFile(join(dir, 'cache', 'blob.bin'), 'x\n')
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: dir } }))
+      expect(ctx.hardLedger.coverageMatrix(root.agent)).toMatchObject({
+        targetRepo: dir,
+        modules: ['.', 'lib'],
+        unscreenedModules: ['.', 'lib'],
+        ignoredEntryCount: 1,
+        snapshot: { gitDir: hardMission.snapshotGitDir(SNAPSHOT_ROOT), kind: 'directory' },
+      })
+      expect(ctx.hardLedger.coverageMatrix(root.agent)?.snapshot?.origin).toBeUndefined()
+
+      const library = join(dir, 'lib', 'native.so')
+      const single = await harness(missionConfig({ target: { repoPath: library } }))
+      const matrix = single.ctx.hardLedger.coverageMatrix(single.root.agent)
+      expect(matrix).toMatchObject({
+        targetRepo: join(dir, 'lib'),
+        modules: ['.'],
+        unscreenedModules: ['.'],
+        ignoredEntryCount: 0,
+        snapshot: { kind: 'file' },
+      })
+      expect(snapshotGit(hardMission.snapshotGitDir(SNAPSHOT_ROOT), 'ls-tree', '-r', '--name-only', matrix?.commit ?? '').trim()).toBe('native.so')
+
+      const ctx3 = await baseHarness()
+      await expect(ctx3.plugin(hardMission, missionConfig({ target: { repoPath: library, commit: 'HEAD' } })))
+        .rejects.toThrow(/target.commit applies to a git work tree/)
+      await mkdir(join(plain, 'empty'))
+      await expect(ctx3.plugin(hardMission, missionConfig({ target: { repoPath: join(plain, 'empty') } })))
+        .rejects.toThrow(/holds no file to capture/)
+    } finally {
+      await rm(plain, { recursive: true, force: true })
+    }
+  })
+
+  it('captures into a configured snapshot root, kept out of the snapshot when it lies inside the target', async () => {
+    const rooted = await mkdtemp(join(tmpdir(), 'hard-mission-rooted-'))
+    try {
+      await mkdir(join(rooted, 'src'), { recursive: true })
+      await writeFile(join(rooted, 'src', 'a.js'), 'x\n')
+      const snapshotRoot = join(rooted, 'snapshots')
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: rooted, snapshotRoot } }))
+      const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+      expect(matrix?.snapshot?.gitDir).toBe(hardMission.snapshotGitDir(join(realpathSync(rooted), 'snapshots')))
+      expect(snapshotGit(hardMission.snapshotGitDir(snapshotRoot), 'ls-tree', '-r', '--name-only', matrix?.commit ?? '').trim()).toBe('src/a.js')
+      const ctx2 = await baseHarness()
+      await expect(ctx2.plugin(hardMission, missionConfig({ target: { repoPath: rooted, snapshotRoot: 'relative' } })))
+        .rejects.toThrow('target.snapshotRoot must be an absolute path')
+    } finally {
+      await rm(rooted, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the harness state directories inside the target out of the snapshot', async () => {
     const stateful = await mkdtemp(join(tmpdir(), 'hard-mission-state-'))
     const previousHome = process.env.DSH_HOME
     try {
@@ -387,14 +486,16 @@ describe('hard mission target pinning', () => {
       await writeFile(join(repo, 'state', 'home', 'settings.json'), '{}\n')
       process.env.DSH_HOME = join(repo, 'state', 'home')
       const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
-      expect(ctx.goals.get(root.agent)?.phase).toBe('active')
-      // A real untracked file beside the state directories still refuses.
-      await writeFile(join(repo, 'src', 'new.ts'), 'export {}\n')
-      const second = await baseHarness()
-      await second.plugin(hardMission, missionConfig({ target: { repoPath: repo } }))
-      const fresh = stubAgent(`hard-mission-state-fresh-${Math.random()}`, undefined, second)
-      second.agents.enter(fresh.agent, undefined)
-      await expect(second.agents.announce(fresh.agent, 'startup')).rejects.toThrow(/: src\/new\.ts \(untracked\);/)
+      const matrix = ctx.hardLedger.coverageMatrix(root.agent)
+      expect(matrix?.snapshot?.origin?.dirty).toBe(false)
+      expect(snapshotGit(hardMission.snapshotGitDir(join(realpathSync(repo), 'state', 'home', 'hard', 'snapshots')), 'ls-tree', '-r', '--name-only', matrix?.commit ?? '').trim()).toBe('src/app.ts')
+      const plainDir = join(stateful, 'plain')
+      await mkdir(join(plainDir, '.dsh'), { recursive: true })
+      await writeFile(join(plainDir, '.dsh', 'x'), 'x\n')
+      await writeFile(join(plainDir, 'a.js'), 'x\n')
+      const plain = await harness(missionConfig({ target: { repoPath: plainDir } }))
+      const plainMatrix = plain.ctx.hardLedger.coverageMatrix(plain.root.agent)
+      expect(snapshotGit(hardMission.snapshotGitDir(join(realpathSync(repo), 'state', 'home', 'hard', 'snapshots')), 'ls-tree', '-r', '--name-only', plainMatrix?.commit ?? '').trim()).toBe('a.js')
     } finally {
       if (previousHome === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previousHome
@@ -423,10 +524,33 @@ describe('hard mission target pinning', () => {
     }
   })
 
-  it('fails loud at load when the target path is not a git repository', async () => {
+  it('fails loud at load when the target path does not exist or is neither a file nor a directory', async () => {
     const ctx = await baseHarness()
     await expect(ctx.plugin(hardMission, missionConfig({ target: { repoPath: join(targetRoot, 'missing') } })))
-      .rejects.toThrow(/git rev-parse failed/)
+      .rejects.toThrow(/does not exist or cannot be read/)
+    await expect(ctx.plugin(hardMission, missionConfig({ target: { repoPath: '/dev/null' } })))
+      .rejects.toThrow('hard mission: target /dev/null is neither a file nor a directory')
+  })
+
+  it('captures a git work tree without commits, and fails loud on a silent or truncated git command', async () => {
+    const unborn = await mkdtemp(join(tmpdir(), 'hard-mission-unborn-'))
+    try {
+      execFileSync('git', ['-C', unborn, 'init', '--quiet'])
+      await writeFile(join(unborn, 'a.js'), 'x\n')
+      const { ctx, root } = await harness(missionConfig({ target: { repoPath: unborn } }))
+      expect(ctx.hardLedger.coverageMatrix(root.agent)?.snapshot).toEqual({ gitDir: hardMission.snapshotGitDir(SNAPSHOT_ROOT), kind: 'git' })
+      const silent = { exitCode: 1, timedOut: false, aborted: false, stdout: { text: '', truncated: false }, stderr: { text: '', truncated: false } }
+      const ctx2 = await baseHarness()
+      vi.spyOn(ctx2.shell, 'execute').mockResolvedValueOnce({ result: () => Promise.resolve(silent) } as never)
+      await expect(ctx2.plugin(hardMission, missionConfig({ target: { repoPath: unborn } }))).rejects.toThrow(/failed in .*: exit 1/)
+      const cut = { ...silent, exitCode: 0, stdout: { text: '', truncated: true } }
+      vi.spyOn(ctx2.shell, 'execute').mockResolvedValueOnce({ result: () => Promise.resolve(cut) } as never)
+      await expect(ctx2.plugin(hardMission, missionConfig({ target: { repoPath: unborn } })))
+        .rejects.toThrow(/output exceeded the capture budget/)
+    } finally {
+      vi.restoreAllMocks()
+      await rm(unborn, { recursive: true, force: true })
+    }
   })
 
   it('fails loud at load when no tracked module survives the exclusion globs', async () => {
@@ -439,7 +563,7 @@ describe('hard mission target pinning', () => {
       const ctx = await baseHarness()
       await expect(ctx.plugin(hardMission, missionConfig({
         target: { repoPath: repo, excludeGlobs: ['**'] },
-      }))).rejects.toThrow(/no tracked modules survived/)
+      }))).rejects.toThrow(/no modules survived/)
     } finally {
       await rm(excluded, { recursive: true, force: true })
     }

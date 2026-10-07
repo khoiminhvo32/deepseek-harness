@@ -161,6 +161,7 @@ describe('dsh --profile hard fabrication traps', () => {
       const armed = sessionFiles.find(event => event.type === 'hard/mission/armed')?.data as {
         targetRepo: string
         commit: string
+        snapshot?: unknown
         modules: string[]
         bugClasses: string[]
         inertModules?: string[]
@@ -170,7 +171,9 @@ describe('dsh --profile hard fabrication traps', () => {
       } | undefined
       expect(armed).toBeDefined()
       expect(armed?.targetRepo).toBe(cwd)
-      expect(armed?.commit).toBe(commit)
+      // The commit pins the harness-owned snapshot of the target; the target's own HEAD is its origin.
+      expect(armed?.commit).toMatch(/^[0-9a-f]{40}$/)
+      expect(armed?.snapshot).toMatchObject({ kind: 'git', origin: { commit, dirty: false } })
       expect(armed?.modules).toEqual(['notes', 'src'])
       expect(armed?.bugClasses.length).toBeGreaterThan(0)
       // The notes module holds only Markdown, so it screens inert; the src

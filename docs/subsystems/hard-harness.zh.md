@@ -12,7 +12,7 @@ The hard bundle is an installation-owned optional bundle: switch it on for a pro
 
 The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
 
-覆盖矩阵来自 mission 的武装记录：加载时 mission 插件固定已配置的目标仓库（把 `target.commit` 解析为完整 sha），并枚举该提交跟踪的每个文件，因此分母在同一提交上逐字节复现。默认不排除任何内容；已配置的排除会记录在武装记录中，并在覆盖率旁报告。首次武装会拒绝与提交不一致的工作区，因为模型读取的是工作区，而引用按提交解析。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量筛查一个类别，记录 `source: model-verified`——最弱的模型级别，从不满足完成评估的审计下限——而模型自己的标记不带归因（读作 `model`）。grep 只能指控：含二进制或固定表并非为其语言编写的模块被记录为不可筛查，在那里批量筛查会被拒绝，模型清除计为盲清除。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
+覆盖矩阵来自 mission 的武装记录：加载时 mission 插件把已配置的目标——git 仓库、普通目录或单个文件——捕获进 harness 在目标之外拥有的 git 存储，并枚举该快照提交中的每个文件，因此分母在相同内容上逐字节复现。快照保存的是武装时模型所看到的内容，包括未提交的改动；模型之后写入的文件都在快照之外，引用与独立读者都按快照解析。默认不排除任何内容；已配置的排除会记录在武装记录中，并在覆盖率旁报告。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量筛查一个类别，记录 `source: model-verified`——最弱的模型级别，从不满足完成评估的审计下限——而模型自己的标记不带归因（读作 `model`）。grep 只能指控：含二进制或固定表并非为其语言编写的模块被记录为不可筛查，在那里批量筛查会被拒绝，模型清除计为盲清除。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
 
 ## Proof-of-effect contract
 
@@ -24,7 +24,7 @@ The two step limits measure different things. `hard-rounds`' `stepsPerRound` is 
 
 ## Independent audit
 
-清除没有机器见证，因此审计让另一个模型阅读同一单元，以测量清除出错的频率。任务 agent 清除单元时，`hard-audit` 按层级抽样——不可筛查的模型阅读最多，批量筛查其次，可筛查的逐单元阅读最少，以固定提交为盐——并记录 `hard/audit/requested` 及其所读清除的 seq。被启动的读者得到目标、提交、单元与中立的类别定义，从不得到判定、声明的站点或任何其他台账记录，并可读取整个仓库。只有当每个引用站点都在固定提交上解析、模块在读取前后都与提交一致、不含无法阅读的二进制文件、且读者读取的每个路径都位于目标之内与 harness 状态之外时，其报告才计入；否则 `hard/audit/result` 记录带原因的 `unavailable`。审计以影子模式运行：它记录的任何内容都不会到达任务 agent、其未完成工作或完成门。
+清除没有机器见证，因此审计让另一个模型阅读同一单元，以测量清除出错的频率。任务 agent 清除单元时，`hard-audit` 按层级抽样——不可筛查的模型阅读最多，批量筛查其次，可筛查的逐单元阅读最少，以固定提交为盐——并记录 `hard/audit/requested` 及其所读清除的 seq。被启动的读者得到目标、提交、单元与中立的类别定义，从不得到判定、声明的站点或任何其他台账记录，并可读取整个仓库。读者在快照提交的临时 worktree 中工作，因此任务 agent 之后的修改与 PoC 永远不会到达读者。只有当每个引用站点都在固定提交上解析、单元不含无法阅读的二进制文件、且读者读取的每个路径都位于其 worktree 之内时，其报告才计入；否则 `hard/audit/result` 记录带原因的 `unavailable`。审计以影子模式运行：它记录的任何内容都不会到达任务 agent、其未完成工作或完成门。
 
 ## Design rationale
 

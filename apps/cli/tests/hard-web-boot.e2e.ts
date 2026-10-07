@@ -80,6 +80,8 @@ describe('the hard bundle boots the hard harness inside the Web composition', ()
         `    objective: '${MISSION}'`,
         '    target:',
         `      repoPath: '${target}'`,
+        // Hermetic: snapshots land in this test's home, not the developer's.
+        `      snapshotRoot: '${join(home, 'hard', 'snapshots')}'`,
         '    bugClasses: [cmdi, sqli]',
         '',
       ].join('\n'))
@@ -168,8 +170,8 @@ describe('the hard bundle boots the hard harness inside the Web composition', ()
       expect(armed?.data).toMatchObject({
         objective: MISSION,
         targetRepo: target,
-        commit,
         modules: ['src'],
+        snapshot: { kind: 'git', origin: { commit, dirty: false } },
       })
       await ctx.fiber.dispose()
     } finally {
@@ -214,7 +216,7 @@ async function bootHeadless(root: string): Promise<{ ctx: Awaited<ReturnType<typ
     },
   }, undefined, 2) + '\n')
   // This boot exercises the composition only — no agent is created, and the
-  // mission row stays off so its arming (which needs a git target) is out of
+  // mission row stays off so its arming (which captures a target) is out of
   // scope here; the Web test arms it against a real repository.
   await writeFile(join(profileDir, 'cordis.patch.yml'), [
     '- id: hard-mission',

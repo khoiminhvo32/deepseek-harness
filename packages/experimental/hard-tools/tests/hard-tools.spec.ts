@@ -349,6 +349,22 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect((refutedWithReason.hypothesis as Record<string, unknown>)['status']).toBe('refuted')
   })
 
+  it('moves an existing hypothesis without restating it, and refuses a proposal without a statement', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    const statement = 'The session check accepts a token committed to the repository.'
+    await execute(ctx, 'hard_update_hypothesis', { statement, status: 'proposed' }, root.agent)
+    const testing = resultJson(await execute(ctx, 'hard_update_hypothesis', { hypothesis_id: 'H-1', status: 'testing' }, root.agent))
+    expect((testing.hypothesis as Record<string, unknown>)['status']).toBe('testing')
+    const confirmed = resultJson(await execute(ctx, 'hard_update_hypothesis', {
+      hypothesis_id: 'H-1', status: 'confirmed', reason: 'the PoC exited 0 with the marker; the benign arm failed',
+    }, root.agent))
+    expect((confirmed.hypothesis as Record<string, unknown>)['status']).toBe('confirmed')
+    expect(ctx.hardLedger.hypotheses(root.agent)).toMatchObject([{ id: 'H-1', statement, status: 'confirmed' }])
+    const unstated = await execute(ctx, 'hard_update_hypothesis', { status: 'proposed' }, root.agent)
+    expect(unstated.isError).toBe(true)
+    expect(unstated.error?.info?.code).toBe('HARD_LEDGER_STATEMENT_REQUIRED')
+  })
+
   it('records coverage cells and requires sinks for cleared', async () => {
     const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const missing = await execute(ctx, 'hard_mark_coverage', {

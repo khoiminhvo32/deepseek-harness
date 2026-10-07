@@ -370,14 +370,18 @@ export class HardLedger extends Service {
   /**
    * Propose a new hypothesis or transition an existing one through its lifecycle.
    * @param agent - the live agent whose session receives the record.
-   * @param request - statement, status, optional existing id, and conditional reason.
+   * @param request - status, statement (omittable for an existing id, which keeps its
+   *   statement), optional existing id, and conditional reason.
    * @returns the assigned or confirmed hypothesis id.
    */
   writeHypothesis(
     agent: Agent,
-    request: { id?: string; statement: string; status: HardHypothesisStatus; reason?: string },
+    request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string },
   ): HardHypothesisId {
-    this.assertText('statement', request.statement)
+    if (request.statement !== undefined) this.assertText('statement', request.statement)
+    else if (request.id === undefined) {
+      throw new HarnessError('proposing a hypothesis requires its statement', 'HARD_LEDGER_STATEMENT_REQUIRED')
+    }
     if (request.status === 'refuted' || request.status === 'deferred') {
       if (request.reason === undefined || request.reason.trim().length === 0) {
         throw new HarnessError(
@@ -399,9 +403,13 @@ export class HardLedger extends Service {
         throw new HarnessError(`unknown hypothesis id ${request.id}`, 'HARD_LEDGER_UNKNOWN_HYPOTHESIS')
       }
     }
+    // A transition without a statement keeps the one the hypothesis already carries.
+    const statement = request.statement ?? this.hypotheses(agent).findLast(hypothesis => hypothesis.id === id)?.statement
+    /* v8 ignore next -- defensive: a known id always has a recorded statement. */
+    if (statement === undefined) throw new HarnessError(`hypothesis ${id} has no statement`, 'HARD_LEDGER_STATEMENT_REQUIRED')
     const record: HardHypothesisStateData = {
       id,
-      statement: request.statement,
+      statement,
       status: request.status,
       ...(request.reason === undefined ? {} : { reason: request.reason }),
     }

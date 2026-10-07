@@ -316,7 +316,11 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
     description: HYPOTHESIS_DESCRIPTION,
     parameters: {
       hypothesis_id: { type: 'string', description: 'H-n id to transition; omit to propose a new hypothesis.' },
-      statement: { type: 'string', required: true, description: 'The hypothesis, concrete enough to test or refute.' },
+      statement: {
+        type: 'string',
+        description: 'The hypothesis, concrete enough to test or refute. Required to propose one; '
+          + 'omit it when moving an existing hypothesis to keep its statement.',
+      },
       status: { type: 'string', required: true, enum: [...HYPOTHESIS_STATUSES], description: 'New lifecycle status.' },
       reason: { type: 'string', description: 'Required for refuted and deferred: the evidence or retry condition.' },
     },
@@ -339,7 +343,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       if (exec.agent === undefined) throw new Error('hard_update_hypothesis requires a live agent')
       const id = ledger.writeHypothesis(exec.agent, {
         ...args.hypothesis_id === undefined ? {} : { id: hypothesisId(args.hypothesis_id) },
-        statement: args.statement,
+        ...args.statement === undefined ? {} : { statement: args.statement },
         status: args.status,
         ...args.reason === undefined ? {} : { reason: args.reason },
       })

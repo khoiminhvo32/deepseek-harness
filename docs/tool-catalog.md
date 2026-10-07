@@ -1799,7 +1799,7 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
     },
     "statement": {
       "type": "string",
-      "description": "The hypothesis, concrete enough to test or refute."
+      "description": "The hypothesis, concrete enough to test or refute. Required to propose one; omit it when moving an existing hypothesis to keep its statement."
     },
     "status": {
       "type": "string",
@@ -1818,7 +1818,6 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
     }
   },
   "required": [
-    "statement",
     "status"
   ]
 }

@@ -12,10 +12,10 @@ hard harness 必须审计交给它的任何东西：git 仓库、没有 git 的�
 
 ## 决策
 
-- **固定提交是 harness 自有的快照。** 加载时，`hard-mission` 通过每次捕获私有的 index，把目标捕获进 `<target.snapshotRoot>/store.git`，这是位于目标之外的 git 目录（默认在 DSH home 下的 `hard/snapshots`）。git 工作树贡献其已跟踪文件以及忽略规则保留的未跟踪文件，内容取自工作区；普通目录贡献其忽略文件保留的每个文件；单个文件只贡献它自己。harness 的状态目录与目标的 `.git` 从不进入，目标内部不会写入任何内容。固定的身份与时间使提交只由内容决定，因此一个存储服务所有目标，并由 ref 让每个快照提交保持存活。
+- **固定提交是 harness 自有的快照。** 加载时，`hard-mission` 通过每次捕获私有的 index，把目标捕获进 `<target.snapshotRoot>/store.git`，这是位于目标之外的 git 目录（默认在 DSH home 下的 `hard/snapshots`）。git 工作树贡献其已跟踪文件以及忽略规则保留的未跟踪文件，内容取自工作区；普通目录贡献其忽略文件保留的每个文件；单个文件只贡献它自己。harness 的状态目录与目标的 `.git` 从不进入，目标内部不会写入任何内容：会写入的命令在以快照根目录为根的 `workspace-write` 沙箱中运行，因此捕获在任何会话沙箱下都能工作。固定的身份与时间使提交只由内容决定，因此一个存储服务所有目标，并由 ref 让每个快照提交保持存活。
 - **武装记录指明快照。** `hard/mission/armed` 在 `commit` 中保存快照提交，并新增 `snapshot`：存储位置、目标类型，以及 git 目标的 HEAD 与工作区是否不同。`pinnedGitArgs` 把它转换为每个读取固定内容的读取方所用的 git 参数；没有快照的记录继续读取目标自身的 git。
 - **快照就是模型看到的内容。** 未提交的改动会被捕获而不是被拒绝，模型之后写入的文件都在快照之外。`target.commit` 只保留为可选检查：git 目标必须检出该提交。
-- **读者读取快照的 worktree。** 每次读取前，`hard-audit` 把固定提交检出到新的临时 worktree，并通过 subagent 接缝新增的 `cwd` 选项在其中启动读者；spawn provider 支持该选项，其他 provider 会拒绝。除读者自己的 spill 文件外，worktree 之外的任何读取都是污染。读取前后的偏离检查已移除，因为 worktree 不会偏离。
+- **读者读取快照的 worktree。** 每次读取前，`hard-audit` 把固定提交检出到存储旁边新的临时 worktree，并通过 subagent 接缝新增的 `cwd` 选项在其中启动读者；spawn provider 支持该选项，其他 provider 会拒绝。除读者自己的 spill 文件外，worktree 之外的任何读取都是污染。读取前后的偏离检查已移除，因为 worktree 不会偏离。
 
 ## 考虑过的替代方案
 

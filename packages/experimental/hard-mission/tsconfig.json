@@ -16,6 +16,7 @@
     { "path": "../../goal/goal" },
     { "path": "../../util/home-paths" },
     { "path": "../../shell/shell" },
+    { "path": "../../sandbox/sandbox" },
     { "path": "../hard-ledger" },
     { "path": "../hard-verifier" }
   ]

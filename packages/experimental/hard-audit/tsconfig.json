@@ -17,6 +17,7 @@
     { "path": "../../llm/llm" },
     { "path": "../../session/session-projection" },
     { "path": "../../shell/shell" },
+    { "path": "../../sandbox/sandbox" },
     { "path": "../../subagent/subagent" },
     { "path": "../hard-ledger" },
     { "path": "../hard-mission" },

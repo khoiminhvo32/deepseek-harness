@@ -343,7 +343,8 @@ describe('hard-audit sampling and request', () => {
     const start = subagents.starts[0]
     const prompt = start?.prompt[0]?.type === 'text' ? start.prompt[0].text : ''
     // The reader works in a worktree of the snapshot, never in the live target, and the worktree is gone afterwards.
-    expect(start?.cwd).toMatch(/dsh-hard-audit-[^/]+\/tree$/)
+    expect(start?.cwd?.startsWith(`${suiteRoot}/.reader-`)).toBe(true)
+    expect(start?.cwd).toMatch(/\/tree$/)
     expect(start?.cwd).not.toBe(targetRepo)
     expect(existsSync(start?.cwd ?? '')).toBe(false)
     expect(prompt).toContain(`Target: the git repository at ${start?.cwd ?? ''}, whose working tree matches commit ${targetSha}.`)
@@ -468,6 +469,7 @@ describe('hard-audit unavailable results', () => {
 
   it('shows the reader the pinned content only: edits and PoCs in the live target stay out of its worktree', async () => {
     const { ctx, root, subagents } = await harness()
+    const resolve = vi.spyOn(ctx.shell, 'resolve')
     const edited = join(targetRepo, 'src', 'app.js')
     const poc = join(targetRepo, 'poc')
     await writeFile(edited, `${APP_SOURCE}// edited by the mission agent\n`)
@@ -485,6 +487,12 @@ describe('hard-audit unavailable results', () => {
       clear(ctx, root, 'src')
       expect((await results(root, 1))[0]).toMatchObject({ outcome: 'corroborated' })
       expect(seen).toEqual({ app: APP_SOURCE, poc: false })
+      // Worktree writes are confined to the snapshot root, whatever the session's sandbox allows.
+      const writes = resolve.mock.calls.map(([request]) => request).filter(request => request.command.includes(' worktree '))
+      expect(writes.map(request => request.sandboxPolicy)).toEqual([
+        { mode: 'workspace-write', workspaceRoot: suiteRoot },
+        { mode: 'workspace-write', workspaceRoot: suiteRoot },
+      ])
     } finally {
       await writeFile(edited, APP_SOURCE)
       await rm(poc, { recursive: true, force: true })

@@ -409,6 +409,18 @@ describe('hard mission target pinning', () => {
     }
   })
 
+  it('confines every snapshot write to the snapshot root and never takes a lock in the target', async () => {
+    const ctx = await baseHarness()
+    const resolve = vi.spyOn(ctx.shell, 'resolve')
+    await ctx.plugin(hardMission, missionConfig())
+    const requests = resolve.mock.calls.map(([request]) => request as { command: string; sandboxPolicy?: unknown })
+    const confined = requests.filter(request => request.sandboxPolicy !== undefined)
+    expect(confined.map(request => request.sandboxPolicy)).toEqual(confined.map(() => ({ mode: 'workspace-write', workspaceRoot: SNAPSHOT_ROOT })))
+    expect(confined.some(request => request.command.includes('commit-tree'))).toBe(true)
+    expect(requests.find(request => request.command.includes(' status '))?.command).toContain('--no-optional-locks')
+    vi.restoreAllMocks()
+  })
+
   it('captures a plain directory and a single file, which hold no git at all', async () => {
     const plain = await mkdtemp(join(tmpdir(), 'hard-mission-plain-'))
     try {

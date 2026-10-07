@@ -14,7 +14,6 @@
 
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -22,6 +21,7 @@ import type { HardMissionArmedData, HardTargetSnapshot } from '@deepseek-ai/dsh-
 // Loads the declaration-merged `Context` keys this plugin injects.
 import type {} from '@deepseek-ai/dsh-goal'
 import type {} from '@deepseek-ai/dsh-shell'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { DSH_HOME_DIR_NAME, dshHomePath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { HARD_EXCLUDED_SAMPLE_LIMIT, HARD_MATRIX_MODULE_LIMIT } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -254,13 +254,21 @@ function shellQuote(value: string): string {
  * @param target - the resolved target the command runs against.
  * @param command - the full git command line; every variable argument is pre-quoted.
  * @param label - the command name used in failure diagnostics.
+ * @param sandboxPolicy - the confinement for a command that writes, absent for a read.
  * @returns the complete stdout text.
  */
-async function gitOutput(ctx: Context, target: ResolvedTarget, command: string, label: string): Promise<string> {
+async function gitOutput(
+  ctx: Context,
+  target: ResolvedTarget,
+  command: string,
+  label: string,
+  sandboxPolicy?: SandboxExecutionPolicy,
+): Promise<string> {
   const spec = ctx.shell.resolve({
     command,
     timeoutMs: ARM_GIT_TIMEOUT_MS,
     stdoutMaxBytes: ARM_LS_FILES_MAX_BYTES,
+    ...sandboxPolicy === undefined ? {} : { sandboxPolicy },
   })
   const execution = await ctx.shell.execute(spec)
   const result = await execution.result()
@@ -351,12 +359,15 @@ async function captureTarget(ctx: Context, target: ResolvedTarget): Promise<Capt
   }
   // The canonical spelling: the record names the store the way every later reader resolves it.
   await mkdir(target.snapshotRoot, { recursive: true })
-  const gitDir = snapshotGitDir(await realpath(target.snapshotRoot))
+  const root = await realpath(target.snapshotRoot)
+  const gitDir = snapshotGitDir(root)
   const git = `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} --work-tree=${shellQuote(shape.workTree)}`
   // A private index per capture: concurrent missions share the store, never an index.
-  const scratch = await mkdtemp(join(tmpdir(), 'dsh-hard-snapshot-'))
+  const scratch = await mkdtemp(join(root, '.capture-'))
+  // Writes stay inside the snapshot root, whatever the session's sandbox confines.
+  const store: SandboxExecutionPolicy = { mode: 'workspace-write', workspaceRoot: root }
   try {
-    return await captureInto(ctx, target, shape, gitDir, git, join(scratch, 'index'), join(scratch, 'pathspec'))
+    return await captureInto(ctx, target, shape, { gitDir, git, store }, join(scratch, 'index'), join(scratch, 'pathspec'))
   } finally {
     await rm(scratch, { recursive: true, force: true })
   }
@@ -367,15 +378,15 @@ async function captureInto(
   ctx: Context,
   target: ResolvedTarget,
   shape: TargetShape,
-  gitDir: string,
-  git: string,
+  snapshot: { readonly gitDir: string; readonly git: string; readonly store: SandboxExecutionPolicy },
   index: string,
   pathspec: string,
 ): Promise<CapturedTarget> {
+  const { gitDir, git, store } = snapshot
   const statePrefixes = [...harnessStatePrefixes(shape.workTree), ...insidePrefix(shape.workTree, target.snapshotRoot)]
   const kept = (output: string): string[] => output.split('\0')
     .filter(path => path.length > 0 && !statePrefixes.some(prefix => path.startsWith(prefix)))
-  if (!existsSync(gitDir)) await gitOutput(ctx, target, `${HERMETIC_GIT} init --bare --quiet ${shellQuote(gitDir)}`, 'init')
+  if (!existsSync(gitDir)) await gitOutput(ctx, target, `${HERMETIC_GIT} init --bare --quiet ${shellQuote(gitDir)}`, 'init', store)
   let origin: HardTargetSnapshot['origin']
   let ignored: string[]
   let paths: string[]
@@ -392,14 +403,14 @@ async function captureInto(
     paths = listed.filter(path => existsSync(join(shape.workTree, path)))
     ignored = kept(await gitOutput(ctx, target, `${repo} ls-files -z --others --ignored --exclude-standard --directory`, 'ls-files --ignored'))
     if (head.length > 0) {
-      const status = kept((await gitOutput(ctx, target, `${repo} status --porcelain -z --untracked-files=all`, 'status'))
+      const status = kept((await gitOutput(ctx, target, `${repo} --no-optional-locks status --porcelain -z --untracked-files=all`, 'status'))
         .split('\0').map(entry => entry.slice(3)).join('\0'))
       origin = { commit: head, dirty: status.length > 0 }
     }
   } else if (shape.kind === 'directory') {
     const excludes = statePrefixes.map(prefix => shellQuote(`:(exclude)${prefix.slice(0, -1)}`)).join(' ')
     paths = kept(await gitOutput(ctx, target,
-      `rm -f ${shellQuote(index)} && GIT_INDEX_FILE=${shellQuote(index)} ${git} ls-files -z --others --exclude-standard -- . ${excludes}`, 'ls-files'))
+      `rm -f ${shellQuote(index)} && GIT_INDEX_FILE=${shellQuote(index)} ${git} ls-files -z --others --exclude-standard -- . ${excludes}`, 'ls-files', store))
     ignored = kept(await gitOutput(ctx, target,
       `GIT_INDEX_FILE=${shellQuote(index)} ${git} ls-files -z --others --ignored --exclude-standard --directory -- . ${excludes}`, 'ls-files --ignored'))
   } else {
@@ -417,7 +428,7 @@ async function captureInto(
     `commit=$(${SNAPSHOT_IDENTITY} ${git} commit-tree "$tree" -m 'hard target snapshot')`,
     `${git} update-ref "refs/hard/snapshots/$commit" "$commit"`,
     'echo "$commit"',
-  ].join('\n'), 'snapshot')).trim()
+  ].join('\n'), 'snapshot', store)).trim()
   /* v8 ignore next -- defensive: the script runs under set -e, so a failed commit-tree fails the command first. */
   if (!/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(commit)) throw new Error(`hard mission: the snapshot of ${target.repoPath} produced no commit`)
   return {

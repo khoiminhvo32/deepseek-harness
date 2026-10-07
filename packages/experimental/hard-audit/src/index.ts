@@ -13,8 +13,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -24,6 +23,7 @@ import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-shell'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SubagentRun } from '@deepseek-ai/dsh-subagent'
 import { cellSampledForPercent, classScope } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardCoverageMatrix } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -261,6 +261,11 @@ function cellPathspec(module: string, repoScoped: boolean): string {
   return shellQuote(module === '.' ? ':(glob)*' : module)
 }
 
+/** The confinement for git commands that write: the snapshot root holding the store and the reader worktrees. */
+function storeWrites(gitDir: string): SandboxExecutionPolicy {
+  return { mode: 'workspace-write', workspaceRoot: dirname(gitDir) }
+}
+
 /**
  * Git with the developer's global and system configuration switched off, so
  * no user hook or attribute runs while the harness reads its snapshot.
@@ -363,9 +368,23 @@ export function apply(ctx: Context, config: Config): void {
     return state
   }
 
-  /** Run one git command in the target directory; a timeout, abort, or truncation throws. */
-  async function runGit(targetRepo: string, command: string, what: string): Promise<{ exitCode: number; stdout: string }> {
-    const spec = ctx.shell.resolve({ command, timeoutMs: resolved.gitTimeoutMs, stdoutMaxBytes: GIT_STDOUT_MAX_BYTES, workdir: targetRepo })
+  /**
+   * Run one git command in the target directory, confined for writes when a
+   * policy is given; a timeout, abort, or truncation throws.
+   */
+  async function runGit(
+    targetRepo: string,
+    command: string,
+    what: string,
+    sandboxPolicy?: SandboxExecutionPolicy,
+  ): Promise<{ exitCode: number; stdout: string }> {
+    const spec = ctx.shell.resolve({
+      command,
+      timeoutMs: resolved.gitTimeoutMs,
+      stdoutMaxBytes: GIT_STDOUT_MAX_BYTES,
+      workdir: targetRepo,
+      ...sandboxPolicy === undefined ? {} : { sandboxPolicy },
+    })
     const result = await (await ctx.shell.execute(spec)).result()
     if (result.timedOut || result.aborted || result.exitCode === null || result.stdout.truncated) {
       throw new HarnessError(`hard audit ${what} did not settle: ${result.stderr.text.trim().slice(-400)}`, 'HARD_AUDIT_GIT_FAILED')
@@ -390,16 +409,18 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * Check the pinned commit out of the snapshot into a fresh temporary
-   * worktree: the reader's whole world, holding exactly the pinned content —
-   * no PoC, no later edit, no harness state.
+   * worktree beside the store: the reader's whole world, holding exactly the
+   * pinned content — no PoC, no later edit, no harness state. Every write
+   * stays inside the snapshot root, whatever the session's sandbox confines.
    */
   async function addWorktree(matrix: HardCoverageMatrix, gitDir: string): Promise<string> {
-    const parent = await mkdtemp(join(tmpdir(), 'dsh-hard-audit-'))
+    const parent = await mkdtemp(join(dirname(gitDir), '.reader-'))
     const tree = join(parent, 'tree')
     const { exitCode } = await runGit(
       matrix.targetRepo,
       `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} worktree add --detach --quiet ${shellQuote(tree)} ${shellQuote(matrix.commit)}`,
       'worktree add',
+      storeWrites(gitDir),
     )
     if (exitCode !== 0) {
       await rm(parent, { recursive: true, force: true })
@@ -411,7 +432,12 @@ export function apply(ctx: Context, config: Config): void {
   /** Remove one reader worktree and its registration; a failure is reported, never raised. */
   async function removeWorktree(matrix: HardCoverageMatrix, gitDir: string, tree: string): Promise<void> {
     try {
-      await runGit(matrix.targetRepo, `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} worktree remove --force ${shellQuote(tree)}`, 'worktree remove')
+      await runGit(
+        matrix.targetRepo,
+        `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} worktree remove --force ${shellQuote(tree)}`,
+        'worktree remove',
+        storeWrites(gitDir),
+      )
     } catch (error: unknown) {
       ctx.logger.warn(`hard-audit: could not remove the reader worktree ${tree}: ${errorText(error)}`)
     }

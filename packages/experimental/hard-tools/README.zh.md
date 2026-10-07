@@ -44,7 +44,7 @@ kind: "package-reference"
 ### Design
 
 - **提交时验证。** `hard_submit_finding` 对 claim（PoC 必须打印的标记）与根因（去重键）做哈希，通过台账提出，然后等待 `hardVerifier.verify` 再作答；模型看到的是执行后的结论，而不是假设。工具描述传授 specificity 契约：从 `$1` 读取 payload、绝不硬编码，因为 harness 会用良性载荷重跑 PoC 并要求其失败。
-- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。`hard_mark_coverage` 拒绝非武装矩阵行的模块并点名有效行，也拒绝在筛查早已裁决的惰性模块上给出 `cleared`（`suspicious` 仍可记录）；harness 重开或 fail-closed 审计给其单元显式标注 `source: 'harness'`，报告因此不会把模型自己给出的 `suspicious` 判定读作投机。`hard_clear_modules` 在任何模块越界、惰性或不可筛查时于任何 grep 之前拒绝整批——不可筛查模块含二进制，或固定模式表并非为其语言编写，在那里 grep 什么也证明不了。
+- **生命周期在台账。** 假设迁移、覆盖单元与扫描都是带响亮失败校验的台账追加；工具只补充 `hypothesis_id` 的假设成员资格检查。`cleared` 判定必须以 `path:symbol` 或 `path:line` 引用所检查的代码；`hard_mark_coverage` 在记录之前于被固定的提交上解析每个位置，并在拒绝清除时点名每个不存在的位置。它也拒绝非武装矩阵行的模块并点名有效行，也拒绝在筛查早已裁决的惰性模块上给出 `cleared`（`suspicious` 仍可记录）；harness 重开或 fail-closed 审计给其单元显式标注 `source: 'harness'`，报告因此不会把模型自己给出的 `suspicious` 判定读作投机。`hard_clear_modules` 在任何模块越界、惰性或不可筛查时于任何 grep 之前拒绝整批——不可筛查模块含二进制，或固定模式表并非为其语言编写，在那里 grep 什么也证明不了。
 
 ### Source map
 

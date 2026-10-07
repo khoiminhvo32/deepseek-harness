@@ -206,6 +206,13 @@ describe('dsh --profile hard fabrication traps', () => {
       // Confirms carry their evidence strength explicitly.
       expect(verdicts.find(v => v.verdict === 'confirmed')?.evidence).toBe('demonstrated')
 
+      // The clear citing code the pinned commit does not hold was refused
+      // before any record existed, naming the missing symbol.
+      const citationError = sessionFiles.find(event => event.type === 'tool/result'
+        && JSON.stringify(event.data).includes('src/reports.js has no runShell at commit'))
+      expect(citationError).toBeDefined()
+      expect((citationError?.data as { message?: { isError?: boolean } }).message?.isError).toBe(true)
+
       // The coverage cross-check reopened the under-declared cell — attributed
       // to the harness that decided it — then the corrected clearance stood;
       // the batch clear landed as model-verified while the model's own marks

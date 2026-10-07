@@ -866,6 +866,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   HardMatrixBoardCell: 'coverage board shape is owned by packages/experimental/hard-ledger/README.md',
   FlowCitationEntry: 'flow citation input is owned by packages/experimental/hard-verifier/README.md',
   FlowCitationReject: 'flow citation rejection is owned by packages/experimental/hard-verifier/README.md',
+  SinkCitationReject: 'declared-site citation rejection is owned by packages/experimental/hard-verifier/README.md',
   ProductEvent: 'Desktop event fields are owned by packages/client/product-analytics/README.md and src/events.ts',
   ConnectionFetchHandler: 'shared Fetch dispatch is owned by packages/client/connection/src/rpc.ts',
   ConnectionRequestRejection: 'transport rejection status is owned by packages/client/connection/src/rpc.ts',

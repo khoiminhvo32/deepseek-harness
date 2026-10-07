@@ -141,13 +141,18 @@ function script(messages) {
   // the specificity check refutes it.
   if (!seen.includes('poc/F-4/poc.sh')) return toolChunks([writePoc('poc/F-4/poc.sh', GENERIC_POC_B64)])
   if (!seen.includes('"id":"F-4"')) return toolChunks([submitFinding('F-4', 'Payload-agnostic proof', CONFIRMED_CLAIM, 'x', 'src/session.js')])
-  // 5. Coverage: clear the cell naming a sink the grep will not find, so the
-  // deterministic cross-check reopens it; then re-mark with the real sinks.
+  // 5. Coverage. First a clear citing code that is not there: the harness
+  // resolves every declared site at the pinned commit and refuses the record.
+  if (!seen.includes('has no runShell')) {
+    return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/reports.js:runShell - the shell helper'] } }])
+  }
+  // Then a clear citing real code that misses the sink, so the deterministic
+  // cross-check reopens it; then re-mark citing the real sink.
   if (!seen.includes('reopenedSinks')) {
-    return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/reports.js:99 system(cmd)'] } }])
+    return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/reports.js:require - imports child_process'] } }])
   }
   if (!seen.includes('"reopenedSinks":[]')) {
-    return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['execSync'] } }])
+    return toolChunks([{ name: 'hard_mark_coverage', args: { module: 'src', bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/reports.js:execSync - the user parameter reaches it through interpolation'] } }])
   }
   // 6. Propose completion while the sqli cell is still open: the completion
   // gate denies the attempt and names the remaining work.

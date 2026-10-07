@@ -19,6 +19,7 @@ import type {
 import { cellSampledForPercent } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
 import { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
+import { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
 
 /**
  * Bug class whose sink pattern names a PROTECTIVE check (the login flow). For
@@ -179,6 +180,12 @@ export interface FlowCitationEntry {
 /** One citation the pinned-commit resolver refused, with the why. */
 export interface FlowCitationReject {
   readonly cite: string
+  readonly reason: string
+}
+
+/** One declared site the pinned-commit resolver refused, with the why. */
+export interface SinkCitationReject {
+  readonly sink: string
   readonly reason: string
 }
 
@@ -371,7 +378,7 @@ export class HardVerifier extends Service {
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
     const missed = result.stdout.text.split('\n')
       .map(line => line.trim())
-      .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => line.includes(sink)))
+      .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
       .slice(0, 8)
     if (missed.length === 0) return undefined
     return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
@@ -448,6 +455,9 @@ export class HardVerifier extends Service {
     // never had" from infrastructure failure: once ls-tree settles, a later
     // git failure is never a citation verdict.
     const tracked = new Map<string, boolean>()
+    const trackedAt = (path: string): Promise<boolean> => this.trackedAtCommit(
+      tracked, targetRepo, commit, path, 'flow citations',
+    )
     for (const { cite, snippet } of citations) {
       const parsed = /^(?<path>.+):(?<start>\d{1,7})(?:-(?<end>\d{1,7}))?$/u.exec(cite.trim())
       if (parsed?.groups === undefined) {
@@ -461,21 +471,7 @@ export class HardVerifier extends Service {
         rejected.push({ cite, reason: 'cite must be path:line or path:line-line' })
         continue
       }
-      let isTracked = tracked.get(path)
-      if (isTracked === undefined) {
-        const spec = this.ctx.shell.resolve({
-          command: `git ls-tree --name-only ${shellQuote(commit)} -- ${shellQuote(path)}`,
-          timeoutMs: config.timeoutSeconds * 1000,
-          stdoutMaxBytes: config.stdoutMaxBytes,
-          workdir: targetRepo,
-        })
-        const execution = await this.ctx.shell.execute(spec)
-        const result = await execution.result()
-        assertGrepSettled(result, `flow citations: ls-tree over ${path}`, 'HARD_VERIFIER_CITATION_FAILED')
-        isTracked = result.stdout.text.split('\n').some(line => line.trim() === path)
-        tracked.set(path, isTracked)
-      }
-      if (!isTracked) {
+      if (!await trackedAt(path)) {
         rejected.push({ cite, reason: 'path is not tracked at the pinned commit' })
         continue
       }
@@ -494,6 +490,130 @@ export class HardVerifier extends Service {
       }
     }
     return { rejected }
+  }
+
+  /**
+   * Resolve every declared site of a `cleared` coverage cell against the
+   * pinned commit, through git alone so the outcome does not depend on the
+   * host's `grep`. A site passes when its path is tracked at the commit and,
+   * for a text file, the commit's file has the cited line or contains the
+   * cited symbol (`git grep -I -F`). A binary — classified by a numstat diff
+   * against the empty tree, the content test `grep -I` applies — passes the
+   * path check without its content being read as resolved: its module is
+   * unscreened, so the clear stands as a blind clear. A symbol match can sit in
+   * a comment; this guards against citing code that does not exist, not
+   * against a wrong clear. It fails closed: a git invocation that errors,
+   * times out, or is aborted throws instead of reading as a verdict.
+   * @param agent - the live agent whose ledger matrix carries the pinned commit.
+   * @param sinks - the declared-site strings, in any order.
+   * @returns the refused sites with per-site reasons; empty means every site resolved.
+   * @throws `HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.
+   * @throws `HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.
+   */
+  async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ rejected: readonly SinkCitationReject[] }> {
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) {
+      throw new HarnessError('hard sink citations: no armed coverage matrix pins a commit', 'HARD_VERIFIER_NO_MATRIX')
+    }
+    const { commit, targetRepo } = matrix
+    const short = commit.slice(0, 7)
+    const tracked = new Map<string, boolean>()
+    const binary = new Map<string, boolean>()
+    const lineCounts = new Map<string, number>()
+    const rejected: SinkCitationReject[] = []
+    for (const sink of sinks) {
+      const citation = parseSinkCitation(sink)
+      if (citation === undefined) {
+        rejected.push({ sink, reason: 'a declared site must be path:symbol or path:line, optionally followed by a note' })
+        continue
+      }
+      const { path } = citation
+      if (!await this.trackedAtCommit(tracked, targetRepo, commit, path, 'sink citations')) {
+        rejected.push({ sink, reason: `${path} is not tracked at commit ${short}` })
+        continue
+      }
+      let isBinary = binary.get(path)
+      if (isBinary === undefined) {
+        const numstat = await this.gitAt(
+          targetRepo,
+          `git diff --numstat --no-renames --no-textconv --no-ext-diff "$(git hash-object -t tree /dev/null)" ${shellQuote(commit)} -- ${shellQuote(path)}`,
+          `sink citations: numstat over ${path}`,
+        )
+        isBinary = numstat.startsWith('-\t-\t')
+        binary.set(path, isBinary)
+      }
+      if (isBinary) continue
+      if (citation.line !== undefined) {
+        let count = lineCounts.get(path)
+        if (count === undefined) {
+          count = Number((await this.gitAt(
+            targetRepo,
+            `set -o pipefail; git show ${shellQuote(`${commit}:${path}`)} | awk 'END { print NR }'`,
+            `sink citations: line count of ${path}`,
+          )).trim())
+          lineCounts.set(path, count)
+        }
+        if (citation.line > count) rejected.push({ sink, reason: `${path} has no line ${citation.line} at commit ${short}` })
+        continue
+      }
+      const found = await this.gitAt(
+        targetRepo,
+        `git grep -I -F -c -e ${shellQuote(citation.locator)} ${shellQuote(commit)} -- ${shellQuote(path)}`,
+        `sink citations: grep for ${citation.locator} in ${path}`,
+      )
+      if (found.trim().length === 0) rejected.push({ sink, reason: `${path} has no ${citation.locator} at commit ${short}` })
+    }
+    return { rejected }
+  }
+
+  /**
+   * Whether one path is tracked at the pinned commit, memoized per call site.
+   * @param memo - the caller's per-check cache.
+   * @param targetRepo - the pinned target repository.
+   * @param commit - the pinned full commit sha.
+   * @param path - the target-repo-relative path.
+   * @param what - the check name, worded for the failure message.
+   * @returns true when `git ls-tree` lists the path at the commit.
+   */
+  private async trackedAtCommit(
+    memo: Map<string, boolean>,
+    targetRepo: string,
+    commit: string,
+    path: string,
+    what: string,
+  ): Promise<boolean> {
+    const known = memo.get(path)
+    if (known !== undefined) return known
+    const listed = await this.gitAt(
+      targetRepo,
+      `git ls-tree --name-only ${shellQuote(commit)} -- ${shellQuote(path)}`,
+      `${what}: ls-tree over ${path}`,
+    )
+    const tracked = listed.split('\n').some(line => line.trim() === path)
+    memo.set(path, tracked)
+    return tracked
+  }
+
+  /**
+   * Run one read-only git command in the pinned target repository and return
+   * its stdout; exit 1 is a settled empty answer (a `git grep` without a
+   * match), anything else unsettled throws.
+   * @param targetRepo - the pinned target repository.
+   * @param command - the full command line; every variable argument is pre-quoted.
+   * @param what - the subject, worded for the failure message.
+   * @returns the command's stdout text.
+   */
+  private async gitAt(targetRepo: string, command: string, what: string): Promise<string> {
+    const spec = this.ctx.shell.resolve({
+      command,
+      timeoutMs: this.resolved.timeoutSeconds * 1000,
+      stdoutMaxBytes: this.resolved.stdoutMaxBytes,
+      workdir: targetRepo,
+    })
+    const execution = await this.ctx.shell.execute(spec)
+    const result = await execution.result()
+    assertGrepSettled(result, what, 'HARD_VERIFIER_CITATION_FAILED')
+    return result.stdout.text
   }
 
   /**
@@ -563,6 +683,8 @@ export class HardVerifier extends Service {
 
 export { parseVector, scoreVector, macroVector, severityBand } from './cvss4.ts'
 export { GUARDED_SURFACE_PATTERNS, SCREENED_EXTENSIONS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
+export { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
+export type { SinkCitation } from './sink-citation.ts'
 export { claimHash, rootFingerprint } from './fingerprint.ts'
 export { classifyRuns, runSatisfied } from './verdict.ts'
 export type { PoCRunRecord } from './verdict.ts'

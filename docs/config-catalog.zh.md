@@ -1220,7 +1220,7 @@ export interface Config {}
 ## `@deepseek-ai/dsh-experimental-hard-verifier`
 
 - `inject`: `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-verifier/src/index.ts:50`](../packages/experimental/hard-verifier/src/index.ts)
+- `source`: [`packages/experimental/hard-verifier/src/index.ts:51`](../packages/experimental/hard-verifier/src/index.ts)
 
 ```ts config-catalog
 /** Verifier plugin config. */

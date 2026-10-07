@@ -1,5 +1,9 @@
 /** The verifier executes proofs of effect through a scripted shell and records durable verdicts. */
 
+import { execFileSync } from 'node:child_process'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -9,7 +13,7 @@ import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
-import HardVerifier, { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, claimHash, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import HardVerifier, { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, claimHash, declarationCoversLine, parseSinkCitation, rootFingerprint, sampleCellForSpotCheck } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { Config as VerifierConfig } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { HardFindingId } from '@deepseek-ai/dsh-experimental-hard-ledger'
@@ -574,6 +578,142 @@ describe('hard verifier coverage cross-check', () => {
     ]).catch((error: unknown) => error)
     expect((failed as { code?: string }).code).toBe('HARD_VERIFIER_CITATION_FAILED')
     expect((failed as Error).message).toContain('hard flow citations: ls-tree over src/web/render.js failed with exit 2')
+  })
+})
+
+/** A shell service on the `shell` key that really runs commands in the requested workdir, so citation checks run real git. */
+class RealShell extends Service {
+  constructor(ctx: Context) {
+    super(ctx, 'shell')
+  }
+
+  resolve(request: { command: string; timeoutMs?: number; stdoutMaxBytes?: number; workdir?: string }) {
+    return { command: request.command, workdir: request.workdir ?? tmpdir() }
+  }
+
+  async execute(spec: { command: string; workdir: string }) {
+    let stdout = ''
+    let stderr = ''
+    let exitCode: number | null = 0
+    try {
+      stdout = execFileSync('/bin/bash', ['-c', spec.command], {
+        cwd: spec.workdir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      })
+    } catch (error: unknown) {
+      const failure = error as { status?: number | null; stdout?: string; stderr?: string }
+      exitCode = failure.status ?? 1
+      stdout = failure.stdout ?? ''
+      stderr = failure.stderr ?? ''
+    }
+    return Promise.resolve({
+      result: () => Promise.resolve({
+        exitCode, signal: null, timedOut: false, aborted: false, timeoutMs: 0,
+        stdout: { text: stdout, truncated: false },
+        stderr: { text: stderr, truncated: false },
+      }),
+    })
+  }
+}
+
+describe('hard verifier declared-site citations', () => {
+  it('parses path:symbol and path:line with an optional note, and refuses everything else', () => {
+    expect(parseSinkCitation('src/files/store.js:readDoc - confirmed path traversal')).toEqual({ path: 'src/files/store.js', locator: 'readDoc' })
+    expect(parseSinkCitation('lib/util/text.js:slugify')).toEqual({ path: 'lib/util/text.js', locator: 'slugify' })
+    expect(parseSinkCitation('src/reports.js:8 execSync with interpolation')).toEqual({ path: 'src/reports.js', locator: '8', line: 8 })
+    expect(parseSinkCitation('execSync')).toBeUndefined()
+    expect(parseSinkCitation('src/reports.js:')).toBeUndefined()
+    expect(parseSinkCitation(':readDoc')).toBeUndefined()
+    expect(parseSinkCitation('src/reports.js: readDoc')).toBeUndefined()
+    expect(parseSinkCitation('src/reports.js:0')).toBeUndefined()
+  })
+
+  it('matches a grep line to a citation by path and line or symbol, and keeps the legacy substring rule', () => {
+    const line = 'src/auth/exec.ts:5:  return exec(userCmd)'
+    expect(declarationCoversLine('src/auth/exec.ts:exec - spawns the command', line)).toBe(true)
+    expect(declarationCoversLine('src/auth/exec.ts:5', line)).toBe(true)
+    expect(declarationCoversLine('src/auth/exec.ts:6', line)).toBe(false)
+    expect(declarationCoversLine('src/auth/other.ts:exec', line)).toBe(false)
+    expect(declarationCoversLine('src/auth/exec.ts:require', line)).toBe(false)
+    // Declarations that are not citations — older logs, batch-screen patterns — keep the substring rule.
+    expect(declarationCoversLine('exec(userCmd)', line)).toBe(true)
+    expect(declarationCoversLine('spawn', line)).toBe(false)
+  })
+
+  it('keeps a cleared cell standing when a cited site covers each grep match, and reopens what no citation covers', async () => {
+    const { ctx } = await harness(
+      [{ exitCode: 0, stdoutText: 'src/auth/exec.ts:5:  return exec(userCmd)\nsrc/auth/run.ts:9:  spawn(cmd)\n' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, {
+      module: 'src/auth', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['src/auth/exec.ts:exec - guarded by allowlist'],
+    })
+    expect(reopened?.declaredSinks).toEqual(['src/auth/run.ts:9:  spawn(cmd)'])
+  })
+
+  it('resolves cited sites at the pinned commit with git alone, and never treats a binary as resolved content', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hard-verifier-cite-'))
+    try {
+      const repo = join(root, 'repo')
+      await mkdir(join(repo, 'src'), { recursive: true })
+      await mkdir(join(repo, 'lib'), { recursive: true })
+      await writeFile(join(repo, 'src', 'store.js'), "'use strict'\nfunction readDoc(name) {\n  return name\n}")
+      await writeFile(join(repo, 'lib', 'libt.so'), Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x72, 0x75, 0x6e]))
+      const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], {
+        encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      })
+      git('init', '--quiet')
+      git('add', '-A')
+      git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+      const commit = git('rev-parse', 'HEAD').trim()
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionProjectionRegistry)
+      await ctx.plugin(AgentRegistry)
+      new RealShell(ctx)
+      await ctx.plugin(HardLedger, {})
+      await ctx.plugin(HardVerifier, {})
+      const agentStub = stubAgent(`hard-verifier-cite-${Math.random()}`)
+      await ctx.agents.register(agentStub.agent)
+      ctx.hardLedger.recordMissionArmed(agentStub.agent, {
+        objective: 'hunt bugs', targetRepo: repo, commit, modules: ['lib', 'src'], bugClasses: ['cmdi'],
+      })
+      const short = commit.slice(0, 7)
+      const result = await ctx.hardVerifier.checkSinkCitations(agentStub.agent, [
+        'src/store.js:readDoc - entry point, no sink reached',
+        // The final line has no trailing newline and still counts.
+        'src/store.js:4',
+        'src/store.js:fndUser',
+        'src/store.js:5',
+        'src/ghost.js:readDoc',
+        // A binary is tracked, so its citation passes the path check; its
+        // content is never read as resolved — the module is unscreened.
+        'lib/libt.so:run_tool',
+        'execSync',
+      ])
+      expect(result.rejected).toEqual([
+        { sink: 'src/store.js:fndUser', reason: `src/store.js has no fndUser at commit ${short}` },
+        { sink: 'src/store.js:5', reason: `src/store.js has no line 5 at commit ${short}` },
+        { sink: 'src/ghost.js:readDoc', reason: `src/ghost.js is not tracked at commit ${short}` },
+        { sink: 'execSync', reason: 'a declared site must be path:symbol or path:line, optionally followed by a note' },
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed on an unsettled git call and refuses to resolve without a matrix', async () => {
+    const unsettled = await harness([{ exitCode: 128, stderrText: 'fatal: bad object', stdoutText: '' }])
+    const unsettledRoot = armMatrix(unsettled.ctx, '/tmp/hard-target')
+    const failed = await unsettled.ctx.hardVerifier.checkSinkCitations(unsettledRoot, ['src/a.ts:run'])
+      .catch((error: unknown) => error)
+    expect((failed as { code?: string }).code).toBe('HARD_VERIFIER_CITATION_FAILED')
+    expect((failed as Error).message).toContain('hard sink citations: ls-tree over src/a.ts failed with exit 128')
+    const bare = await harness([])
+    const missing = await bare.ctx.hardVerifier.checkSinkCitations(root0Agent(bare.ctx), ['src/a.ts:run'])
+      .catch((error: unknown) => error)
+    expect((missing as { code?: string }).code).toBe('HARD_VERIFIER_NO_MATRIX')
   })
 })
 

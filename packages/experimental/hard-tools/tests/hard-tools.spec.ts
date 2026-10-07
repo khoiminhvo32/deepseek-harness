@@ -70,11 +70,35 @@ interface ScriptedRun {
   readonly timedOut?: boolean
 }
 
+/**
+ * Answers for the verifier's declared-site citation commands: every cited
+ * path is a tracked text file of 999 lines containing any symbol, except the
+ * listed untracked paths.
+ */
+interface CitationAnswers {
+  readonly untracked?: readonly string[]
+}
+
+/** The scripted answer to one citation git command, or `undefined` when the command is not one. */
+function citationAnswer(command: string, answers: CitationAnswers): ScriptedRun | undefined {
+  const path = /-- '([^']+)'$/u.exec(command)?.[1] ?? /:([^']+)' \| awk/u.exec(command)?.[1]
+  if (command.startsWith('git ls-tree')) {
+    return { exitCode: 0, stdoutText: path !== undefined && !(answers.untracked ?? []).includes(path) ? `${path}\n` : '' }
+  }
+  if (command.startsWith('git diff --numstat')) return { exitCode: 0, stdoutText: `1\t0\t${path ?? ''}\n` }
+  if (command.startsWith('git grep')) return { exitCode: 0, stdoutText: `sha:${path ?? ''}:1\n` }
+  if (command.includes("awk 'END")) return { exitCode: 0, stdoutText: '999\n' }
+  return undefined
+}
+
 /** A shell service on the `shell` key cycling a script of outcomes in call order. */
 class SingleRunShell extends Service {
   private readonly calls: { command: string; timeoutMs?: number }[] = []
 
-  constructor(ctx: Context, private readonly script: readonly ScriptedRun[]) {
+  /** Every command this shell received, citation commands included. */
+  readonly commands: string[] = []
+
+  constructor(ctx: Context, private readonly script: readonly ScriptedRun[], private readonly citations?: CitationAnswers) {
     super(ctx, 'shell')
   }
 
@@ -83,9 +107,13 @@ class SingleRunShell extends Service {
   }
 
   async execute(spec: { command: string; timeoutMs?: number }) {
-    void spec
-    this.calls.push({ command: spec.command, ...spec.timeoutMs === undefined ? {} : { timeoutMs: spec.timeoutMs } })
-    const scripted = this.script[(this.calls.length - 1) % this.script.length] as ScriptedRun
+    this.commands.push(spec.command)
+    const answered = this.citations === undefined ? undefined : citationAnswer(spec.command, this.citations)
+    if (answered === undefined) {
+      this.calls.push({ command: spec.command, ...spec.timeoutMs === undefined ? {} : { timeoutMs: spec.timeoutMs } })
+    }
+    const scripted = answered ?? this.script[(this.calls.length - 1) % this.script.length]
+    if (scripted === undefined) throw new Error('scripted shell has no run')
     return {
       result: () => Promise.resolve({
         exitCode: scripted.exitCode,
@@ -106,7 +134,11 @@ const SUBMIT_SCRIPT = (pass: string): ScriptedRun[] => [
   { exitCode: 0, stdoutText: pass },
 ]
 
-async function harness(scripted: ScriptedRun | readonly ScriptedRun[], verifyConfig: VerifierConfig = { runs: 1 }) {
+async function harness(
+  scripted: ScriptedRun | readonly ScriptedRun[],
+  verifyConfig: VerifierConfig = { runs: 1 },
+  citations?: CitationAnswers,
+) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -114,12 +146,12 @@ async function harness(scripted: ScriptedRun | readonly ScriptedRun[], verifyCon
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(HardLedger, {})
-  new SingleRunShell(ctx, Array.isArray(scripted) ? scripted : [scripted])
+  const shell = new SingleRunShell(ctx, Array.isArray(scripted) ? scripted : [scripted], citations)
   await ctx.plugin(HardVerifier, verifyConfig)
   const fiber = await ctx.plugin(hardTools, {})
   const root = stubAgent(`hard-tools-root-${Math.random()}`)
   await ctx.agents.register(root.agent)
-  return { ctx, fiber, root }
+  return { ctx, fiber, root, shell }
 }
 
 const testSignal = new AbortController().signal
@@ -335,6 +367,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     const { ctx, root } = await harness(
       { exitCode: 0, stdoutText: 'src/db/exec.ts:9: exec(userCmd)\n' },
       { runs: 1, coverageSpotCheckPercent: 100 },
+      {},
     )
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
@@ -354,10 +387,51 @@ describe('hard_update_hypothesis and methodology tools', () => {
     ])
   })
 
+  it('refuses a clear whose declared sites do not resolve at the pinned commit, naming each, and records nothing', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 100 }, {
+      untracked: ['src/db/ghost.ts'],
+    })
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/db'],
+      bugClasses: ['cmdi'],
+    })
+    const refused = await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'cmdi', verdict: 'cleared',
+      declared_sinks: ['src/db/query.ts:runQuery - parameterized', 'src/db/ghost.ts:exec', 'execSync'],
+    }, root.agent)
+    expect(refused.isError).toBe(true)
+    const text = (refused.content[0] as { type: string; text: string }).text
+    expect(text).toContain('every declared site must resolve at the pinned commit')
+    expect(text).toContain('src/db/ghost.ts:exec (src/db/ghost.ts is not tracked at commit aaaaaaa)')
+    expect(text).toContain('execSync (a declared site must be path:symbol or path:line, optionally followed by a note)')
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+    // The cross-check never ran: the refusal precedes the record and the audit.
+    expect(shell.commands.some(command => command.startsWith('grep -rInE'))).toBe(false)
+  })
+
+  it('resolves cleared sites only: a suspicious verdict records without any citation command', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 100 }, {})
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['src/db'],
+      bugClasses: ['cmdi'],
+    })
+    resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'cmdi', verdict: 'suspicious', declared_sinks: ['the query builder looks unsafe'],
+    }, root.agent))
+    expect(shell.commands).toEqual([])
+  })
+
   it('marks the cell suspicious and fails the tool call when the cross-check grep errors', async () => {
     const { ctx, root } = await harness(
       { exitCode: 2, stdoutText: '' },
       { runs: 1, coverageSpotCheckPercent: 100 },
+      {},
     )
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
@@ -502,7 +576,11 @@ describe('hard_update_hypothesis and methodology tools', () => {
   it('refuses a batch over a module the harness cannot screen before any grep runs', async () => {
     // A grep that would match proves the refusal precedes the screen: had the
     // screen run, this batch would have returned evidence instead of an error.
-    const { ctx, root } = await harness({ exitCode: 0, stdoutText: 'wp/admin/ajax.php:9: passthru($cmd)\n' })
+    const { ctx, root } = await harness(
+      { exitCode: 0, stdoutText: 'wp/admin/ajax.php:9: passthru($cmd)\n' },
+      { runs: 1, coverageSpotCheckPercent: 0 },
+      {},
+    )
     ctx.hardLedger.recordMissionArmed(root.agent, {
       objective: 'hunt bugs in the target repository',
       targetRepo: '/tmp/hard-target',

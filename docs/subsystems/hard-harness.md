@@ -373,6 +373,26 @@ async auditCoverage(agent: Agent, cell: CoverageAuditCell): Promise<CoverageReop
 async checkFlowCitations( agent: Agent, citations: readonly FlowCitationEntry[], ): Promise<{ rejected: readonly FlowCitationReject[] }>
 
 /**
+ * Resolve every declared site of a `cleared` coverage cell against the
+ * pinned commit, through git alone so the outcome does not depend on the
+ * host's `grep`. A site passes when its path is tracked at the commit and,
+ * for a text file, the commit's file has the cited line or contains the
+ * cited symbol (`git grep -I -F`). A binary — classified by a numstat diff
+ * against the empty tree, the content test `grep -I` applies — passes the
+ * path check without its content being read as resolved: its module is
+ * unscreened, so the clear stands as a blind clear. A symbol match can sit in
+ * a comment; this guards against citing code that does not exist, not
+ * against a wrong clear. It fails closed: a git invocation that errors,
+ * times out, or is aborted throws instead of reading as a verdict.
+ * @param agent - the live agent whose ledger matrix carries the pinned commit.
+ * @param sinks - the declared-site strings, in any order.
+ * @returns the refused sites with per-site reasons; empty means every site resolved.
+ * @throws `HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.
+ * @throws `HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.
+ */
+async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ rejected: readonly SinkCitationReject[] }>
+
+/**
  * Mechanical screen behind the batch clear: grep the requested modules for
  * the union of the model's patterns and the class's fixed patterns,
  * anchored at the pinned target repository. The union means the model's

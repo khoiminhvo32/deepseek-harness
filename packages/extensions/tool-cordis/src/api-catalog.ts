@@ -1427,6 +1427,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['`HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.', '`HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.'],
       },
       {
+        signature: 'async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ rejected: readonly SinkCitationReject[] }>',
+        description: 'Resolve every declared site of a `cleared` coverage cell against the pinned commit, through git alone so the outcome does not depend on the host\'s `grep`. A site passes when its path is tracked at the commit and, for a text file, the commit\'s file has the cited line or contains the cited symbol (`git grep -I -F`). A binary — classified by a numstat diff against the empty tree, the content test `grep -I` applies — passes the path check without its content being read as resolved: its module is unscreened, so the clear stands as a blind clear. A symbol match can sit in a comment; this guards against citing code that does not exist, not against a wrong clear. It fails closed: a git invocation that errors, times out, or is aborted throws instead of reading as a verdict.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the pinned commit.' }, { name: 'sinks', description: 'the declared-site strings, in any order.' }],
+        returns: 'the refused sites with per-site reasons; empty means every site resolved.',
+        throws: ['`HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.', '`HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.'],
+      },
+      {
         signature: 'async screenModules( agent: Agent, bugClass: string, modules: readonly string[], patterns: readonly string[], ): Promise<{ clean: boolean; evidence: readonly string[] }>',
         description: 'Mechanical screen behind the batch clear: grep the requested modules for the union of the model\'s patterns and the class\'s fixed patterns, anchored at the pinned target repository. The union means the model\'s patterns can only ADD matches, never subtract — a narrow pattern choice cannot sneak past the harness table. Any match fails the whole batch and returns the matching lines as evidence for a manual read. An empty grep is silence, not proof of absence: the caller records the cells as a batch screen, the weakest model tier, and refuses modules the tables cannot screen before this runs. The pattern table follows the class\'s reading: guarded-surface classes grep for the exported operations, sink classes grep for the sink shapes, and the one remaining absence-shaped class (`login-bypass`) is refused — for its protective sinks an empty grep is suspicious, not clean.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix anchors the grep.' }, { name: 'bugClass', description: 'the bug class to prove absent.' }, { name: 'modules', description: 'the target-repo-relative modules to grep.' }, { name: 'patterns', description: 'the model\'s own extended-regex absence patterns.' }],
@@ -7533,6 +7540,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SignInErrorCode',
     declaration: 'export type SignInErrorCode = \'no-response\' | \'network\' | \'protocol\' | \'expired\' | \'storage\';',
+  },
+  {
+    name: 'SinkCitationReject',
+    declaration: 'export interface SinkCitationReject {\n    readonly sink: string;\n    readonly reason: string;\n}',
   },
   {
     name: 'SkillCandidate',

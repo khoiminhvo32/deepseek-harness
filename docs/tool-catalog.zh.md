@@ -1428,7 +1428,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_mark_coverage`
 
-Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol or path:line (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
 
 ```json
 {
@@ -1453,7 +1453,7 @@ Record one coverage cell verdict for the systematic pass: a module swept for one
     },
     "declared_sinks": {
       "type": "array",
-      "description": "Code sites inspected, as path:symbol or path:line plus an optional note; required for cleared."
+      "description": "Code sites inspected, as path:symbol, path:line, or path:start-end plus an optional note; required for cleared."
     }
   },
   "required": [
@@ -1826,7 +1826,6 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
     }
   },
   "required": [
-
     "status"
   ]
 }

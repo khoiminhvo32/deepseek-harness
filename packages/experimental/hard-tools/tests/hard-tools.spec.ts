@@ -422,7 +422,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     const text = (refused.content[0] as { type: string; text: string }).text
     expect(text).toContain('every declared site must resolve at the pinned commit')
     expect(text).toContain('src/db/ghost.ts:exec (src/db/ghost.ts is not tracked at commit aaaaaaa)')
-    expect(text).toContain('execSync (a declared site must be path:symbol or path:line, optionally followed by a note)')
+    expect(text).toContain('execSync (a declared site must be path:symbol, path:line, or path:start-end, optionally followed by a note)')
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
     // The cross-check never ran: the refusal precedes the record and the audit.
     expect(shell.commands.some(command => command.startsWith('grep -rInE'))).toBe(false)

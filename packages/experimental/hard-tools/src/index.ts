@@ -47,7 +47,7 @@ const HYPOTHESIS_DESCRIPTION = 'Propose a new hypothesis, or move an existing on
 const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systematic pass: a module swept for one '
   + 'bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you '
   + 'created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected '
-  + 'for this class, each written path:symbol or path:line (target-repo relative), optionally followed by a space '
+  + 'for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space '
   + 'and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site '
   + 'at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module '
   + 'against your declared list. '
@@ -360,7 +360,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       bug_class: { type: 'string', required: true, description: 'Bug class swept in this cell.' },
       verdict: { type: 'string', required: true, enum: ['cleared', 'suspicious', 'uncovered'], description: 'Cell verdict.' },
       declared_sinks: {
-        type: 'array', description: 'Code sites inspected, as path:symbol or path:line plus an optional note; required for cleared.',
+        type: 'array', description: 'Code sites inspected, as path:symbol, path:line, or path:start-end plus an optional note; required for cleared.',
       },
     },
     output: {
@@ -387,8 +387,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       const cell = { module: args.module, bugClass: args.bug_class, verdict: args.verdict, declaredSinks }
       // The ledger's row checks are cheap and decide first, so a refused cell
       // never costs a git call.
-      ledger.assertModulesInMatrix(agent, [cell.module])
-      if (cell.verdict === 'cleared') ledger.assertClearableModules(agent, [cell.module])
+      ledger.assertCoverageCell(agent, cell)
       // A clear claims the cited code was read: resolve every site at the
       // pinned commit before the record exists. Without an armed matrix there
       // is no commit to resolve against, and the merge-extensible default holds.

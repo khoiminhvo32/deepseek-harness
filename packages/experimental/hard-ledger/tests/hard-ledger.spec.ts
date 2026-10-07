@@ -703,6 +703,24 @@ describe('hard ledger coverage matrix', () => {
       .toThrow('modules "data/manuals", "docs" are inert — the harness already screened them as containing no code')
   })
 
+  it('records a repository-scoped class on the whole-repository cell, whatever the root module is', async () => {
+    const { ctx, root } = await harness()
+    // No root files at all, so "." is not a row; the pilot's root held only a README, so "." was inert.
+    const armed = {
+      objective: 'hunt bugs', targetRepo: '/tmp/hard-target', commit: 'c'.repeat(40),
+      modules: ['docs', 'src'], bugClasses: ['cmdi', 'dependencies', 'misconfig'], inertModules: ['docs'],
+    }
+    ctx.hardLedger.recordMissionArmed(root.agent, armed)
+    ctx.hardLedger.markCoverage(root.agent, { module: '.', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['src/app.js:require'] })
+    ctx.hardLedger.markCoverage(root.agent, { module: '.', bugClass: 'misconfig', verdict: 'suspicious', declaredSinks: [] })
+    expect(ctx.hardLedger.uncoveredCells(root.agent).filter(cell => cell.module === '.')).toEqual([])
+    // An inert row named for a repository class still records: the row is not what the class covers.
+    ctx.hardLedger.markCoverage(root.agent, { module: 'docs', bugClass: 'misconfig', verdict: 'cleared', declaredSinks: ['config/app.yml:15'] })
+    // A module-scoped class keeps the row and inert checks.
+    expect(() => { ctx.hardLedger.markCoverage(root.agent, { module: '.', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['x'] }) })
+      .toThrow('module "." is not in the armed coverage matrix')
+  })
+
   it('bounds the valid-rows list in the rejection message', async () => {
     const { ctx, root } = await harness()
     ctx.hardLedger.recordMissionArmed(root.agent, {

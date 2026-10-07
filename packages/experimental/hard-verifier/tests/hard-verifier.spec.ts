@@ -617,10 +617,13 @@ class RealShell extends Service {
 }
 
 describe('hard verifier declared-site citations', () => {
-  it('parses path:symbol and path:line with an optional note, and refuses everything else', () => {
+  it('parses path:symbol, path:line, and path:start-end with an optional note, and refuses everything else', () => {
     expect(parseSinkCitation('src/files/store.js:readDoc - confirmed path traversal')).toEqual({ path: 'src/files/store.js', locator: 'readDoc' })
     expect(parseSinkCitation('lib/util/text.js:slugify')).toEqual({ path: 'lib/util/text.js', locator: 'slugify' })
-    expect(parseSinkCitation('src/reports.js:8 execSync with interpolation')).toEqual({ path: 'src/reports.js', locator: '8', line: 8 })
+    expect(parseSinkCitation('src/reports.js:8 execSync with interpolation')).toEqual({ path: 'src/reports.js', locator: '8', lines: { first: 8, last: 8 } })
+    expect(parseSinkCitation('src/web/routes.js:14-24 dispatches every view')).toEqual({ path: 'src/web/routes.js', locator: '14-24', lines: { first: 14, last: 24 } })
+    expect(parseSinkCitation('src/web/routes.js:24-14')).toBeUndefined()
+    expect(parseSinkCitation('src/web/routes.js:0-3')).toBeUndefined()
     expect(parseSinkCitation('execSync')).toBeUndefined()
     expect(parseSinkCitation('src/reports.js:')).toBeUndefined()
     expect(parseSinkCitation(':readDoc')).toBeUndefined()
@@ -633,6 +636,8 @@ describe('hard verifier declared-site citations', () => {
     expect(declarationCoversLine('src/auth/exec.ts:exec - spawns the command', line)).toBe(true)
     expect(declarationCoversLine('src/auth/exec.ts:5', line)).toBe(true)
     expect(declarationCoversLine('src/auth/exec.ts:6', line)).toBe(false)
+    expect(declarationCoversLine('src/auth/exec.ts:3-7 the command path', line)).toBe(true)
+    expect(declarationCoversLine('src/auth/exec.ts:6-9', line)).toBe(false)
     expect(declarationCoversLine('src/auth/other.ts:exec', line)).toBe(false)
     expect(declarationCoversLine('src/auth/exec.ts:require', line)).toBe(false)
     // Declarations that are not citations — older logs, batch-screen patterns — keep the substring rule.
@@ -686,6 +691,8 @@ describe('hard verifier declared-site citations', () => {
         'src/store.js:4',
         'src/store.js:fndUser',
         'src/store.js:5',
+        'src/store.js:2-4 the whole reader',
+        'src/store.js:3-6',
         'src/ghost.js:readDoc',
         // A binary is tracked, so its citation passes the path check; its
         // content is never read as resolved — the module is unscreened.
@@ -695,8 +702,9 @@ describe('hard verifier declared-site citations', () => {
       expect(result.rejected).toEqual([
         { sink: 'src/store.js:fndUser', reason: `src/store.js has no fndUser at commit ${short}` },
         { sink: 'src/store.js:5', reason: `src/store.js has no line 5 at commit ${short}` },
+        { sink: 'src/store.js:3-6', reason: `src/store.js has no line 6 at commit ${short}` },
         { sink: 'src/ghost.js:readDoc', reason: `src/ghost.js is not tracked at commit ${short}` },
-        { sink: 'execSync', reason: 'a declared site must be path:symbol or path:line, optionally followed by a note' },
+        { sink: 'execSync', reason: 'a declared site must be path:symbol, path:line, or path:start-end, optionally followed by a note' },
       ])
     } finally {
       await rm(root, { recursive: true, force: true })

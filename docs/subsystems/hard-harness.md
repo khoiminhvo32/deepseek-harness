@@ -72,10 +72,11 @@ recordVerdict(agent: Agent, data: HardFindingVerdictData): void
 /**
  * Propose a new hypothesis or transition an existing one through its lifecycle.
  * @param agent - the live agent whose session receives the record.
- * @param request - statement, status, optional existing id, and conditional reason.
+ * @param request - status, statement (omittable for an existing id, which keeps its
+ *   statement), optional existing id, and conditional reason.
  * @returns the assigned or confirmed hypothesis id.
  */
-writeHypothesis( agent: Agent, request: { id?: string; statement: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId
+writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId
 
 /**
  * Append one coverage cell verdict, replacing any prior verdict for the cell.
@@ -83,6 +84,20 @@ writeHypothesis( agent: Agent, request: { id?: string; statement: string; status
  * @param request - the cell coordinates, verdict, and declared sink sites; the module must be an armed matrix row when a matrix exists.
  */
 markCoverage(agent: Agent, request: HardCoverageCellData): void
+
+/**
+ * Validate the cell one coverage verdict names. A module-scoped class takes
+ * a matrix row, and a cleared verdict refuses an inert row — it duplicates
+ * the screen the harness already ran, while suspicious stays accepted so a
+ * real sighting surfaces. A repository-scoped class has one cell for the
+ * whole repository that a verdict on any module records, so no row check
+ * applies: the root module `.` the steering names may be inert, or no row
+ * at all, without affecting what the class covers.
+ * @param agent - the live agent whose ledger matrix anchors the check.
+ * @param cell - the module, bug class, and verdict being recorded.
+ * @throws `HARD_LEDGER_MODULE_NOT_IN_MATRIX` or `HARD_LEDGER_INERT_MODULE` for a module-scoped class, as the row checks do.
+ */
+assertCoverageCell(agent: Agent, cell: Pick<HardCoverageCellData, 'module' | 'bugClass' | 'verdict'>): void
 
 /**
  * Reject modules outside the armed coverage matrix, naming the valid rows

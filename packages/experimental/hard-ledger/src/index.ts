@@ -26,6 +26,7 @@ import {
   refutationBreakdownFromState,
   uncoveredCellsFromState,
 } from './aggregate.ts'
+import { classScope } from './scope.ts'
 import type {
   CompletionAssessment,
   CoverageBySource,
@@ -425,10 +426,7 @@ export class HardLedger extends Service {
   markCoverage(agent: Agent, request: HardCoverageCellData): void {
     this.assertText('module', request.module)
     this.assertText('bugClass', request.bugClass)
-    this.assertModulesInMatrix(agent, [request.module])
-    // A cleared verdict on an inert module duplicates the screen the harness
-    // already ran; suspicious stays accept-able so a real sighting surfaces.
-    if (request.verdict === 'cleared') this.assertClearableModules(agent, [request.module])
+    this.assertCoverageCell(agent, request)
     const verdicts: readonly HardCoverageVerdict[] = ['cleared', 'suspicious', 'uncovered']
     if (!verdicts.includes(request.verdict)) {
       throw new HarnessError(
@@ -452,6 +450,24 @@ export class HardLedger extends Service {
       declaredSinks: [...request.declaredSinks],
       ...(request.source === undefined ? {} : { source: request.source }),
     })
+  }
+
+  /**
+   * Validate the cell one coverage verdict names. A module-scoped class takes
+   * a matrix row, and a cleared verdict refuses an inert row — it duplicates
+   * the screen the harness already ran, while suspicious stays accepted so a
+   * real sighting surfaces. A repository-scoped class has one cell for the
+   * whole repository that a verdict on any module records, so no row check
+   * applies: the root module `.` the steering names may be inert, or no row
+   * at all, without affecting what the class covers.
+   * @param agent - the live agent whose ledger matrix anchors the check.
+   * @param cell - the module, bug class, and verdict being recorded.
+   * @throws `HARD_LEDGER_MODULE_NOT_IN_MATRIX` or `HARD_LEDGER_INERT_MODULE` for a module-scoped class, as the row checks do.
+   */
+  assertCoverageCell(agent: Agent, cell: Pick<HardCoverageCellData, 'module' | 'bugClass' | 'verdict'>): void {
+    if (classScope(cell.bugClass) === 'repo') return
+    this.assertModulesInMatrix(agent, [cell.module])
+    if (cell.verdict === 'cleared') this.assertClearableModules(agent, [cell.module])
   }
 
   /**

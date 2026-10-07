@@ -535,7 +535,7 @@ export class HardVerifier extends Service {
     for (const sink of sinks) {
       const citation = parseSinkCitation(sink)
       if (citation === undefined) {
-        rejected.push({ sink, reason: 'a declared site must be path:symbol or path:line, optionally followed by a note' })
+        rejected.push({ sink, reason: 'a declared site must be path:symbol, path:line, or path:start-end, optionally followed by a note' })
         continue
       }
       const { path } = citation
@@ -554,7 +554,7 @@ export class HardVerifier extends Service {
         binary.set(path, isBinary)
       }
       if (isBinary) continue
-      if (citation.line !== undefined) {
+      if (citation.lines !== undefined) {
         let count = lineCounts.get(path)
         if (count === undefined) {
           count = Number((await this.gitAt(
@@ -564,7 +564,8 @@ export class HardVerifier extends Service {
           )).trim())
           lineCounts.set(path, count)
         }
-        if (citation.line > count) rejected.push({ sink, reason: `${path} has no line ${citation.line} at commit ${short}` })
+        const last = citation.lines.last
+        if (last > count) rejected.push({ sink, reason: `${path} has no line ${last} at commit ${short}` })
         continue
       }
       const found = await this.gitAt(

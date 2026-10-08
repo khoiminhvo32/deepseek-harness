@@ -350,6 +350,19 @@ The hard-harness verifier on the `hardVerifier` key: rejects duplicates, execute
 async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingProposedData, 'id'>, ): Promise<HardFindingVerdictData>
 
 /**
+ * Refuse a proposal the verifier could never decide: a root cause a
+ * confirmed finding already holds, or a CVSS vector that does not parse.
+ * Callers run it before appending the proposal, so a refused claim never
+ * becomes a finding that awaits verification forever; `verify` runs it
+ * again for callers that skip it.
+ * @param agent - the live agent whose ledger holds the findings.
+ * @param request - the proposal fields, with its id once it has been appended.
+ * @returns the recomputed score and whether the claimed score matches it.
+ * @throws `HARD_VERIFIER_DUPLICATE` or `HARD_VERIFIER_INVALID_VECTOR`.
+ */
+assertVerifiable( agent: Agent, request: Pick<HardFindingRequest, 'fingerprint' | 'cvssVector' | 'cvssClaimed'> & { readonly id?: string }, ): { computed: number; match: boolean }
+
+/**
  * Deterministic cross-check of one `cleared` coverage cell, branched by the
  * class's reading. Presence classes (the default): re-grep the module
  * against the fixed sink patterns and reopen the cell as `suspicious` when
@@ -358,7 +371,9 @@ async verify( agent: Agent, proposed: HardFindingRequest & Pick<HardFindingPropo
  * module still exports an operation the model never declared a guard for —
  * the reopening evidence is the missed operation names. Both greps run from
  * the pinned target repository the armed coverage matrix records, so the
- * module path is always target-repo relative. Sampling follows the
+ * module path is always target-repo relative: a repository-scoped class
+ * greps the whole tree, and the root module `.` greps only the files at the
+ * root. Sampling follows the
  * configured spot-check percent by cell hash; an unsampled cell, a
  * non-cleared cell, a class without applicable patterns, a missing matrix,
  * or a grep with no undeclared matches returns `undefined` and changes
@@ -414,7 +429,8 @@ async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ reje
 /**
  * Mechanical screen behind the batch clear: grep the requested modules for
  * the union of the model's patterns and the class's fixed patterns,
- * anchored at the pinned target repository. The union means the model's
+ * anchored at the pinned target repository; the root module `.` greps only
+ * the files at the root. The union means the model's
  * patterns can only ADD matches, never subtract — a narrow pattern choice
  * cannot sneak past the harness table. Any match fails the whole batch and
  * returns the matching lines as evidence for a manual read. An empty grep

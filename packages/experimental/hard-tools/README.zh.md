@@ -31,7 +31,7 @@ kind: "package-reference"
   name: '@deepseek-ai/dsh-experimental-hard-tools'
 ```
 
-七个工具都要求存活代理并返回紧凑 JSON。提交结果携带 `verdict.verdict`、运行次数、重算分数、声称分数是否匹配以及有界的 reason；拒绝以 `HARD_VERIFIER_DUPLICATE` 等稳定代码浮现。生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools)是模型收到的确切 schema。
+七个工具都要求存活代理并返回紧凑 JSON。提交结果携带 `verdict.verdict`、运行次数、重算分数、声称分数是否匹配以及有界的 reason；拒绝以 `HARD_VERIFIER_DUPLICATE` 等稳定代码浮现；因根因重复或向量无法解析而被拒绝的提交不会记录任何提案。生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools)是模型收到的确切 schema。
 
 -----
 

@@ -297,6 +297,8 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
         }),
         ...known === undefined ? {} : { hypothesisId: known },
       }
+      // A claim the verifier could never decide is refused before it becomes a finding that awaits verification forever.
+      verifier.assertVerifiable(exec.agent, request)
       const id = ledger.proposeFinding(exec.agent, request)
       const verdict = await verifier.verify(exec.agent, { ...request, id })
       return {

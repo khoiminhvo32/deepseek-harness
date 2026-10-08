@@ -725,6 +725,90 @@ describe('hard verifier declared-site citations', () => {
   })
 })
 
+describe('hard verifier root module and repository classes', () => {
+  /** Run one command the verifier built under real bash in `cwd`, as the shell seam would. */
+  function runUnderBash(command: string, cwd: string): { status: number; stdout: string } {
+    try {
+      return { status: 0, stdout: execFileSync('bash', ['-c', command], { cwd, encoding: 'utf8' }) }
+    } catch (error: unknown) {
+      const failed = error as { status: number; stdout: string }
+      return { status: failed.status, stdout: failed.stdout }
+    }
+  }
+
+  it('greps only the root files for the root module, under real bash', async () => {
+    const { ctx, shell } = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    expect(await ctx.hardVerifier.auditCoverage(root, { module: '.', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['app.js:1'] }))
+      .toBeUndefined()
+    const command = shell.runs[0]?.command ?? ''
+    expect(command).not.toContain('grep -rInE')
+    const tree = await mkdtemp(join(tmpdir(), 'hard-root-grep-'))
+    try {
+      // An empty root settles clean instead of letting grep read stdin.
+      expect(runUnderBash(command, tree)).toEqual({ status: 0, stdout: '' })
+      await mkdir(join(tree, 'sub'))
+      await writeFile(join(tree, 'sub/deep.js'), 'exec(cmd)\n')
+      await writeFile(join(tree, '.hidden.js'), 'execSync(x)\n')
+      await writeFile(join(tree, 'app.js'), 'const a = 1\nsystem(cmd)\n')
+      const found = runUnderBash(command, tree)
+      expect(found.status).toBe(0)
+      expect(found.stdout.split('\n').filter(Boolean).sort()).toEqual(['.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'])
+    } finally {
+      await rm(tree, { recursive: true, force: true })
+    }
+  })
+
+  it('greps the whole tree for a repository class on any module and matches ./-prefixed paths to citations', async () => {
+    const { ctx, shell } = await harness(
+      [{ exitCode: 0, stdoutText: './package.json:3:  "dependencies": {\n./vendor/lib/package.json:2:  "dependencies": {}\n' }],
+      { coverageSpotCheckPercent: 100 },
+    )
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, {
+      module: 'src/auth', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['package.json:dependencies'],
+    })
+    expect(shell.runs[0]?.command).toMatch(/^grep -rInE '.*' \.$/u)
+    expect(reopened).toEqual({
+      module: 'src/auth', bugClass: 'dependencies', verdict: 'suspicious',
+      declaredSinks: ['vendor/lib/package.json:2:  "dependencies": {}'], source: 'harness',
+    })
+  })
+
+  it('batch-screens the root module apart from the directory modules and merges the evidence', async () => {
+    const { ctx, shell } = await harness([
+      { exitCode: 0, stdoutText: 'src/auth/run.js:4:exec(cmd)\n' },
+      { exitCode: 0, stdoutText: 'app.js:2:system(cmd)\n' },
+    ])
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const screen = await ctx.hardVerifier.screenModules(root, 'cmdi', ['src/auth', '.'], ['spawn'])
+    expect(screen).toEqual({ clean: false, evidence: ['src/auth/run.js:4:exec(cmd)', 'app.js:2:system(cmd)'] })
+    expect(shell.runs[0]?.command).toMatch(/^grep -rInE '.*' 'src\/auth'$/u)
+    expect(shell.runs[1]?.command).toContain('grep -HInE')
+    const rootOnly = await harness([{ exitCode: 1, stdoutText: '' }])
+    const rootOnlyAgent = armMatrix(rootOnly.ctx, '/tmp/hard-target')
+    expect(await rootOnly.ctx.hardVerifier.screenModules(rootOnlyAgent, 'cmdi', ['.'], ['spawn'])).toEqual({ clean: true, evidence: [] })
+    expect(rootOnly.shell.runs).toHaveLength(1)
+  })
+
+  it('refuses an undecidable proposal before it is recorded', async () => {
+    const claim = 'Checked before the proposal exists.'
+    const { ctx, root, shell } = await harness([benignFail, { exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` }], { runs: 1 })
+    const request = findingRequest(claim)
+    const badVector = await Promise.resolve().then(() => ctx.hardVerifier.assertVerifiable(root.agent, {
+      ...request, cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:U/SI:N/SA:N',
+    })).catch((error: unknown) => error)
+    expect((badVector as { code?: string }).code).toBe('HARD_VERIFIER_INVALID_VECTOR')
+    expect((badVector as Error).message).toMatch(/^proposal: cvss vector does not parse/u)
+    expect(ctx.hardVerifier.assertVerifiable(root.agent, request)).toEqual({ computed: 9.3, match: true })
+    const id = ctx.hardLedger.proposeFinding(root.agent, request)
+    await ctx.hardVerifier.verify(root.agent, { ...request, id })
+    expect(() => ctx.hardVerifier.assertVerifiable(root.agent, request))
+      .toThrow('proposal: a confirmed finding with the same root cause already exists (F-1)')
+    expect(shell.runs).toHaveLength(2)
+  })
+})
+
 describe('hard verifier config and shape', () => {
   it('validates direct-apply config fail-loud', () => {
     expect(() => new HardVerifier(new Context(), { runs: 0 }))

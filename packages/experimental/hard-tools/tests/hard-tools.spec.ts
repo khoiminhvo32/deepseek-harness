@@ -288,6 +288,25 @@ describe('hard_submit_finding', () => {
     expect(second.error?.info?.code).toBe('HARD_VERIFIER_DUPLICATE')
   })
 
+  it('refuses an unparsable vector and a duplicate root cause before recording a proposal', async () => {
+    const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
+    const args = {
+      title: 'SQL injection in login lookup',
+      bug_class: 'sqli', component: 'src/auth/login.ts', symbol: 'login()',
+      claim: CLAIM, cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'poc/poc.sh', payload: "x' OR 1=1 --",
+    }
+    const badVector = await execute(ctx, 'hard_submit_finding', {
+      ...args, cvss_vector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:U/SI:N/SA:N',
+    }, root.agent)
+    expect(badVector.error?.info?.code).toBe('HARD_VERIFIER_INVALID_VECTOR')
+    expect(ctx.hardLedger.findings(root.agent)).toEqual([])
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
+    await execute(ctx, 'hard_submit_finding', args, root.agent)
+    const duplicate = await execute(ctx, 'hard_submit_finding', args, root.agent)
+    expect(duplicate.error?.info?.code).toBe('HARD_VERIFIER_DUPLICATE')
+    expect(ctx.hardLedger.findings(root.agent)).toHaveLength(1)
+  })
+
   it('rejects a finding that cites an unknown hypothesis', async () => {
     const { ctx, root } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
     const result = await execute(ctx, 'hard_submit_finding', {

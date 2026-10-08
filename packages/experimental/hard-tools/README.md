@@ -31,7 +31,7 @@ Mount the plugin with the hard ledger and verifier.
   name: '@deepseek-ai/dsh-experimental-hard-tools'
 ```
 
-All seven tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
+All seven tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`, and a submission refused for a duplicate root cause or an unparsable vector records no proposal. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
 
 -----
 

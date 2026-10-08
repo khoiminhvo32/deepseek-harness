@@ -16,7 +16,7 @@ import type {
   HardFindingRequest,
   HardFindingVerdictData,
 } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { cellSampledForPercent, pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { cellSampledForPercent, classScope, pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
 import { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 import { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
@@ -155,15 +155,44 @@ function assertGrepSettled(result: GrepOutcome, what: string, code: string): voi
   }
 }
 
+/**
+ * The grep command over one coverage cell's code. A repository-scoped class
+ * greps the whole tree whatever module recorded it; the root module of a
+ * module-scoped class greps only the files directly at the root, because its
+ * cell does not cover the subdirectories (their own modules do); any other
+ * module greps its directory.
+ * @param pattern - the shell-quoted extended-regex alternation.
+ * @param module - the cell's module.
+ * @param bugClass - the cell's bug class.
+ * @returns the command line, run from the target repository root.
+ */
+function cellGrep(pattern: string, module: string, bugClass: string): string {
+  if (classScope(bugClass) === 'repo') return `grep -rInE ${pattern} .`
+  if (module !== '.') return `grep -rInE ${pattern} ${shellQuote(module)}`
+  return 'set --; for f in * .[!.]* ..?*; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done; '
+    + `if [ "$#" -gt 0 ]; then grep -HInE ${pattern} -- "$@"; fi`
+}
+
+/**
+ * The non-empty lines of one grep's output, with the `./` a recursive grep
+ * over `.` prefixes to every path removed so the paths compare with
+ * target-relative citations.
+ * @param stdout - the grep's stdout.
+ * @returns the trimmed match lines.
+ */
+function grepLines(stdout: string): string[] {
+  return stdout.split('\n').map(line => line.trim().replace(/^\.\//u, '')).filter(line => line.length > 0)
+}
+
 /** Deterministically recompute the score and compare with the model's claim. */
-function recomputeCvss(proposed: HardFindingProposedData): { computed: number; match: boolean } {
+function recomputeCvss(proposed: Pick<HardFindingProposedData, 'cvssVector' | 'cvssClaimed'>, subject: string): { computed: number; match: boolean } {
   let computed: number
   try {
     computed = scoreVector(parseVector(proposed.cvssVector))
   } catch (error: unknown) {
     /* v8 ignore next -- defensive: parseVector only throws Error instances */
     throw new HarnessError(
-      `${proposed.id}: cvss vector does not parse: ${error instanceof Error ? error.message : String(error)}`,
+      `${subject}: cvss vector does not parse: ${error instanceof Error ? error.message : String(error)}`,
       'HARD_VERIFIER_INVALID_VECTOR',
     )
   }
@@ -275,17 +304,7 @@ export class HardVerifier extends Service {
   ): Promise<HardFindingVerdictData> {
     const config = this.resolved
     const ledger = this.ctx.hardLedger
-    for (const record of ledger.findings(agent)) {
-      if (record.proposed.fingerprint === proposed.fingerprint && record.proposed.id !== proposed.id
-        && record.verdict?.verdict === 'confirmed') {
-        throw new HarnessError(
-          `${proposed.id}: a confirmed finding with the same root cause already exists (${record.proposed.id})`,
-          'HARD_VERIFIER_DUPLICATE',
-        )
-      }
-    }
-
-    const { computed, match } = recomputeCvss(proposed)
+    const { computed, match } = this.assertVerifiable(agent, proposed)
     const matrix = ledger.coverageMatrix(agent)
     const workdir = config.pocWorkdir ?? matrix?.targetRepo
     const command = (payload: string): string => `bash ${shellQuote(proposed.pocPath)} ${shellQuote(payload)}`
@@ -346,6 +365,34 @@ export class HardVerifier extends Service {
   }
 
   /**
+   * Refuse a proposal the verifier could never decide: a root cause a
+   * confirmed finding already holds, or a CVSS vector that does not parse.
+   * Callers run it before appending the proposal, so a refused claim never
+   * becomes a finding that awaits verification forever; `verify` runs it
+   * again for callers that skip it.
+   * @param agent - the live agent whose ledger holds the findings.
+   * @param request - the proposal fields, with its id once it has been appended.
+   * @returns the recomputed score and whether the claimed score matches it.
+   * @throws `HARD_VERIFIER_DUPLICATE` or `HARD_VERIFIER_INVALID_VECTOR`.
+   */
+  assertVerifiable(
+    agent: Agent,
+    request: Pick<HardFindingRequest, 'fingerprint' | 'cvssVector' | 'cvssClaimed'> & { readonly id?: string },
+  ): { computed: number; match: boolean } {
+    const subject = request.id === undefined ? 'proposal' : request.id
+    for (const record of this.ctx.hardLedger.findings(agent)) {
+      if (record.proposed.fingerprint === request.fingerprint && record.proposed.id !== request.id
+        && record.verdict?.verdict === 'confirmed') {
+        throw new HarnessError(
+          `${subject}: a confirmed finding with the same root cause already exists (${record.proposed.id})`,
+          'HARD_VERIFIER_DUPLICATE',
+        )
+      }
+    }
+    return recomputeCvss(request, subject)
+  }
+
+  /**
    * Deterministic cross-check of one `cleared` coverage cell, branched by the
    * class's reading. Presence classes (the default): re-grep the module
    * against the fixed sink patterns and reopen the cell as `suspicious` when
@@ -354,7 +401,9 @@ export class HardVerifier extends Service {
    * module still exports an operation the model never declared a guard for —
    * the reopening evidence is the missed operation names. Both greps run from
    * the pinned target repository the armed coverage matrix records, so the
-   * module path is always target-repo relative. Sampling follows the
+   * module path is always target-repo relative: a repository-scoped class
+   * greps the whole tree, and the root module `.` greps only the files at the
+   * root. Sampling follows the
    * configured spot-check percent by cell hash; an unsampled cell, a
    * non-cleared cell, a class without applicable patterns, a missing matrix,
    * or a grep with no undeclared matches returns `undefined` and changes
@@ -377,7 +426,7 @@ export class HardVerifier extends Service {
     if (targetRepo === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
-      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)}`,
+      command: cellGrep(shellQuote(patterns.join('|')), cell.module, cell.bugClass),
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
       workdir: targetRepo,
@@ -385,9 +434,8 @@ export class HardVerifier extends Service {
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = result.stdout.text.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
+    const missed = grepLines(result.stdout.text)
+      .filter(line => !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
       .slice(0, 8)
     if (missed.length === 0) return undefined
     return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
@@ -417,7 +465,7 @@ export class HardVerifier extends Service {
     if (targetRepo === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
-      command: `grep -rInE ${shellQuote(patterns.join('|'))} ${shellQuote(cell.module)}`,
+      command: cellGrep(shellQuote(patterns.join('|')), cell.module, cell.bugClass),
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
       workdir: targetRepo,
@@ -425,7 +473,7 @@ export class HardVerifier extends Service {
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = [...new Set(result.stdout.text.split('\n').flatMap(line => surfaceOperands(line)))]
+    const missed = [...new Set(grepLines(result.stdout.text).flatMap(line => surfaceOperands(line)))]
       .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)))
       .slice(0, 8)
     if (missed.length === 0) return undefined
@@ -633,7 +681,8 @@ export class HardVerifier extends Service {
   /**
    * Mechanical screen behind the batch clear: grep the requested modules for
    * the union of the model's patterns and the class's fixed patterns,
-   * anchored at the pinned target repository. The union means the model's
+   * anchored at the pinned target repository; the root module `.` greps only
+   * the files at the root. The union means the model's
    * patterns can only ADD matches, never subtract — a narrow pattern choice
    * cannot sneak past the harness table. Any match fails the whole batch and
    * returns the matching lines as evidence for a manual read. An empty grep
@@ -677,21 +726,27 @@ export class HardVerifier extends Service {
     if (targetRepo === undefined) {
       throw new HarnessError('hard screen: no armed coverage matrix', 'HARD_VERIFIER_NO_MATRIX')
     }
-    const union = [...new Set([...patterns, ...classPatterns])]
-    const spec = this.ctx.shell.resolve({
-      command: `grep -rInE ${shellQuote(union.join('|'))} ${modules.map(shellQuote).join(' ')}`,
-      timeoutMs: this.resolved.timeoutSeconds * 1000,
-      stdoutMaxBytes: this.resolved.stdoutMaxBytes,
-      workdir: targetRepo,
-    })
-    const execution = await this.ctx.shell.execute(spec)
-    const result = await execution.result()
-    assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
-    const evidence = result.stdout.text.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .slice(0, 8)
-    return { clean: evidence.length === 0, evidence }
+    const pattern = shellQuote([...new Set([...patterns, ...classPatterns])].join('|'))
+    // The root module greps only its own files, so it runs apart from the directory modules.
+    const directories = modules.filter(module => module !== '.')
+    const commands = [
+      ...directories.length === 0 ? [] : [`grep -rInE ${pattern} ${directories.map(shellQuote).join(' ')}`],
+      ...modules.includes('.') ? [cellGrep(pattern, '.', bugClass)] : [],
+    ]
+    const evidence: string[] = []
+    for (const command of commands) {
+      const spec = this.ctx.shell.resolve({
+        command,
+        timeoutMs: this.resolved.timeoutSeconds * 1000,
+        stdoutMaxBytes: this.resolved.stdoutMaxBytes,
+        workdir: targetRepo,
+      })
+      const execution = await this.ctx.shell.execute(spec)
+      const result = await execution.result()
+      assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
+      evidence.push(...grepLines(result.stdout.text))
+    }
+    return { clean: evidence.length === 0, evidence: evidence.slice(0, 8) }
   }
 }
 

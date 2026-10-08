@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-ledger` 拥有 hard harness 的持久方法论状态：增量 `hard/*` 会话事件（finding 提案与验证器结论、假设生命周期、覆盖单元、扫描摘要，以及任务武装记录），以及负责校验、追加并折叠这些事件的 `ctx.hardLedger` 服务。会话日志是唯一存储；id 从日志分配，所有折叠都从日志派生。
+`dsh-experimental-hard-ledger` 拥有 hard harness 的持久方法论状态：增量 `hard/*` 会话事件（finding 提案与验证器结论、包含链接的假设生命周期、已记录弱点、覆盖单元、扫描摘要，以及任务武装记录），以及负责校验、追加并折叠这些事件的 `ctx.hardLedger` 服务。会话日志是唯一存储；id 从日志分配，所有折叠都从日志派生。
 
 ## 目录
 
@@ -45,7 +45,8 @@ kind: "package-reference"
 
 - **日志派生状态。** `findings`、`hypotheses`、`coverage`、`sweepCount`、`coverageMatrix` 与 `openWork` 读取 `hardLedger` 会话投影——对 `hard/*` 事件的纯折叠，框架在恢复时重建并随每次提交增量推进；没有并行存储，日志保持唯一事实来源，fork/重启行为天然跟随会话。
 - **客户端 wire 视图。** 投影定义携带 `wire` 视图——一份严格模式的摘要：已武装矩阵、每格最新判定与判定方、覆盖聚合、以及使用服务自身阈值的门评估——以 `hardLedger` 为键发布到 session store，供 Web 覆盖面板读取。客户端安全词汇位于 `./client` 子路径且仅含类型：那里任何内容都不得把运行时 import 拖进浏览器包。
-- **从日志分配顺序 id。** `F-<n>` 与 `H-<n>` 计数器统计各自类型的历史事件；假设迁移会对照日志中已存在的 id 校验成员资格。
+- **从日志分配顺序 id。** `F-<n>`、`H-<n>` 与 `W-<n>` 计数器统计各自类型的历史事件；假设迁移会对照日志中已存在的 id 校验成员资格。
+- **弱点与链。** `recordFlaw` 追加 `hard/flaw/recorded`：无论单独影响多小都作为串联素材保留的弱点，写明它给予攻击者什么以及需要什么。携带 `links` 的假设是对两个或更多不同的已记录弱点或已确认 finding 的链；不带 links 的迁移保留原有链接。一旦存在两个或更多弱点或已确认 finding（被某个弱点点名的已确认 finding 只通过该弱点计一次），`openWork` 列出每个尚未被任何链式假设链接的条目，因此完成门会一直阻塞到每个条目都被考虑过——提出后附理由驳回的链也算考虑过。
 - **增量事件，无需格式升级。** 这些事件都是纯增量 root：无表面、信封或头变化，任何既有事件形态不变，因此词汇增长无需格式升级。早于该词汇表的构建会拒绝此类日志而非误读，这正是仓库内事件要求的读取契约。
 - **有界文本。** 自由文本字段上限 2000 字符；`refuted` 与 `deferred` 假设的 reason 字段为必填。
 - **完成评估与可验证空扫描。** `completionAssessment(agent, emptySweepsToFinish)` 纯粹从台账状态认证完成——没有未完成工作、末尾连续的空验证扫描、以及至少一个模型审读过的覆盖单元格或已解决的假设——批量筛查（`model-verified`）从不满足这一下限，因为模型一个单元都没有读；它绝不统计发现数量，因为发现配额会诱导捏造。空扫描必须引用 `emptyProofRef`——台账已折叠为 `refuted` 的假设，或最新判定为 `cleared`、带已声明 sink 且来源不是 `harness` 的单元格（机器筛查无法证明扫描确实做了）——Phase B 也可以引用 `emptyProofFlowDoc`：其已记录的 `hard/flow/doc` 带至少一条已解析引用的模块。两个字段互斥。服务还提供 `recordFlowDoc`——校验器在对照钉住的提交解析每条引用之后记录的持久 flow 文档摘要——并通过 `flowDocs` 读回。记录时校验以稳定代码响亮失败，因此日志只保存记录时刻为真的证明。`emptySweepRun` 统计末尾连击，`armedGoalId` 给出门所依据的目标命名。

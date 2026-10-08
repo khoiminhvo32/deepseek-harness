@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-rounds` 在随附的 goal-round driver 之上叠加 hard 任务层。driver 拥有预约、修订围栏与轮次上限；本插件记录携带 A/B 轮换阶段与台账未完成工作计数的持久 `hard/round/start`，注入命名阶段指令、未完成工作——以及在没有未完成工作时——完成门剩余阻塞项的 `<hard_round n/max>` 上下文，在 `stepsPerRound` 转向预算处取消轮次 turn，在 `maxStepsPerTurn` 成本上限处停止任何 turn（`hard/step-cap/reached`），并在轮次的 turn 收尾时记录 `hard/round/end`。
+`dsh-experimental-hard-rounds` 在随附的 goal-round driver 之上叠加 hard 任务层。driver 拥有预约、修订围栏与轮次上限；本插件记录携带 A/B 轮换阶段（当轮次改为运行 Phase C 时另带 `chaining: true`）与台账未完成工作计数的持久 `hard/round/start`，注入命名阶段指令、未完成工作——以及在没有未完成工作时——完成门剩余阻塞项的 `<hard_round n/max>` 上下文，在 `stepsPerRound` 转向预算处取消轮次 turn，在 `maxStepsPerTurn` 成本上限处停止任何 turn（`hard/step-cap/reached`），并在轮次的 turn 收尾时记录 `hard/round/end`。
 
 ## 目录
 
@@ -36,9 +36,10 @@ kind: "package-reference"
     stepsPerRound: 200
     maxStepsPerTurn: 200
     deepReadEveryN: 3
+    chainEveryN: 5
 ```
 
-两个步数预算是不同的限制。`stepsPerRound` 是轮次的转向预算，在 `agent/turn-stopping` 中检查——该钩子只在模型想要停止时触发，因此它约束的是驱动能把轮次推多远，而不是成本。`maxStepsPerTurn` 是成本上限，在每个 turn——无论是否属于轮次——的 `agent/pre-step` 边界检查，因此不停调用工具的 turn 仍会被停止；停止以 `hard/step-cap/reached` 记录。`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。在没有未完成工作时，完成门的剩余阻塞项来自 hard 台账的 `emptySweepsToFinish` 配置，因此上下文与门不可能各执一词。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
+两个步数预算是不同的限制。`stepsPerRound` 是轮次的转向预算，在 `agent/turn-stopping` 中检查——该钩子只在模型想要停止时触发，因此它约束的是驱动能把轮次推多远，而不是成本。`maxStepsPerTurn` 是成本上限，在每个 turn——无论是否属于轮次——的 `agent/pre-step` 边界检查，因此不停调用工具的 turn 仍会被停止；停止以 `hard/step-cap/reached` 记录。`deepReadEveryN` 轮换方法论阶段：每 `deepReadEveryN` 个 Phase A 轮次之后是一个 Phase B 深读轮次。保持它与 mission 的 `deepReadEveryN` 相等；两者分开存放是为了让驱动无需读取其他插件的配置即可轮换，但取值分叉会产生分叉的节奏。`chainEveryN` 安排串联阶段：一旦台账持有两个或更多弱点或已确认 finding，每第 `chainEveryN` 个轮次就是 Phase C，优先于 A/B 轮换；`0` 表示从不安排，未链接的素材无论如何都留作未完成工作。在没有未完成工作时，完成门的剩余阻塞项来自 hard 台账的 `emptySweepsToFinish` 配置，因此上下文与门不可能各执一词。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-rounds)是每个可接受字段的穷尽来源。
 
 -----
 
@@ -52,7 +53,7 @@ kind: "package-reference"
 
 - **驱动而非分叉。** 预约、修订围栏、轮次计数与上限阻塞路径都属于随附的 goal-round driver；本模块只观察 driver 已经产生的事件，两者在接纳语义上不会分叉。
 - **延迟追加。** 提交后的追加流禁止重入追加，因此轮次 start 记录与其上下文注入在被接纳消息提交一个微任务之后落地。
-- **确定性轮换。** Phase B 落在能被 `deepReadEveryN + 1` 整除的轮次上，仅由被接纳的轮次号计算。
+- **确定性轮换。** 当台账持有至少两个弱点或已确认 finding 时，Phase C 落在能被 `chainEveryN` 整除的轮次上；否则 Phase B 落在能被 `deepReadEveryN + 1` 整除的轮次上。两者都由被接纳的轮次号与接纳时的台账状态计算，开始记录保留 A/B 槽位，并以 `chaining: true` 标记 Phase C 轮次。
 - **有界 turn。** 步数账目读取该轮 turn 的 `step/start` 事件；达到 `stepsPerRound` 时以 `hook` 原因取消 turn，轮次 end 记录 `step-cap`。
 - **step 边界上的成本上限。** `maxStepsPerTurn` 以循环自身按 turn 的 1-based step 位置判定——信任它不会像私有计数器那样漂移。达到上限即拒绝该 step，turn 以 `blocked` 收尾，对轮次内外的 turn 一视同仁。
 
@@ -74,7 +75,7 @@ kind: "package-reference"
 
 #### What the model sees
 
-每个被接纳的轮次一条 `hard-round` 源的 user 消息：`<hard_round n/max>` 头、该阶段的指令（Phase A 为系统性 source-to-sink 扫描，Phase B 为深读 pass）、台账的有界未完成工作列表，以及用 hard 工具记录进度的要求。
+每个被接纳的轮次一条 `hard-round` 源的 user 消息：`<hard_round n/max>` 头、该阶段的指令（Phase A 为系统性 source-to-sink 扫描，Phase B 为深读 pass，Phase C 为把一个弱点给予的东西与另一个弱点需要的东西配对并证明最强的链）、台账的有界未完成工作列表，以及用 hard 工具记录进度的要求。
 
 #### Token effect
 

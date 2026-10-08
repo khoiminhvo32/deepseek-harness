@@ -10,7 +10,7 @@ The hard bundle is an installation-owned optional bundle: switch it on for a pro
 
 ## Ledger state
 
-The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
+The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`), hypothesis ids (`H-n`), and weakness ids (`W-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress. Weaknesses are kept as chaining material whatever their standalone impact; once two or more weaknesses or confirmed findings exist, each must appear in the links of a chain hypothesis before the gate certifies completion, and the round driver schedules a chaining round (Phase C) every `chainEveryN` rounds.
 
 覆盖矩阵来自 mission 的武装记录：加载时 mission 插件把已配置的目标——git 仓库、普通目录或单个文件——捕获进 harness 在目标之外拥有的 git 存储，并枚举该快照提交中的每个文件，因此分母在相同内容上逐字节复现。快照保存的是武装时模型所看到的内容，包括未提交的改动；模型之后写入的文件都在快照之外，引用与独立读者都按快照解析。默认不排除任何内容；已配置的排除会记录在武装记录中，并在覆盖率旁报告。矩阵承载于一条增量 `hard/mission/armed` 事件。三层经济学让分母在真实仓库上可达：`CLASS_SCOPE` 给 `dependencies` 与 `misconfig` 各一个仓库级单元而非每模块一个；所有已跟踪文件都非可执行的模块（`inertModules`）由 harness 直接预判定，无需模型事件；`hard_clear_modules` 在 harness grep（模型 pattern 与固定表取并集）背后跨模块批量筛查一个类别，记录 `source: model-verified`——最弱的模型级别，从不满足完成评估的审计下限——而模型自己的标记不带归因（读作 `model`）。grep 只能指控：含二进制或固定表并非为其语言编写的模块被记录为不可筛查，在那里批量筛查会被拒绝，模型清除计为盲清除。`coverageProgress` 按范围化总数统计判定，`uncoveredCells` 只列出仍需要模型的单元，`coverageBySource` 按决定方拆分判定，`openWork` 把按哈希抽样的批量清除单元送回人工重读，使筛查的假阴性率始终被测量。
 
@@ -73,10 +73,45 @@ recordVerdict(agent: Agent, data: HardFindingVerdictData): void
  * Propose a new hypothesis or transition an existing one through its lifecycle.
  * @param agent - the live agent whose session receives the record.
  * @param request - status, statement (omittable for an existing id, which keeps its
- *   statement), optional existing id, and conditional reason.
+ *   statement), optional existing id, conditional reason, and the chain links
+ *   (omittable for an existing id, which keeps its links).
  * @returns the assigned or confirmed hypothesis id.
  */
-writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId
+writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string; links?: readonly string[] }, ): HardHypothesisId
+
+/**
+ * Append one weakness as chaining material and return its id. The caller
+ * resolves every site at the pinned commit before this append.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the weakness fields without the assigned id; a named finding or hypothesis id must be recorded.
+ * @returns the assigned weakness id.
+ */
+recordFlaw( agent: Agent, request: Omit<HardFlawData, 'id' | 'findingId' | 'hypothesisId'> & { findingId?: string; hypothesisId?: string }, ): HardFlawId
+
+/**
+ * Recorded weaknesses in record order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per weakness.
+ */
+flaws(agent: Agent): readonly HardFlawData[]
+
+/**
+ * The ids a chain hypothesis may link: every recorded weakness, then every
+ * confirmed finding no weakness already names. The math lives in
+ * `chainMaterialFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the `W-n` and `F-n` ids in record order.
+ */
+chainMaterial(agent: Agent): readonly string[]
+
+/**
+ * Chain material no hypothesis links yet; empty while fewer than two
+ * weaknesses and confirmed findings exist. The math lives in
+ * `unchainedMaterialFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the unlinked `W-n` and `F-n` ids.
+ */
+unchainedMaterial(agent: Agent): readonly string[]
 
 /**
  * Append one coverage cell verdict, replacing any prior verdict for the cell.

@@ -7,15 +7,21 @@
  * @module @deepseek-ai/dsh-experimental-hard-rounds
  */
 
-/** Which methodology pass a round belongs to. */
+/** Which A/B rotation slot a round occupies: systematic sweep or deep reading. */
 export type HardRoundPhase = 'A' | 'B'
 
 /** One admitted goal round, appended when its round message enters history. */
 export interface HardRoundStartData {
   /** The admitted round number, matching the goal's admitted count. */
   readonly round: number
-  /** The methodology pass this round belongs to under the A/B rotation. */
+  /** The A/B rotation slot of this round, recorded even when the round chains instead. */
   readonly phase: HardRoundPhase
+  /**
+   * `true` when the round runs the chaining pass (phase C) in place of its
+   * A/B slot. Optional so the change is additive; absent means the round ran
+   * its A/B slot.
+   */
+  readonly chaining?: true
   /** Open-work items the ledger reported at round start. */
   readonly openWorkCount: number
 }

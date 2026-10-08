@@ -45,7 +45,7 @@
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 9 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_mark_module`、`hard_record_flow`、`hard_status`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/flow/doc`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_mark_module`、`hard_record_flaw`、`hard_record_flow`、`hard_status`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/flow/doc`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
@@ -1424,11 +1424,11 @@ Batch-screen one bug class across several modules without reading them cell by c
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_mark_coverage`
 
-Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention. logic covers business-logic flaws no sink pattern finds: a check in the wrong order, a state machine that skips a step, a limit enforced on one path but not its sibling, a value trusted after it was checked. A logic clear declares at least two sites, each with a note stating the invariant it upholds, and compares sibling paths that perform the same operation; the harness cannot grep it, so nothing but your read stands behind it.
 
 ```json
 {
@@ -1464,7 +1464,7 @@ Record one coverage cell verdict for the systematic pass: a module swept for one
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_mark_module`
 
@@ -1516,6 +1516,58 @@ Record several bug classes for one module after reading it once: one entry per c
   "required": [
     "module",
     "cells"
+  ]
+}
+```
+
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_record_flaw`
+
+Record one weakness as chaining material: a flaw, bug, or confirmed finding, kept whatever its standalone impact — record low and informational ones too, because a chain may need them. grants is what an attacker gains from it alone (a capability, a leaked value, a state change), requires is what the attacker needs before it is usable (a role, a configuration, another capability). sites are the code sites, each path:symbol, path:line, or path:start-end plus an optional note, resolved at the pinned commit. Once two or more weaknesses or confirmed findings exist, each must appear in the links of at least one chain hypothesis before the mission can complete.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "One-line name of the weakness."
+    },
+    "component": {
+      "type": "string",
+      "description": "Component, module, or file the weakness lives in."
+    },
+    "grants": {
+      "type": "string",
+      "description": "What an attacker gains from this weakness alone."
+    },
+    "requires": {
+      "type": "string",
+      "description": "What an attacker needs before the weakness is usable."
+    },
+    "sites": {
+      "type": "array",
+      "description": "Code sites as path:symbol, path:line, or path:start-end plus an optional note; at least one.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "finding_id": {
+      "type": "string",
+      "description": "The F-n finding that proved this weakness, when one exists."
+    },
+    "hypothesis_id": {
+      "type": "string",
+      "description": "The H-n hypothesis this weakness came from, when one exists."
+    }
+  },
+  "required": [
+    "title",
+    "component",
+    "grants",
+    "requires",
+    "sites"
   ]
 }
 ```
@@ -1679,11 +1731,11 @@ Record one flow document for a module after the deep-reading pass. All six secti
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_status`
 
-Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way.
+Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way. view chains: every recorded weakness with what it grants and requires, the confirmed findings, every chain hypothesis with its links, and the material no chain hypothesis links yet.
 
 ```json
 {
@@ -1695,7 +1747,8 @@ Read the coverage board and the remaining work without changing anything. view s
       "enum": [
         "summary",
         "cells",
-        "open-work"
+        "open-work",
+        "chains"
       ]
     },
     "filter": {
@@ -1727,7 +1780,7 @@ Read the coverage board and the remaining work without changing anything. view s
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_submit_finding`
 
@@ -1791,7 +1844,7 @@ Submit one vulnerability finding for harness verification. The harness executes 
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_sweep_summary`
 
@@ -1847,11 +1900,11 @@ Record one completed sweep pass. When the pass found nothing, empty_proof is req
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_update_hypothesis`
 
-Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.
+Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell. A chain hypothesis also names links: two or more recorded weaknesses (W-n) or confirmed findings (F-n) it combines, where what one grants satisfies what another requires, and states the combined impact. Prove a chain with one PoC through hard_submit_finding citing its hypothesis id; a chain you rule out is refuted with the reason, which still counts as considering its links.
 
 ```json
 {
@@ -1879,6 +1932,13 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
     "reason": {
       "type": "string",
       "description": "Required for refuted and deferred: the evidence or retry condition."
+    },
+    "links": {
+      "type": "array",
+      "description": "For a chain hypothesis: the W-n weaknesses and F-n confirmed findings it combines, at least two; omit it when moving an existing hypothesis to keep its links.",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [
@@ -1887,7 +1947,7 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
 }
 ```
 
-Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof.
 

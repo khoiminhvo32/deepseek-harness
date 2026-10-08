@@ -49,7 +49,7 @@ kind: "package-reference"
 
 快照就是任务武装时模型所看到的内容。模型之后写入的文件——PoC、修改——都在快照之外，因此引用与独立读者始终按武装时的内容解析。每次加载都会重新捕获目标，但恢复的会话保留其武装记录的提交。
 
-`bugClasses` 默认为具有机械 source-to-sink 语义的全部 OWASP Top 10 类别清单（sqli、xss、cmdi、path-traversal、open-redirect、deserialization、ssrf、authn、authn-bypass、login-bypass、oauth-bypass、session、authz、crypto-misuse、misconfig、dependencies、race）；空列表会从契约中移除类别清单。不安全设计与安全日志没有机械的 source-sink 对，保留在深度阅读过程。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-mission)是全部受支持字段的唯一权威来源。
+`bugClasses` 默认为具有机械 source-to-sink 语义的全部 OWASP Top 10 类别清单（sqli、xss、cmdi、path-traversal、open-redirect、deserialization、ssrf、authn、authn-bypass、login-bypass、oauth-bypass、session、authz、crypto-misuse、misconfig、dependencies、race），外加用于业务逻辑缺陷的 `logic`——由于没有 sink 模式能找到这类缺陷，其清除需要声明所检查的不变量；空列表会从契约中移除类别清单。安全日志没有机械的 source-sink 对，保留在深度阅读过程。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-mission)是全部受支持字段的唯一权威来源。
 
 -----
 
@@ -89,7 +89,7 @@ kind: "package-reference"
 
 ```markdown
 Mission: Find and verify every authentication bypass
-This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Propose completion with update_goal action complete once the objective is genuinely achieved; the harness, not you, certifies it — an early attempt is denied with the exact remaining work, and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. Ending a turn does not end the mission.
+This session carries one durable goal and keeps working toward it across turns. Do not stop to announce progress while concrete work remains; take the next action instead. Systematic passes sweep these bug classes: sqli, xss, cmdi, path-traversal, open-redirect, deserialization, ssrf, authn, authn-bypass, login-bypass, oauth-bypass, session, authz, crypto-misuse, misconfig, dependencies, race, logic. Every 3 systematic passes, run a deep-reading pass that models dataflow, trust boundaries, and state machines to form and test hypotheses beyond pattern matching. Hunt business-logic flaws as well as sink-shaped bugs: compare sibling paths that perform the same operation, and check the order of checks and state transitions. Record every weakness you find with hard_record_flaw, however small its standalone impact, naming what it grants an attacker and what it requires; then chain weaknesses and confirmed findings into the highest impact you can prove, as chain hypotheses with links, in the chaining rounds and whenever a new weakness fits an existing one. Propose completion with update_goal action complete once the objective is genuinely achieved; the harness, not you, certifies it — an early attempt is denied with the exact remaining work, and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. Every PoC takes its exploit input as $1 and must fail when the harness re-runs it with a benign payload: the proof must depend on the payload (the specificity check). Ending a turn does not end the mission.
 ```
 
 #### Token effect

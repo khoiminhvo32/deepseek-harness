@@ -305,6 +305,38 @@ export type OpenWorkCounts = {
   readonly suspiciousCells: number
   /** Batch-screened cells the spot-check sends back for a manual read. */
   readonly screenReReads: number
+  /** Chain material no chain hypothesis links yet. */
+  readonly unchainedMaterial: number
+}
+
+/**
+ * The ids a chain hypothesis may link, in record order: every recorded
+ * weakness, then every confirmed finding no weakness already names.
+ * @param state - the folded ledger projection state.
+ * @returns the `W-n` and `F-n` ids available as chain links.
+ */
+export function chainMaterialFromState(state: HardLedgerProjectionState): string[] {
+  const flaws = state.flaws ?? []
+  const named = new Set(flaws.map(flaw => flaw.findingId).filter(id => id !== undefined))
+  const confirmed = state.findings
+    .filter(entry => entry.verdict?.verdict === 'confirmed' && !named.has(entry.proposed.id))
+    .map(entry => entry.proposed.id)
+  return [...flaws.map(flaw => flaw.id), ...confirmed]
+}
+
+/**
+ * Chain material no hypothesis links yet. With fewer than two items nothing
+ * can be chained, so nothing is owed; otherwise every item must appear in at
+ * least one chain hypothesis, whatever that hypothesis's status — a chain
+ * proposed and refuted with its reason counts as considered.
+ * @param state - the folded ledger projection state.
+ * @returns the unlinked `W-n` and `F-n` ids, in record order.
+ */
+export function unchainedMaterialFromState(state: HardLedgerProjectionState): string[] {
+  const material = chainMaterialFromState(state)
+  if (material.length < 2) return []
+  const linked = new Set(state.hypotheses.flatMap(hypothesis => hypothesis.links ?? []))
+  return material.filter(id => !linked.has(id))
 }
 
 /**
@@ -325,6 +357,7 @@ export function openWorkCountsFromState(
     uncoveredCells: uncoveredCellsFromState(state).length,
     suspiciousCells: state.coverage.filter(cell => cell.verdict === 'suspicious').length,
     screenReReads: state.coverage.filter(cell => isScreenReRead(cell, thresholds.screenSpotCheckPercent)).length,
+    unchainedMaterial: unchainedMaterialFromState(state).length,
   }
 }
 
@@ -374,6 +407,9 @@ export function openWorkFromState(state: HardLedgerProjectionState, thresholds: 
     if (isScreenReRead(cell, thresholds.screenSpotCheckPercent)) {
       work.push(`cell ${cell.module} × ${cell.bugClass} was batch-cleared; verify the mechanical screen`)
     }
+  }
+  for (const id of unchainedMaterialFromState(state)) {
+    work.push(`${id} is in no chain hypothesis: link it with another weakness or finding, or propose that chain and refute it with the reason`)
   }
   return work
 }

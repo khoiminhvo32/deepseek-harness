@@ -14,6 +14,9 @@ export type HardFindingId = Branded<'HardFindingId'>
 /** Opaque identity of one hypothesis, `H-<n>`. */
 export type HardHypothesisId = Branded<'HardHypothesisId'>
 
+/** Opaque identity of one recorded weakness, `W-<n>`. */
+export type HardFlawId = Branded<'HardFlawId'>
+
 /** Verification outcome of one finding, decided by the verifier only. */
 export type HardVerdict = 'confirmed' | 'refuted' | 'flaky'
 
@@ -149,6 +152,39 @@ export interface HardHypothesisStateData {
   readonly status: HardHypothesisStatus
   /** Required for `refuted` and `deferred`: the concrete evidence or retry condition. */
   readonly reason?: string
+  /**
+   * The weaknesses (`W-n`) and confirmed findings (`F-n`) a chain hypothesis
+   * combines, at least two distinct ids; absent on an ordinary hypothesis. A
+   * transition without links keeps the ones the hypothesis carries. Optional
+   * so the change is additive.
+   */
+  readonly links?: readonly string[]
+}
+
+/**
+ * One recorded weakness: a flaw or bug kept as chaining material whatever its
+ * standalone impact, including ones too weak to report alone. `grants` names
+ * what an attacker gains from it and `requires` what the attacker needs
+ * before it is usable, so a chain pairs one weakness's grant with another's
+ * requirement. Every site resolved at the pinned commit before the record
+ * was appended.
+ */
+export interface HardFlawData {
+  readonly id: HardFlawId
+  /** One-line name of the weakness. */
+  readonly title: string
+  /** Target component, module, or file the weakness lives in. */
+  readonly component: string
+  /** What an attacker gains from this weakness alone. */
+  readonly grants: string
+  /** What an attacker needs before the weakness is usable. */
+  readonly requires: string
+  /** Code sites as `path:symbol`, `path:line`, or `path:start-end` with an optional note. */
+  readonly sites: readonly string[]
+  /** The finding that proved this weakness, when one exists. */
+  readonly findingId?: HardFindingId
+  /** The hypothesis this weakness came from, when one exists. */
+  readonly hypothesisId?: HardHypothesisId
 }
 
 /** One coverage cell verdict for the systematic pass. */

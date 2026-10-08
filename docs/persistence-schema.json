@@ -11863,6 +11863,115 @@
       }
     },
     {
+      "key": "event:hard/flaw/recorded",
+      "kind": "event",
+      "event": "hard/flaw/recorded",
+      "surface": false,
+      "digest": "883e93df3e09e9bced9ebd4b2b89c040643b9b2a5d1ee6e7d207e44873eeaf6a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "component",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "findingId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "grants",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "hypothesisId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "requires",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sites",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "title",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/flaw/recorded"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:hard/flow/doc",
       "kind": "event",
       "event": "hard/flow/doc",
@@ -12205,7 +12314,7 @@
       "kind": "event",
       "event": "hard/hypothesis/state",
       "surface": false,
-      "digest": "b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1",
+      "digest": "11064b683a0aa59bf53f2f29e2ae178888f8a6b14989eed85879d6cc8d23cd69",
       "schema": {
         "root": 0,
         "nodes": [
@@ -12219,22 +12328,22 @@
               },
               {
                 "name": "ignorable",
-                "type": 9,
+                "type": 10,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 10,
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 10,
+                "type": 11,
                 "optional": false
               },
               {
                 "name": "type",
-                "type": 11,
+                "type": 12,
                 "optional": false
               }
             ],
@@ -12249,6 +12358,11 @@
                 "optional": false
               },
               {
+                "name": "links",
+                "type": 3,
+                "optional": true
+              },
+              {
                 "name": "reason",
                 "type": 2,
                 "optional": true
@@ -12260,7 +12374,7 @@
               },
               {
                 "name": "status",
-                "type": 3,
+                "type": 4,
                 "optional": false
               }
             ],
@@ -12271,13 +12385,17 @@
             "type": "string"
           },
           {
+            "kind": "array",
+            "element": 2
+          },
+          {
             "kind": "union",
             "types": [
-              4,
               5,
               6,
               7,
-              8
+              8,
+              9
             ]
           },
           {
@@ -12617,7 +12735,7 @@
       "kind": "event",
       "event": "hard/round/start",
       "surface": false,
-      "digest": "ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c",
+      "digest": "3454a1b61bdcf0c0a266f4f3ab44447a25194f021d8f10053794bf01095d80a2",
       "schema": {
         "root": 0,
         "nodes": [
@@ -12631,17 +12749,17 @@
               },
               {
                 "name": "ignorable",
-                "type": 6,
+                "type": 2,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 2,
+                "type": 3,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 2,
+                "type": 3,
                 "optional": false
               },
               {
@@ -12656,22 +12774,31 @@
             "kind": "object",
             "properties": [
               {
-                "name": "openWorkCount",
+                "name": "chaining",
                 "type": 2,
-                "optional": false
+                "optional": true
               },
               {
-                "name": "phase",
+                "name": "openWorkCount",
                 "type": 3,
                 "optional": false
               },
               {
+                "name": "phase",
+                "type": 4,
+                "optional": false
+              },
+              {
                 "name": "round",
-                "type": 2,
+                "type": 3,
                 "optional": false
               }
             ],
             "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
           },
           {
             "kind": "primitive",
@@ -12680,8 +12807,8 @@
           {
             "kind": "union",
             "types": [
-              4,
-              5
+              5,
+              6
             ]
           },
           {
@@ -12691,10 +12818,6 @@
           {
             "kind": "literal",
             "value": "B"
-          },
-          {
-            "kind": "literal",
-            "value": true
           },
           {
             "kind": "literal",
@@ -26220,6 +26343,11 @@
       "sources": []
     },
     {
+      "digest": "11064b683a0aa59bf53f2f29e2ae178888f8a6b14989eed85879d6cc8d23cd69",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "113b41f09d2824570abc5ffc66837c8fbacf5d1b7431d6eba477511d43e61bda",
       "names": [],
       "sources": []
@@ -26520,7 +26648,7 @@
       "digest": "1e5545d0505fb302ed9babf0f278726c57150b8f3fc8b78ffe00a9d753af5dd8",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:242"
+        "packages/experimental/hard-ledger/src/types.ts:278"
       ]
     },
     {
@@ -26693,7 +26821,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingVerdictData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:107"
+        "packages/experimental/hard-ledger/src/types.ts:110"
       ]
     },
     {
@@ -26907,10 +27035,15 @@
       "sources": []
     },
     {
+      "digest": "3454a1b61bdcf0c0a266f4f3ab44447a25194f021d8f10053794bf01095d80a2",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:255"
+        "packages/experimental/hard-ledger/src/types.ts:291"
       ]
     },
     {
@@ -27078,7 +27211,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStatus"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:21"
+        "packages/experimental/hard-ledger/src/types.ts:24"
       ]
     },
     {
@@ -27301,7 +27434,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:211"
+        "packages/experimental/hard-ledger/src/types.ts:247"
       ]
     },
     {
@@ -27327,6 +27460,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamMessageId",
         "packages/experimental/agent-team/src/types.ts#TeamTaskId",
         "packages/experimental/hard-ledger/src/types.ts#HardFindingId",
+        "packages/experimental/hard-ledger/src/types.ts#HardFlawId",
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisId",
         "packages/feedback/message-feedback/src/types.ts#MessageFeedbackVersion",
         "packages/goal/goal/src/types.ts#GoalId",
@@ -27355,6 +27489,7 @@
         "packages/experimental/agent-team/src/types.ts:8",
         "packages/experimental/hard-ledger/src/types.ts:12",
         "packages/experimental/hard-ledger/src/types.ts:15",
+        "packages/experimental/hard-ledger/src/types.ts:18",
         "packages/feedback/message-feedback/src/types.ts:14",
         "packages/goal/goal/src/types.ts:17",
         "packages/interaction/commands/src/brand.ts:31",
@@ -27497,7 +27632,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocSections"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:180"
+        "packages/experimental/hard-ledger/src/types.ts:216"
       ]
     },
     {
@@ -27873,7 +28008,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardVerdict"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:18"
+        "packages/experimental/hard-ledger/src/types.ts:21"
       ]
     },
     {
@@ -27925,15 +28060,6 @@
       "digest": "6d3a59af2e30043b7da57606dd3e80f486f5ce81c8af3ecff835c78bcc96983f",
       "names": [],
       "sources": []
-    },
-    {
-      "digest": "6ddbea6b829df6db38232a0026e22d2fc0ddaffca52783fa6fe3a1118617fbfd",
-      "names": [
-        "packages/experimental/hard-rounds/src/domain.ts#HardRoundStartData"
-      ],
-      "sources": [
-        "packages/experimental/hard-rounds/src/domain.ts:14"
-      ]
     },
     {
       "digest": "6e52dd55a1d48954ed5464ec46fe34d9eb65f709baabc9561e7a279910b0c406",
@@ -27996,7 +28122,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:155"
+        "packages/experimental/hard-ledger/src/types.ts:191"
       ]
     },
     {
@@ -28034,7 +28160,7 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:176"
+        "packages/experimental/hard-ledger/src/types.ts:212"
       ]
     },
     {
@@ -28116,15 +28242,6 @@
       "sources": []
     },
     {
-      "digest": "7954cecbb131efd177055dd9c49fc9012ad7f5857d4a08ebe072593ff5a70b98",
-      "names": [
-        "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
-      ],
-      "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:146"
-      ]
-    },
-    {
       "digest": "79650cfa10aa3c52440328d85e8a25f0ffadc8d7efd784e3c0819d8bb74a1985",
       "names": [],
       "sources": [
@@ -28142,7 +28259,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:177"
+        "packages/experimental/hard-ledger/src/types.ts:213"
       ]
     },
     {
@@ -28254,6 +28371,15 @@
       "names": [],
       "sources": [
         "packages/core/agent/src/types.ts:96"
+      ]
+    },
+    {
+      "digest": "7fad0fd7cb38b69da1f735ef4968cb59244ac04a37f197496f7ffafee020a277",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFlawData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:172"
       ]
     },
     {
@@ -28386,7 +28512,7 @@
       "digest": "84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:306"
+        "packages/experimental/hard-ledger/src/types.ts:342"
       ]
     },
     {
@@ -28448,6 +28574,11 @@
       "sources": []
     },
     {
+      "digest": "883e93df3e09e9bced9ebd4b2b89c040643b9b2a5d1ee6e7d207e44873eeaf6a",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "88841202942c7683b3b7e5ea6a796047ec326b6701ac23e58cc236d85613b9fa",
       "names": [],
       "sources": []
@@ -28458,7 +28589,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageVerdict"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:24"
+        "packages/experimental/hard-ledger/src/types.ts:27"
       ]
     },
     {
@@ -28650,7 +28781,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:261"
+        "packages/experimental/hard-ledger/src/types.ts:297"
       ]
     },
     {
@@ -28715,7 +28846,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMatrixExclusions"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:280"
+        "packages/experimental/hard-ledger/src/types.ts:316"
       ]
     },
     {
@@ -29097,7 +29228,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:315"
+        "packages/experimental/hard-ledger/src/types.ts:351"
       ]
     },
     {
@@ -29227,11 +29358,6 @@
     },
     {
       "digest": "b2a5c8c008a31e3dc6c3013502f2356aca13894b31c8e70601fa92f2d40d1dba",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "b2ca5611d82c38dcf57beda2d6ac9c50bb001052ab52932a04541186fafc40a1",
       "names": [],
       "sources": []
     },
@@ -29414,7 +29540,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingProposedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:44"
+        "packages/experimental/hard-ledger/src/types.ts:47"
       ]
     },
     {
@@ -29582,7 +29708,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:196"
+        "packages/experimental/hard-ledger/src/types.ts:232"
       ]
     },
     {
@@ -29594,6 +29720,15 @@
       "digest": "c804ffb892a79ccdda0153e8cd32f3d9cfb32f57729d2d8c4f838408f3ad42b8",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "c8a5d0cd04061885b92d3e8f826e7f9100eefa64b82d63abfe0dc6895fdbc986",
+      "names": [
+        "packages/experimental/hard-rounds/src/domain.ts#HardRoundStartData"
+      ],
+      "sources": [
+        "packages/experimental/hard-rounds/src/domain.ts:14"
+      ]
     },
     {
       "digest": "c8e6f48878cc2a2f0dc59682280d81f407943fb503f32c64bf9ff3d9393c3eff",
@@ -29633,11 +29768,6 @@
       "sources": []
     },
     {
-      "digest": "ccbb541cf9d9b06d32fe9bbad9ec4a1a1d8345cae91e4a0a4aef7321b51d499c",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "cd186c309e2bef305705e1d324139240f5e681f4f6a957d6a25b0225f65560df",
       "names": [],
       "sources": []
@@ -29653,7 +29783,7 @@
         "packages/experimental/hard-rounds/src/domain.ts#HardRoundEndData"
       ],
       "sources": [
-        "packages/experimental/hard-rounds/src/domain.ts:24"
+        "packages/experimental/hard-rounds/src/domain.ts:30"
       ]
     },
     {
@@ -29666,6 +29796,15 @@
       "names": [],
       "sources": [
         "packages/llm/llm-retry/src/types.ts:17"
+      ]
+    },
+    {
+      "digest": "ce813bc0fd9f662d84379ec1a02a6fd7ca175566a66757829447144c984f1240",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:149"
       ]
     },
     {
@@ -29723,7 +29862,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardTargetSnapshot"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:296"
+        "packages/experimental/hard-ledger/src/types.ts:332"
       ]
     },
     {
@@ -29924,6 +30063,11 @@
       "sources": []
     },
     {
+      "digest": "e30cd8c5b6f1db16f7e4199ee18e8f446e1139e79d8dc8b09a34f3d469abc43f",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "e31572180d6b28b73f073ad30ae19d5d82982d3daf984723984e23da1e7c459a",
       "names": [],
       "sources": []
@@ -30080,7 +30224,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:245"
+        "packages/experimental/hard-ledger/src/types.ts:281"
       ]
     },
     {
@@ -30138,7 +30282,7 @@
         "packages/experimental/hard-rounds/src/domain.ts#HardStepCapReachedData"
       ],
       "sources": [
-        "packages/experimental/hard-rounds/src/domain.ts:34"
+        "packages/experimental/hard-rounds/src/domain.ts:40"
       ]
     },
     {
@@ -30170,7 +30314,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:237"
+        "packages/experimental/hard-ledger/src/types.ts:273"
       ]
     },
     {

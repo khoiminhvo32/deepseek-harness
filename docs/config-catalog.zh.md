@@ -1109,7 +1109,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:120`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:128`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1140,7 +1140,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-mission`
 
 - `inject`: `agents` · `goals` · `systemPrompt` · `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-mission/src/index.ts:133`](../packages/experimental/hard-mission/src/index.ts)
+- `source`: [`packages/experimental/hard-mission/src/index.ts:136`](../packages/experimental/hard-mission/src/index.ts)
 
 ```ts config-catalog
 /** Mission plugin config. */
@@ -1200,7 +1200,7 @@ export interface TargetConfig {
 ## `@deepseek-ai/dsh-experimental-hard-rounds`
 
 - `inject`: `agents` · `goals` · `hardLedger` · `sessionProjections`
-- `source`: [`packages/experimental/hard-rounds/src/index.ts:55`](../packages/experimental/hard-rounds/src/index.ts)
+- `source`: [`packages/experimental/hard-rounds/src/index.ts:58`](../packages/experimental/hard-rounds/src/index.ts)
 
 ```ts config-catalog
 /** Rounds module config. */
@@ -1229,6 +1229,13 @@ export interface Config {
    * config, but divergent values produce divergent cadence.
    */
   deepReadEveryN?: number
+  /**
+   * Round interval of the chaining pass: every Nth round is phase C, taking
+   * precedence over the A/B rotation, once the ledger holds two or more
+   * weaknesses or confirmed findings to combine. `0` never schedules it; the
+   * unchained material still stands as open work either way.
+   */
+  chainEveryN?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-rounds -->

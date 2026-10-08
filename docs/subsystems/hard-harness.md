@@ -10,7 +10,7 @@ The hard bundle is an installation-owned optional bundle: switch it on for a pro
 
 ## Ledger state
 
-The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`) and hypothesis ids (`H-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress.
+The ledger is log-derived: `ctx.hardLedger` appends validated `hard/*` events and reads the `hardLedger` session projection, a pure fold the framework restores at resume and advances on every commit. Finding ids (`F-n`), hypothesis ids (`H-n`), and weakness ids (`W-n`) are assigned from the projected counts. The verifier records exactly one verdict per proposal; a split verdict is flaky and never counts as progress. Weaknesses are kept as chaining material whatever their standalone impact; once two or more weaknesses or confirmed findings exist, each must appear in the links of a chain hypothesis before the gate certifies completion, and the round driver schedules a chaining round (Phase C) every `chainEveryN` rounds.
 
 The coverage matrix comes from the mission's arming record: at load the mission plugin captures the configured target — a git repository, a plain directory, or one file — into a git store the harness owns outside the target, and enumerates every file of that snapshot commit, so the denominator reproduces byte-for-byte on the same content. The snapshot holds what the model saw at arming, uncommitted changes included; files the model writes later stay outside it, and citations and the independent reader resolve against it. Nothing is excluded by default; a configured exclusion is recorded in the arming record and reported beside the coverage ratio. The matrix rides one additive `hard/mission/armed` event. Three economics keep the denominator reachable on real repositories: `CLASS_SCOPE` gives `dependencies` and `misconfig` one repository-level cell instead of one per module; modules whose every tracked file is non-executable (`inertModules`) are pre-verdicted by the harness without a model event; and `hard_clear_modules` batch-screens one class across modules behind a harness grep that unions the model's patterns with the fixed table, recording `source: model-verified` — the weakest model tier, which never satisfies the completion assessment's audit floor — while the model's own marks stay unattributed (read as `model`). The grep can only accuse: a module holding a binary or a language the fixed tables were not written for is recorded as unscreened, a batch screen there is refused, and a model clear there counts as a blind clear. `coverageProgress` counts verdicts over the scoped total, `uncoveredCells` lists only the cells that still need the model, `coverageBySource` partitions verdicts by decider, and `openWork` sends a hash-sampled share of batch-cleared cells back for a manual re-read so the screen's false-negative rate stays measured.
 
@@ -73,10 +73,45 @@ recordVerdict(agent: Agent, data: HardFindingVerdictData): void
  * Propose a new hypothesis or transition an existing one through its lifecycle.
  * @param agent - the live agent whose session receives the record.
  * @param request - status, statement (omittable for an existing id, which keeps its
- *   statement), optional existing id, and conditional reason.
+ *   statement), optional existing id, conditional reason, and the chain links
+ *   (omittable for an existing id, which keeps its links).
  * @returns the assigned or confirmed hypothesis id.
  */
-writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId
+writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string; links?: readonly string[] }, ): HardHypothesisId
+
+/**
+ * Append one weakness as chaining material and return its id. The caller
+ * resolves every site at the pinned commit before this append.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the weakness fields without the assigned id; a named finding or hypothesis id must be recorded.
+ * @returns the assigned weakness id.
+ */
+recordFlaw( agent: Agent, request: Omit<HardFlawData, 'id' | 'findingId' | 'hypothesisId'> & { findingId?: string; hypothesisId?: string }, ): HardFlawId
+
+/**
+ * Recorded weaknesses in record order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per weakness.
+ */
+flaws(agent: Agent): readonly HardFlawData[]
+
+/**
+ * The ids a chain hypothesis may link: every recorded weakness, then every
+ * confirmed finding no weakness already names. The math lives in
+ * `chainMaterialFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the `W-n` and `F-n` ids in record order.
+ */
+chainMaterial(agent: Agent): readonly string[]
+
+/**
+ * Chain material no hypothesis links yet; empty while fewer than two
+ * weaknesses and confirmed findings exist. The math lives in
+ * `unchainedMaterialFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the unlinked `W-n` and `F-n` ids.
+ */
+unchainedMaterial(agent: Agent): readonly string[]
 
 /**
  * Append one coverage cell verdict, replacing any prior verdict for the cell.

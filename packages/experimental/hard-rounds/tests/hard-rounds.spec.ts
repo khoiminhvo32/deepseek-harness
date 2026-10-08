@@ -211,10 +211,10 @@ describe('hard rounds accounting', () => {
   })
 
   it('rotates to the deep-reading phase after every N systematic rounds', async () => {
-    expect(phaseFor(1, 3)).toBe('A')
-    expect(phaseFor(3, 3)).toBe('A')
-    expect(phaseFor(4, 3)).toBe('B')
-    expect(phaseFor(8, 3)).toBe('B')
+    expect(phaseFor(1, 3, 0, 0)).toBe('A')
+    expect(phaseFor(3, 3, 0, 0)).toBe('A')
+    expect(phaseFor(4, 3, 0, 0)).toBe('B')
+    expect(phaseFor(8, 3, 0, 0)).toBe('B')
 
     const { ctx, root } = await harness()
     const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
@@ -236,6 +236,30 @@ describe('hard rounds accounting', () => {
     ])
     expect(root.injected[3]).toContain('<hard_round 4/9> phase B')
     expect(root.injected[3]).toContain('Phase B: run the deep-reading pass')
+  })
+
+  it('chains every Nth round once two weaknesses or confirmed findings exist, ahead of the A/B rotation', async () => {
+    expect(phaseFor(5, 3, 5, 2)).toBe('C')
+    expect(phaseFor(5, 3, 5, 1)).toBe('A')
+    expect(phaseFor(8, 3, 0, 4)).toBe('B')
+    expect(phaseFor(20, 3, 5, 2)).toBe('C')
+
+    const { ctx, root } = await harness({ chainEveryN: 2 })
+    const goal = ctx.goals.create(root.agent, { objective: 'find bugs', maxGoalRounds: 9 })
+    const starts = probe(ctx, root.session, 'hard/round/start')
+    const weakness = { title: 't', component: 'c', grants: 'g', requires: 'r', sites: ['a.ts:1'] }
+    admitRound(root.agent, goal, 1)
+    await drain()
+    root.session.append('step/start', { turn: 1, step: 0 })
+    root.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await drain()
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    admitRound(root.agent, goal, 2)
+    await drain()
+    expect(starts()).toEqual([{ round: 1, phase: 'A', openWorkCount: 0 }, { round: 2, phase: 'A', openWorkCount: 2, chaining: true }])
+    expect(root.injected[1]).toContain('<hard_round 2/9> phase C')
+    expect(root.injected[1]).toContain('Phase C: chain what the ledger holds.')
   })
 
   it('counts steps, cancels at the step cap, and records the round end', async () => {
@@ -292,6 +316,7 @@ describe('hard rounds accounting', () => {
     expect(() => { hardRounds.apply(ctx, { maxStepsPerTurn: 0 }) }).toThrow('maxStepsPerTurn must be a safe integer between 1 and 2000')
     expect(() => { hardRounds.apply(ctx, { maxStepsPerTurn: 2001 }) }).toThrow('maxStepsPerTurn must be a safe integer between 1 and 2000')
     expect(() => { hardRounds.apply(ctx, { deepReadEveryN: 1.5 }) }).toThrow('deepReadEveryN must be a positive safe integer')
+    expect(() => { hardRounds.apply(ctx, { chainEveryN: -1 }) }).toThrow('chainEveryN must be a non-negative safe integer')
     expect(() => { hardRounds.apply(ctx, {}) }).not.toThrow()
   })
 

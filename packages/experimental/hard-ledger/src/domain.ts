@@ -10,6 +10,7 @@ import type {
   HardCoverageCellData,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardFlawData,
   HardFlowDocData,
   HardGateDecisionData,
   HardHypothesisStateData,
@@ -34,6 +35,12 @@ declare module '@deepseek-ai/dsh-session/types' {
     'hard/finding/verdict': HardFindingVerdictData
     /** One hypothesis state transition in the deep-reading pass. */
     'hard/hypothesis/state': HardHypothesisStateData
+    /**
+     * One recorded weakness kept as chaining material, with every site
+     * already resolved at the pinned commit; the ledger folds it into the
+     * weakness list chain hypotheses link.
+     */
+    'hard/flaw/recorded': HardFlawData
     /**
      * One flow document recorded for a module, with every citation already
      * resolved against the pinned commit; the ledger folds it as the durable

@@ -2,7 +2,7 @@
  * Hard round accounting on top of the shipped goal-round driver. The driver
  * owns reservation, revision fencing, and the goal-round cap; this plugin
  * observes each admitted goal round and adds the hard-mission layer: a
- * durable `hard/round/start` with the A/B rotation phase and the ledger's
+ * durable `hard/round/start` with the A/B rotation phase, whether the round chains, and the ledger's
  * open-work count, a model-facing round context injection naming the round,
  * the phase instruction, the open work, and — once no open work stands — the
  * completion gate's remaining blockers, per-round step accounting against
@@ -24,7 +24,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
 // Loads the declaration-merged `SessionEventMap` and `MessageSourceMap` entries.
-import type {} from './domain.ts'
+import type { HardRoundPhase } from './domain.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -50,6 +50,9 @@ export const DEFAULT_MAX_STEPS_PER_TURN = 200
 
 /** Default number of systematic passes between deep-reading passes. */
 export const DEFAULT_DEEP_READ_EVERY_N = 3
+
+/** Default round interval of the chaining pass. */
+export const DEFAULT_CHAIN_EVERY_N = 5
 
 /** Rounds module config. */
 export interface Config {
@@ -77,6 +80,13 @@ export interface Config {
    * config, but divergent values produce divergent cadence.
    */
   deepReadEveryN?: number
+  /**
+   * Round interval of the chaining pass: every Nth round is phase C, taking
+   * precedence over the A/B rotation, once the ledger holds two or more
+   * weaknesses or confirmed findings to combine. `0` never schedules it; the
+   * unchained material still stands as open work either way.
+   */
+  chainEveryN?: number
 }
 
 /** Schemastery config for the rounds module. */
@@ -84,6 +94,7 @@ export const Config: z<Config> = z.object({
   stepsPerRound: z.number().step(1).min(1).default(DEFAULT_STEPS_PER_ROUND),
   maxStepsPerTurn: z.number().step(1).min(1).max(2000).default(DEFAULT_MAX_STEPS_PER_TURN),
   deepReadEveryN: z.number().step(1).min(1).default(DEFAULT_DEEP_READ_EVERY_N),
+  chainEveryN: z.number().step(1).min(0).default(DEFAULT_CHAIN_EVERY_N),
 })
 
 /** Fully materialized rounds inputs. */
@@ -91,6 +102,7 @@ interface ResolvedConfig {
   readonly stepsPerRound: number
   readonly maxStepsPerTurn: number
   readonly deepReadEveryN: number
+  readonly chainEveryN: number
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -107,23 +119,48 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(deepReadEveryN) || deepReadEveryN < 1) {
     throw new TypeError('deepReadEveryN must be a positive safe integer')
   }
-  return { stepsPerRound, maxStepsPerTurn, deepReadEveryN }
+  const chainEveryN = config.chainEveryN ?? DEFAULT_CHAIN_EVERY_N
+  if (!Number.isSafeInteger(chainEveryN) || chainEveryN < 0) {
+    throw new TypeError('chainEveryN must be a non-negative safe integer')
+  }
+  return { stepsPerRound, maxStepsPerTurn, deepReadEveryN, chainEveryN }
 }
 
-/** The methodology pass of one round: one deep-reading pass after every N systematic passes.
+/** The methodology pass one round runs: its A/B slot, or the chaining pass C in place of it. */
+export type HardRoundPass = HardRoundPhase | 'C'
+
+/**
+ * The methodology pass of one round: every `chainEveryN`th round chains when
+ * there is material to combine; otherwise one deep-reading pass follows every
+ * N systematic passes.
  * @param round - the admitted round number.
  * @param deepReadEveryN - systematic passes between deep-reading passes.
- * @returns `B` for the deep-reading round, `A` for a systematic round.
+ * @param chainEveryN - round interval of the chaining pass; `0` never chains.
+ * @param chainMaterial - weaknesses and confirmed findings the ledger holds.
+ * @returns `C` for a chaining round, `B` for a deep-reading round, `A` for a systematic round.
  */
-export function phaseFor(round: number, deepReadEveryN: number): 'A' | 'B' {
+export function phaseFor(round: number, deepReadEveryN: number, chainEveryN: number, chainMaterial: number): HardRoundPass {
+  if (chainEveryN > 0 && chainMaterial >= 2 && round % chainEveryN === 0) return 'C'
+  return rotationSlot(round, deepReadEveryN)
+}
+
+/** The A/B rotation slot of one round: one deep-reading round after every N systematic rounds. */
+function rotationSlot(round: number, deepReadEveryN: number): HardRoundPhase {
   return round % (deepReadEveryN + 1) === 0 ? 'B' : 'A'
 }
 
 /** The phase's model-facing instruction for one round. */
-function phaseOrder(phase: 'A' | 'B'): string {
-  return phase === 'A'
-    ? 'Phase A: continue the systematic source-to-sink sweep module by module: read a module once, then record every class you swept there with hard_mark_module.'
-    : 'Phase B: run the deep-reading pass — model dataflow, trust boundaries, and state machines, then propose or test hypotheses.'
+function phaseOrder(phase: HardRoundPass): string {
+  switch (phase) {
+    case 'A':
+      return 'Phase A: continue the systematic source-to-sink sweep module by module: read a module once, then record every class you swept there with hard_mark_module.'
+    case 'B':
+      return 'Phase B: run the deep-reading pass — model dataflow, trust boundaries, and state machines, then propose or test hypotheses.'
+    case 'C':
+      return 'Phase C: chain what the ledger holds. Read hard_status view chains, pair what one weakness grants with what '
+        + 'another requires, propose each plausible chain with hard_update_hypothesis and its links, state the combined '
+        + 'impact, and prove the strongest with one PoC through hard_submit_finding citing the chain hypothesis.'
+  }
 }
 
 /**
@@ -134,7 +171,7 @@ function phaseOrder(phase: 'A' | 'B'): string {
  * longer exists.
  * @param round - the admitted round number.
  * @param maxRounds - the goal's round cap.
- * @param phase - the round's A/B rotation phase.
+ * @param phase - the round's A/B/C rotation phase.
  * @param openWork - the ledger's open-work items.
  * @param gateBlockers - the completion gate's remaining blockers, empty while open work stands or the gate certifies.
  * @param coverage - the coverage denominator once a matrix is armed.
@@ -143,7 +180,7 @@ function phaseOrder(phase: 'A' | 'B'): string {
 function roundContext(
   round: number,
   maxRounds: number,
-  phase: 'A' | 'B',
+  phase: HardRoundPass,
   openWork: readonly string[],
   gateBlockers: readonly string[],
   coverage: { verdicted: number; total: number } | undefined,
@@ -188,7 +225,7 @@ export function apply(ctx: Context, config: Config): void {
       const goal = ctx.goals.get(agent)
       if (goal === undefined) return
       const round = event.data.source.round
-      const phase = phaseFor(round, resolved.deepReadEveryN)
+      const phase = phaseFor(round, resolved.deepReadEveryN, resolved.chainEveryN, ctx.hardLedger.chainMaterial(agent).length)
       const openWork = ctx.hardLedger.openWork(agent)
       const matrix = ctx.hardLedger.coverageMatrix(agent)
       const coverage = matrix === undefined ? undefined : ctx.hardLedger.coverageProgress(agent)
@@ -205,7 +242,12 @@ export function apply(ctx: Context, config: Config): void {
       // The post-commit append feed forbids reentrant appends, so the round
       // start record and its context injection settle one microtask later.
       queueMicrotask(() => {
-        session.append('hard/round/start', { round, phase, openWorkCount: openWork.length })
+        session.append('hard/round/start', {
+          round,
+          phase: rotationSlot(round, resolved.deepReadEveryN),
+          openWorkCount: openWork.length,
+          ...(phase === 'C' ? { chaining: true as const } : {}),
+        })
         agent.inject(createUserMessage({
           content: [{ type: 'text', text: roundContext(round, goal.maxGoalRounds, phase, openWork, gateBlockers, coverage) }],
           source: { kind: 'hard-round' },

@@ -88,6 +88,19 @@ const hypothesisSchema = zod.object({
   statement: zod.string().min(1),
   status: zod.enum(['proposed', 'testing', 'confirmed', 'refuted', 'deferred']),
   reason: zod.string().min(1).optional(),
+  links: zod.array(zod.string().min(1)).readonly().optional(),
+})
+
+/** Validates one folded weakness record. */
+const flawSchema = zod.object({
+  id: zod.string().min(1),
+  title: zod.string().min(1),
+  component: zod.string().min(1),
+  grants: zod.string().min(1),
+  requires: zod.string().min(1),
+  sites: zod.array(zod.string().min(1)).readonly(),
+  findingId: zod.string().min(1).optional(),
+  hypothesisId: zod.string().min(1).optional(),
 })
 
 const coverageSchema = zod.object({
@@ -144,6 +157,8 @@ export const hardLedgerStateSchema = zod.object({
   coverage: zod.array(coverageSchema),
   // Optional: cached states from before the flow-document event fold without one.
   flowDocs: zod.array(flowDocSchema).optional(),
+  // Optional: cached states from before the weakness event fold without one.
+  flaws: zod.array(flawSchema).optional(),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
   recentSweeps: zod.array(sweepSummarySchema).max(HARD_SWEEP_WINDOW).readonly(),
   goalId: zod.string().min(1).optional(),
@@ -177,6 +192,8 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
         : state.hypotheses.map((record, position) => position === index ? event.data : record)
       return { ...state, hypotheses }
     }
+    case 'hard/flaw/recorded':
+      return { ...state, flaws: [...state.flaws ?? [], event.data] }
     case 'hard/coverage/cell': {
       const key = (record: { module: string; bugClass: string }): string => `${record.module}\u0000${record.bugClass}`
       const index = state.coverage.findIndex(record => key(record) === key(event.data))
@@ -365,8 +382,8 @@ export function hardLedgerProjectionDefinition(thresholds: LedgerThresholds = {
     // Version 4 changes the empty-sweep proof from free text to a verifiable
     // reference and adds the bounded sweep window plus the armed goal id; the
     // bump forces a full log rebuild so both recover on resume. The flow
-    // documents added after it fold into an optional state field, so no
-    // rebuild is required.
+    // documents and weaknesses added after it fold into optional state
+    // fields, so no rebuild is required.
     stateVersion: 4,
   } satisfies HardLedgerProjectionDefinition
 }

@@ -52,9 +52,11 @@ export const inject = ['agents', 'goals', 'systemPrompt', 'shell', 'hardLedger']
 /**
  * Bug classes the default mission contract sweeps in its systematic pass:
  * every OWASP Top 10 class with mechanical source-to-sink semantics, with
- * authentication surfaced as its distinct bypass flavors. Insecure design and
- * security logging stay in the deep-reading pass, where hypotheses rather
- * than source-sink patterns find them.
+ * authentication surfaced as its distinct bypass flavors, plus `logic` for
+ * business-logic flaws, whose cells the model clears by declaring the
+ * invariants it checked because no sink pattern finds them. Security logging
+ * stays in the deep-reading pass, where hypotheses rather than source-sink
+ * patterns find it.
  */
 export const DEFAULT_BUG_CLASSES: readonly string[] = [
   'sqli',
@@ -74,6 +76,7 @@ export const DEFAULT_BUG_CLASSES: readonly string[] = [
   'misconfig',
   'dependencies',
   'race',
+  'logic',
 ]
 
 /** Default automatic continuation-round cap handed to the created goal. */
@@ -495,6 +498,12 @@ function missionContract(resolved: ResolvedConfig): string {
     + sweep
     + `Every ${resolved.deepReadEveryN} systematic passes, run a deep-reading pass that models dataflow, `
     + 'trust boundaries, and state machines to form and test hypotheses beyond pattern matching. '
+    + 'Hunt business-logic flaws as well as sink-shaped bugs: compare sibling paths that perform the same '
+    + 'operation, and check the order of checks and state transitions. '
+    + 'Record every weakness you find with hard_record_flaw, however small its standalone impact, naming what it '
+    + 'grants an attacker and what it requires; then chain weaknesses and confirmed findings into the highest '
+    + 'impact you can prove, as chain hypotheses with links, in the chaining rounds and whenever a new weakness '
+    + 'fits an existing one. '
     + 'Propose completion with update_goal action complete once the objective is genuinely achieved; '
     + 'the harness, not you, certifies it — an early attempt is denied with the exact remaining work, '
     + 'and an empty sweep only counts when it cites a refuted hypothesis or a cell you cleared. '

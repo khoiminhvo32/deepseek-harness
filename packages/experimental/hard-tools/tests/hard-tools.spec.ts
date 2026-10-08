@@ -177,9 +177,9 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('hard tools registration', () => {
-  it('registers the eight tools and disposes them with the fiber', async () => {
+  it('registers the nine tools and disposes them with the fiber', async () => {
     const { ctx, fiber } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
-    const names = ['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_mark_module', 'hard_sweep_summary', 'hard_clear_modules', 'hard_status']
+    const names = ['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flaw', 'hard_record_flow', 'hard_mark_coverage', 'hard_mark_module', 'hard_sweep_summary', 'hard_clear_modules', 'hard_status']
     expect(names.map(name => ctx.tools.get(name)?.name)).toEqual(names)
     await fiber.dispose()
     expect(ctx.tools.get('hard_submit_finding')).toBeUndefined()
@@ -201,6 +201,7 @@ describe('hard tools agentless and presentation', () => {
     for (const [name, args] of [
       ['hard_submit_finding', { title: 'x', bug_class: 'sqli', component: 'c', claim: 'x', cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p', payload: "x' OR 1=1 --" }],
       ['hard_update_hypothesis', { statement: 'x', status: 'proposed' }],
+      ['hard_record_flaw', { title: 'x', component: 'c', grants: 'g', requires: 'r', sites: ['a.ts:1'] }],
       ['hard_mark_coverage', { module: 'm', bug_class: 'sqli', verdict: 'suspicious', declared_sinks: [] }],
       ['hard_mark_module', { module: 'm', cells: [{ bug_class: 'sqli', verdict: 'suspicious' }] }],
       ['hard_record_flow', { module: 'm', entry_points: [], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] }],
@@ -224,6 +225,8 @@ describe('hard tools agentless and presentation', () => {
       .toMatchObject({ title: 'Hypothesis proposed: proposed' })
     expect(ctx.tools.get('hard_update_hypothesis')?.presentCall?.({ hypothesis_id: 'H-1', statement: 'x', status: 'testing' }))
       .toMatchObject({ title: 'Hypothesis H-1: testing' })
+    expect(ctx.tools.get('hard_record_flaw')?.presentCall?.({ title: 'Slug leak', component: 'c', grants: 'g', requires: 'r', sites: ['a.ts:1'] }))
+      .toMatchObject({ title: 'Weakness: Slug leak' })
     expect(ctx.tools.get('hard_mark_coverage')?.presentCall?.({ module: 'm', bug_class: 'sqli', verdict: 'cleared' }))
       .toMatchObject({ title: 'Coverage m x sqli: cleared' })
     expect(ctx.tools.get('hard_record_flow')?.presentCall?.({
@@ -836,6 +839,97 @@ describe('hard_update_hypothesis and methodology tools', () => {
   })
 })
 
+describe('weaknesses, chains, and logic clears', () => {
+  const weakness = {
+    title: 'Re-parent skips edit_post', component: 'src/db', grants: 'set any post_parent', requires: 'upload_files',
+    sites: ['src/db/media.ts:972 type check only'],
+  }
+
+  function arm(ctx: Context, agent: Agent, bugClasses: string[] = ['cmdi']): void {
+    ctx.hardLedger.recordMissionArmed(agent, {
+      objective: 'hunt bugs in the target repository', targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['src/db'], bugClasses,
+    })
+  }
+
+  it('records a weakness only when every site resolves, and reports the material no chain links', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1 }, { untracked: ['src/db/ghost.ts'] })
+    arm(ctx, root.agent)
+    const refused = await execute(ctx, 'hard_record_flaw', { ...weakness, sites: ['src/db/ghost.ts:exec'] }, root.agent)
+    expect(refused.isError).toBe(true)
+    expect((refused.content[0] as { type: string; text: string }).text)
+      .toContain('hard_record_flaw rejected — every site must resolve at the pinned commit: src/db/ghost.ts:exec (src/db/ghost.ts is not tracked at commit aaaaaaa)')
+    expect(ctx.hardLedger.flaws(root.agent)).toEqual([])
+    expect(resultJson(await execute(ctx, 'hard_record_flaw', weakness, root.agent))).toEqual({ flaw: { id: 'W-1' }, unchained: [] })
+    const hypothesis = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'slug leak', status: 'proposed' })
+    expect(resultJson(await execute(ctx, 'hard_record_flaw', { ...weakness, hypothesis_id: ` ${hypothesis} ` }, root.agent)))
+      .toEqual({ flaw: { id: 'W-2' }, unchained: ['W-1', 'W-2'] })
+    const unknown = await execute(ctx, 'hard_record_flaw', { ...weakness, finding_id: 'F-9' }, root.agent)
+    expect((unknown.content[0] as { type: string; text: string }).text).toContain('unknown finding id F-9')
+    expect(shell.commands.some(command => command.includes(' grep -I -n -E '))).toBe(false)
+  })
+
+  it('records a weakness without resolving sites when no matrix pins a commit', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' })
+    expect(resultJson(await execute(ctx, 'hard_record_flaw', weakness, root.agent))).toEqual({ flaw: { id: 'W-1' }, unchained: [] })
+    expect(shell.commands).toEqual([])
+  })
+
+  it('links a chain hypothesis to weaknesses and reads the chain board back', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' })
+    const finding = ctx.hardLedger.proposeFinding(root.agent, {
+      title: 'Slug leak', bugClass: 'authz', component: 'src/db', claim: 'leaks slugs', cvssVector: VECTOR, cvssClaimed: 9.3,
+      pocPath: 'poc.sh', payload: 'x', claimHash: 'c'.repeat(64), fingerprint: 'd'.repeat(64),
+    })
+    ctx.hardLedger.recordVerdict(root.agent, {
+      id: finding, verdict: 'confirmed', runs: 1, cvssComputed: 9.3, cvssMatch: true, reason: 'proved', fingerprint: 'd'.repeat(64),
+    })
+    await execute(ctx, 'hard_record_flaw', { ...weakness, finding_id: finding }, root.agent)
+    await execute(ctx, 'hard_record_flaw', weakness, root.agent)
+    const summary = resultJson(await execute(ctx, 'hard_status', { view: 'summary' }, root.agent))
+    expect((summary.summary as { openWork: { unchainedMaterial: number } }).openWork.unchainedMaterial).toBe(2)
+    ctx.hardLedger.writeHypothesis(root.agent, { statement: 'ordinary', status: 'proposed' })
+    expect(resultJson(await execute(ctx, 'hard_update_hypothesis', {
+      statement: 'W-2 grants what W-1 requires', status: 'proposed', links: ['W-2', 'W-1'],
+    }, root.agent))).toEqual({ hypothesis: { id: 'H-2', status: 'proposed' } })
+    expect(resultJson(await execute(ctx, 'hard_status', { view: 'chains' }, root.agent))).toEqual({
+      chains: {
+        weaknesses: [
+          { id: 'W-1', title: weakness.title, component: 'src/db', grants: weakness.grants, requires: weakness.requires, findingId: 'F-1' },
+          { id: 'W-2', title: weakness.title, component: 'src/db', grants: weakness.grants, requires: weakness.requires },
+        ],
+        confirmedFindings: [{ id: 'F-1', title: 'Slug leak', component: 'src/db' }],
+        chainHypotheses: [{ id: 'H-2', status: 'proposed', links: ['W-2', 'W-1'], statement: 'W-2 grants what W-1 requires' }],
+        unchained: [],
+      },
+    })
+    const bad = await execute(ctx, 'hard_update_hypothesis', { statement: 'x', status: 'proposed', links: ['W-1'] }, root.agent)
+    expect((bad.content[0] as { type: string; text: string }).text).toContain('a chain links at least two distinct weaknesses or findings')
+  })
+
+  it('refuses a logic clear that does not declare two sites with invariant notes, in both coverage tools', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 100 }, {})
+    arm(ctx, root.agent, ['logic', 'cmdi'])
+    const message = 'a logic clear declares at least two sites, each path:locator followed by a note stating the invariant it upholds'
+    for (const declared of [['src/db/a.ts:1 owner checked'], ['src/db/a.ts:1', 'src/db/b.ts:2 owner checked']]) {
+      const refused = await execute(ctx, 'hard_mark_coverage', { module: 'src/db', bug_class: 'logic', verdict: 'cleared', declared_sinks: declared }, root.agent)
+      expect((refused.content[0] as { type: string; text: string }).text).toContain(message)
+    }
+    const batch = await execute(ctx, 'hard_mark_module', {
+      module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'suspicious' }, { bug_class: 'logic', verdict: 'cleared', declared_sinks: ['src/db/a.ts:1'] }],
+    }, root.agent)
+    expect((batch.content[0] as { type: string; text: string }).text).toContain(`logic: ${message}`)
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'logic', verdict: 'cleared',
+      declared_sinks: ['src/db/a.ts:1 update checks owner', 'src/db/b.ts:2 sibling update checks owner too'],
+    }, root.agent))).toEqual({ coverage: { module: 'src/db', bugClass: 'logic', verdict: 'cleared' }, reopenedSinks: [] })
+    // A suspicious logic cell needs no invariants.
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', { module: 'src/db', bug_class: 'logic', verdict: 'suspicious' }, root.agent)))
+      .toMatchObject({ coverage: { verdict: 'suspicious' } })
+  })
+})
+
 describe('hard_status', () => {
   /** Arm a 3-module, 2-class matrix with one inert and one unscreened module and an exclusion. */
   function armBoard(ctx: Context, agent: Agent): void {
@@ -865,7 +959,10 @@ describe('hard_status', () => {
         unscreenedModules: ['wp'], unscreenedModuleCount: 1,
         excludeGlobs: ['vendor/**'], excludedFileCount: 9,
       },
-      openWork: { pendingFindings: 0, flakyFindings: 0, openHypotheses: 0, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 0 },
+      openWork: {
+        pendingFindings: 0, flakyFindings: 0, openHypotheses: 0, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 0,
+        unchainedMaterial: 0,
+      },
       gate: { complete: false, blockers: summary.gate.blockers },
     })
     // No ratio or percentage reaches the model: a salient number invites clearing for the number's sake.

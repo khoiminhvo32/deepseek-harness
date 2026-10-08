@@ -1259,10 +1259,34 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the verdict payload to persist.' }],
       },
       {
-        signature: 'writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string }, ): HardHypothesisId',
+        signature: 'writeHypothesis( agent: Agent, request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string; links?: readonly string[] }, ): HardHypothesisId',
         description: 'Propose a new hypothesis or transition an existing one through its lifecycle.',
-        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'status, statement (omittable for an existing id, which keeps its statement), optional existing id, and conditional reason.' }],
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'status, statement (omittable for an existing id, which keeps its statement), optional existing id, conditional reason, and the chain links (omittable for an existing id, which keeps its links).' }],
         returns: 'the assigned or confirmed hypothesis id.',
+      },
+      {
+        signature: 'recordFlaw( agent: Agent, request: Omit<HardFlawData, \'id\' | \'findingId\' | \'hypothesisId\'> & { findingId?: string; hypothesisId?: string }, ): HardFlawId',
+        description: 'Append one weakness as chaining material and return its id. The caller resolves every site at the pinned commit before this append.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the weakness fields without the assigned id; a named finding or hypothesis id must be recorded.' }],
+        returns: 'the assigned weakness id.',
+      },
+      {
+        signature: 'flaws(agent: Agent): readonly HardFlawData[]',
+        description: 'Recorded weaknesses in record order.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per weakness.',
+      },
+      {
+        signature: 'chainMaterial(agent: Agent): readonly string[]',
+        description: 'The ids a chain hypothesis may link: every recorded weakness, then every confirmed finding no weakness already names. The math lives in `chainMaterialFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the `W-n` and `F-n` ids in record order.',
+      },
+      {
+        signature: 'unchainedMaterial(agent: Agent): readonly string[]',
+        description: 'Chain material no hypothesis links yet; empty while fewer than two weaknesses and confirmed findings exist. The math lives in `unchainedMaterialFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the unlinked `W-n` and `F-n` ids.',
       },
       {
         signature: 'markCoverage(agent: Agent, request: HardCoverageCellData): void',
@@ -5667,6 +5691,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface HardFindingVerdictData {\n    readonly id: HardFindingId;\n    readonly verdict: HardVerdict;\n    readonly runs: number;\n    readonly cvssComputed: number;\n    readonly cvssMatch: boolean;\n    readonly reason: string;\n    readonly fingerprint: string;\n    readonly benignArm?: HardBenignArmResult;\n    readonly cause?: HardFindingCause;\n    readonly evidence?: HardFindingEvidence;\n}',
   },
   {
+    name: 'HardFlawData',
+    declaration: 'export interface HardFlawData {\n    readonly id: HardFlawId;\n    readonly title: string;\n    readonly component: string;\n    readonly grants: string;\n    readonly requires: string;\n    readonly sites: readonly string[];\n    readonly findingId?: HardFindingId;\n    readonly hypothesisId?: HardHypothesisId;\n}',
+  },
+  {
+    name: 'HardFlawId',
+    declaration: 'export type HardFlawId = Branded<\'HardFlawId\'>;',
+  },
+  {
     name: 'HardFlowDocData',
     declaration: 'export interface HardFlowDocData {\n    readonly module: string;\n    readonly sections: HardFlowDocSections;\n    readonly citations: number;\n    readonly quirkIds?: readonly string[];\n}',
   },
@@ -5680,7 +5712,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardHypothesisStateData',
-    declaration: 'export interface HardHypothesisStateData {\n    readonly id: HardHypothesisId;\n    readonly statement: string;\n    readonly status: HardHypothesisStatus;\n    readonly reason?: string;\n}',
+    declaration: 'export interface HardHypothesisStateData {\n    readonly id: HardHypothesisId;\n    readonly statement: string;\n    readonly status: HardHypothesisStatus;\n    readonly reason?: string;\n    readonly links?: readonly string[];\n}',
   },
   {
     name: 'HardHypothesisStatus',
@@ -6336,7 +6368,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'OpenWorkCounts',
-    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n};',
+    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n    readonly unchainedMaterial: number;\n};',
   },
   {
     name: 'OptionalSessionSeq',

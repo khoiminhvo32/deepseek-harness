@@ -33,6 +33,7 @@ export const BUG_CLASS_DEFINITIONS: Readonly<Record<string, string>> = {
   'misconfig': 'configuration, framework settings, or deployment recipes enable an unsafe default or a debug surface',
   'dependencies': 'a declared or vendored dependency version carries a known vulnerability that the code reaches',
   'race': 'concurrent operations interleave so that a check and its use, or two updates, observe inconsistent state',
+  'logic': 'the code enforces its business rules incompletely: a check in the wrong order, a state machine that skips a step, a rule enforced on one path but not a sibling path performing the same operation, or a value trusted after it was checked',
 }
 
 /**

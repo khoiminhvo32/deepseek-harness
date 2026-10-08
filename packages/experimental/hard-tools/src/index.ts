@@ -43,7 +43,19 @@ const SUBMIT_DESCRIPTION = 'Submit one vulnerability finding for harness verific
 
 const HYPOTHESIS_DESCRIPTION = 'Propose a new hypothesis, or move an existing one through its lifecycle: '
   + 'proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; '
-  + 'an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.'
+  + 'an empty sweep only counts when it refutes a hypothesis or clears a coverage cell. '
+  + 'A chain hypothesis also names links: two or more recorded weaknesses (W-n) or confirmed findings (F-n) it '
+  + 'combines, where what one grants satisfies what another requires, and states the combined impact. Prove a '
+  + 'chain with one PoC through hard_submit_finding citing its hypothesis id; a chain you rule out is refuted with '
+  + 'the reason, which still counts as considering its links.'
+
+const FLAW_DESCRIPTION = 'Record one weakness as chaining material: a flaw, bug, or confirmed finding, kept whatever '
+  + 'its standalone impact — record low and informational ones too, because a chain may need them. grants is what an '
+  + 'attacker gains from it alone (a capability, a leaked value, a state change), requires is what the attacker needs '
+  + 'before it is usable (a role, a configuration, another capability). sites are the code sites, each path:symbol, '
+  + 'path:line, or path:start-end plus an optional note, resolved at the pinned commit. Once two or more weaknesses '
+  + 'or confirmed findings exist, each must appear in the links of at least one chain hypothesis before the mission '
+  + 'can complete.'
 
 const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systematic pass: a module swept for one '
   + 'bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you '
@@ -55,7 +67,11 @@ const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systemati
   + 'For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it '
   + 'exports, so cleared requires one declaration per exported operation — name the guard that protects it, '
   + 'or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any '
-  + 'operation none of your declarations mention.'
+  + 'operation none of your declarations mention. '
+  + 'logic covers business-logic flaws no sink pattern finds: a check in the wrong order, a state machine that '
+  + 'skips a step, a limit enforced on one path but not its sibling, a value trusted after it was checked. A logic '
+  + 'clear declares at least two sites, each with a note stating the invariant it upholds, and compares sibling '
+  + 'paths that perform the same operation; the harness cannot grep it, so nothing but your read stands behind it.'
 
 const MARK_MODULE_DESCRIPTION = 'Record several bug classes for one module after reading it once: one entry per class '
   + 'with its verdict and declared sites, under the same rules as hard_mark_coverage for each entry. Every entry is '
@@ -85,7 +101,8 @@ const STATUS_DESCRIPTION = 'Read the coverage board and the remaining work witho
   + 'and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many '
   + 'matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness '
   + 'cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged '
-  + 'the same way.'
+  + 'the same way. view chains: every recorded weakness with what it grants and requires, the confirmed findings, '
+  + 'every chain hypothesis with its links, and the material no chain hypothesis links yet.'
 
 /** Default page size of a `hard_status` listing. */
 const STATUS_DEFAULT_LIMIT = 50
@@ -95,6 +112,27 @@ const STATUS_MAX_LIMIT = 200
 
 /** Unscreened module names one `hard_status` summary lists before it relies on the count. */
 const STATUS_UNSCREENED_LIST_LIMIT = 20
+
+/** The bug class whose clears declare invariants rather than sinks. */
+const LOGIC_CLASS = 'logic'
+
+/**
+ * Refuse a logic clear that does not state what it checked: at least two
+ * declared sites, each followed by a note naming the invariant. A logic flaw
+ * has no sink the harness can grep, so the declared invariants are the only
+ * record of the read.
+ * @param cell - the coverage cell about to be recorded.
+ * @throws `HARD_TOOLS_LOGIC_INVARIANTS_REQUIRED` when the clear names fewer than two sites or a site without a note.
+ */
+function assertLogicInvariants(cell: { bugClass: string; verdict: string; declaredSinks: readonly string[] }): void {
+  if (cell.bugClass !== LOGIC_CLASS || cell.verdict !== 'cleared') return
+  if (cell.declaredSinks.length < 2 || cell.declaredSinks.some(sink => sink.trim().split(/\s+/u).length < 2)) {
+    throw new HarnessError(
+      'a logic clear declares at least two sites, each path:locator followed by a note stating the invariant it upholds',
+      'HARD_TOOLS_LOGIC_INVARIANTS_REQUIRED',
+    )
+  }
+}
 
 /** The state filters a `hard_status` cell listing accepts. */
 const STATUS_FILTERS = ['uncovered', 'suspicious', 'cleared', 'all'] as const
@@ -253,7 +291,7 @@ function readModuleCells(
   })
 }
 
-/** Register the eight hard-harness tools. */
+/** Register the nine hard-harness tools. */
 export function apply(ctx: Context, _config: Config): void {  const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
 
@@ -393,6 +431,11 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       },
       status: { type: 'string', required: true, enum: [...HYPOTHESIS_STATUSES], description: 'New lifecycle status.' },
       reason: { type: 'string', description: 'Required for refuted and deferred: the evidence or retry condition.' },
+      links: {
+        type: 'array', items: { type: 'string' },
+        description: 'For a chain hypothesis: the W-n weaknesses and F-n confirmed findings it combines, at least two; '
+          + 'omit it when moving an existing hypothesis to keep its links.',
+      },
     },
     output: {
       schema: {
@@ -416,10 +459,63 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
         ...args.statement === undefined ? {} : { statement: args.statement },
         status: args.status,
         ...args.reason === undefined ? {} : { reason: args.reason },
+        ...args.links === undefined ? {} : { links: args.links },
       })
       return Promise.resolve({ hypothesis: { id, status: args.status } })
     },
     presentCall: args => present(`Hypothesis ${args.hypothesis_id ?? 'proposed'}: ${args.status}`, args.statement),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'hard_record_flaw',
+    description: FLAW_DESCRIPTION,
+    parameters: {
+      title: { type: 'string', required: true, description: 'One-line name of the weakness.' },
+      component: { type: 'string', required: true, description: 'Component, module, or file the weakness lives in.' },
+      grants: { type: 'string', required: true, description: 'What an attacker gains from this weakness alone.' },
+      requires: { type: 'string', required: true, description: 'What an attacker needs before the weakness is usable.' },
+      sites: {
+        type: 'array', required: true, items: { type: 'string' },
+        description: 'Code sites as path:symbol, path:line, or path:start-end plus an optional note; at least one.',
+      },
+      finding_id: { type: 'string', description: 'The F-n finding that proved this weakness, when one exists.' },
+      hypothesis_id: { type: 'string', description: 'The H-n hypothesis this weakness came from, when one exists.' },
+    },
+    output: {
+      schema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          flaw: {
+            type: 'object', additionalProperties: false, required: true,
+            properties: { id: { type: 'string', required: true } },
+          },
+          unchained: { type: 'array', required: true, items: { type: 'string' }, description: 'Material no chain hypothesis links yet.' },
+        },
+      } as const,
+      render: renderJson,
+    },
+    async execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_record_flaw requires a live agent')
+      if (args.sites.length > 0 && ledger.coverageMatrix(agent) !== undefined) {
+        const { rejected } = await verifier.checkSinkCitations(agent, args.sites)
+        if (rejected.length > 0) {
+          throw new Error('hard_record_flaw rejected — every site must resolve at the pinned commit: '
+            + rejected.map(entry => `${entry.sink} (${entry.reason})`).join('; '))
+        }
+      }
+      const id = ledger.recordFlaw(agent, {
+        title: args.title,
+        component: args.component,
+        grants: args.grants,
+        requires: args.requires,
+        sites: args.sites,
+        ...args.finding_id === undefined ? {} : { findingId: args.finding_id.trim() },
+        ...args.hypothesis_id === undefined ? {} : { hypothesisId: hypothesisId(args.hypothesis_id) },
+      })
+      return { flaw: { id }, unchained: [...ledger.unchainedMaterial(agent)] }
+    },
+    presentCall: args => present(`Weakness: ${args.title}`, args.component),
   }))
 
   ctx.tools.register(defineTool({
@@ -458,6 +554,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       // The ledger's row checks are cheap and decide first, so a refused cell
       // never costs a git call.
       ledger.assertCoverageCell(agent, cell)
+      assertLogicInvariants(cell)
       // A clear claims the cited code was read: resolve every site at the
       // pinned commit before the record exists. Without an armed matrix there
       // is no commit to resolve against, and the merge-extensible default holds.
@@ -526,8 +623,9 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       for (const cell of cells) {
         try {
           ledger.assertCoverageCell(agent, cell)
+          assertLogicInvariants(cell)
         } catch (error: unknown) {
-          /* v8 ignore next -- defensive: assertCoverageCell fails only with a HarnessError. */
+          /* v8 ignore next -- defensive: both checks fail only with a HarnessError. */
           if (!(error instanceof HarnessError)) throw error
           throw new HarnessError(`${cell.bugClass}: ${error.message}`, error.code)
         }
@@ -722,7 +820,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
     name: 'hard_status',
     description: STATUS_DESCRIPTION,
     parameters: {
-      view: { type: 'string', required: true, enum: ['summary', 'cells', 'open-work'], description: 'What to read.' },
+      view: { type: 'string', required: true, enum: ['summary', 'cells', 'open-work', 'chains'], description: 'What to read.' },
       filter: {
         type: 'string', enum: [...STATUS_FILTERS],
         description: 'With view cells: which cells to list; uncovered by default.',
@@ -759,6 +857,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
                   uncoveredCells: { type: 'integer', required: true },
                   suspiciousCells: { type: 'integer', required: true },
                   screenReReads: { type: 'integer', required: true },
+                  unchainedMaterial: { type: 'integer', required: true },
                 },
               },
               gate: {
@@ -789,6 +888,49 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
             },
           },
           openWork: { type: 'array', items: { type: 'string' } },
+          chains: {
+            type: 'object', additionalProperties: false,
+            properties: {
+              weaknesses: {
+                type: 'array', required: true,
+                items: {
+                  type: 'object', additionalProperties: false,
+                  properties: {
+                    id: { type: 'string', required: true },
+                    title: { type: 'string', required: true },
+                    component: { type: 'string', required: true },
+                    grants: { type: 'string', required: true },
+                    requires: { type: 'string', required: true },
+                    findingId: { type: 'string' },
+                  },
+                },
+              },
+              confirmedFindings: {
+                type: 'array', required: true,
+                items: {
+                  type: 'object', additionalProperties: false,
+                  properties: {
+                    id: { type: 'string', required: true },
+                    title: { type: 'string', required: true },
+                    component: { type: 'string', required: true },
+                  },
+                },
+              },
+              chainHypotheses: {
+                type: 'array', required: true,
+                items: {
+                  type: 'object', additionalProperties: false,
+                  properties: {
+                    id: { type: 'string', required: true },
+                    status: { type: 'string', required: true },
+                    links: { type: 'array', required: true, items: { type: 'string' } },
+                    statement: { type: 'string', required: true },
+                  },
+                },
+              },
+              unchained: { type: 'array', required: true, items: { type: 'string' }, description: 'Material no chain hypothesis links yet.' },
+            },
+          },
           totalMatching: { type: 'integer' },
           offset: { type: 'integer' },
         },
@@ -821,6 +963,27 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
             openWork: ledger.openWorkCounts(agent),
             gate: { complete: gate.complete, blockers: [...gate.blockers] },
             ...(goal === undefined ? {} : { goalRound: { started: goal.roundsStarted, max: goal.maxGoalRounds } }),
+          },
+        })
+      }
+      if (args.view === 'chains') {
+        return Promise.resolve({
+          chains: {
+            weaknesses: ledger.flaws(agent).map(flaw => ({
+              id: flaw.id,
+              title: flaw.title,
+              component: flaw.component,
+              grants: flaw.grants,
+              requires: flaw.requires,
+              ...(flaw.findingId === undefined ? {} : { findingId: flaw.findingId }),
+            })),
+            confirmedFindings: ledger.findings(agent)
+              .filter(entry => entry.verdict?.verdict === 'confirmed')
+              .map(entry => ({ id: entry.proposed.id, title: entry.proposed.title, component: entry.proposed.component })),
+            chainHypotheses: ledger.hypotheses(agent).flatMap(hypothesis => hypothesis.links === undefined
+              ? []
+              : [{ id: hypothesis.id, status: hypothesis.status, links: [...hypothesis.links], statement: hypothesis.statement }]),
+            unchained: [...ledger.unchainedMaterial(agent)],
           },
         })
       }

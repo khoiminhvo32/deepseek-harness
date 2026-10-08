@@ -32,7 +32,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`, `grep` | `ctx.tools`, `ctx.subprocess`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments. |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_mark_module`, `hard_record_flow`, `hard_status`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/flow/doc`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_mark_module`, `hard_record_flaw`, `hard_record_flow`, `hard_status`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/flow/doc`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1420,7 +1420,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_mark_coverage`
 
-Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.
+Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention. logic covers business-logic flaws no sink pattern finds: a check in the wrong order, a state machine that skips a step, a limit enforced on one path but not its sibling, a value trusted after it was checked. A logic clear declares at least two sites, each with a note stating the invariant it upholds, and compares sibling paths that perform the same operation; the harness cannot grep it, so nothing but your read stands behind it.
 
 ```json
 {
@@ -1508,6 +1508,58 @@ Record several bug classes for one module after reading it once: one entry per c
   "required": [
     "module",
     "cells"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_record_flaw`
+
+Record one weakness as chaining material: a flaw, bug, or confirmed finding, kept whatever its standalone impact — record low and informational ones too, because a chain may need them. grants is what an attacker gains from it alone (a capability, a leaked value, a state change), requires is what the attacker needs before it is usable (a role, a configuration, another capability). sites are the code sites, each path:symbol, path:line, or path:start-end plus an optional note, resolved at the pinned commit. Once two or more weaknesses or confirmed findings exist, each must appear in the links of at least one chain hypothesis before the mission can complete.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "One-line name of the weakness."
+    },
+    "component": {
+      "type": "string",
+      "description": "Component, module, or file the weakness lives in."
+    },
+    "grants": {
+      "type": "string",
+      "description": "What an attacker gains from this weakness alone."
+    },
+    "requires": {
+      "type": "string",
+      "description": "What an attacker needs before the weakness is usable."
+    },
+    "sites": {
+      "type": "array",
+      "description": "Code sites as path:symbol, path:line, or path:start-end plus an optional note; at least one.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "finding_id": {
+      "type": "string",
+      "description": "The F-n finding that proved this weakness, when one exists."
+    },
+    "hypothesis_id": {
+      "type": "string",
+      "description": "The H-n hypothesis this weakness came from, when one exists."
+    }
+  },
+  "required": [
+    "title",
+    "component",
+    "grants",
+    "requires",
+    "sites"
   ]
 }
 ```
@@ -1675,7 +1727,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_status`
 
-Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way.
+Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way. view chains: every recorded weakness with what it grants and requires, the confirmed findings, every chain hypothesis with its links, and the material no chain hypothesis links yet.
 
 ```json
 {
@@ -1687,7 +1739,8 @@ Read the coverage board and the remaining work without changing anything. view s
       "enum": [
         "summary",
         "cells",
-        "open-work"
+        "open-work",
+        "chains"
       ]
     },
     "filter": {
@@ -1843,7 +1896,7 @@ Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experiment
 
 ### `hard_update_hypothesis`
 
-Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.
+Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell. A chain hypothesis also names links: two or more recorded weaknesses (W-n) or confirmed findings (F-n) it combines, where what one grants satisfies what another requires, and states the combined impact. Prove a chain with one PoC through hard_submit_finding citing its hypothesis id; a chain you rule out is refuted with the reason, which still counts as considering its links.
 
 ```json
 {
@@ -1871,6 +1924,13 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
     "reason": {
       "type": "string",
       "description": "Required for refuted and deferred: the evidence or retry condition."
+    },
+    "links": {
+      "type": "array",
+      "description": "For a chain hypothesis: the W-n weaknesses and F-n confirmed findings it combines, at least two; omit it when moving an existing hypothesis to keep its links.",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [

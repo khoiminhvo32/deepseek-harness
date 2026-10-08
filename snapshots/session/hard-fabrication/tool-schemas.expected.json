@@ -208,7 +208,7 @@
     },
     {
       "name": "hard_mark_coverage",
-      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention.",
+      "description": "Record one coverage cell verdict for the systematic pass: a module swept for one bug class. The module must be a row of the armed coverage matrix — sweeping an untracked directory you created yourself (such as a poc/ scratch folder) is refused. cleared requires the code sites you inspected for this class, each written path:symbol, path:line, or path:start-end (target-repo relative), optionally followed by a space and a note; in a module with no sink, cite the entry points you inspected. The harness resolves every site at the pinned commit and refuses a clear that cites code which is not there, and it may re-grep the module against your declared list. For authz and authn-bypass the reading is inverted: the harness greps the module for the operations it exports, so cleared requires one declaration per exported operation — name the guard that protects it, or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any operation none of your declarations mention. logic covers business-logic flaws no sink pattern finds: a check in the wrong order, a state machine that skips a step, a limit enforced on one path but not its sibling, a value trusted after it was checked. A logic clear declares at least two sites, each with a note stating the invariant it upholds, and compares sibling paths that perform the same operation; the harness cannot grep it, so nothing but your read stands behind it.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -289,6 +289,53 @@
         "required": [
           "module",
           "cells"
+        ]
+      }
+    },
+    {
+      "name": "hard_record_flaw",
+      "description": "Record one weakness as chaining material: a flaw, bug, or confirmed finding, kept whatever its standalone impact — record low and informational ones too, because a chain may need them. grants is what an attacker gains from it alone (a capability, a leaked value, a state change), requires is what the attacker needs before it is usable (a role, a configuration, another capability). sites are the code sites, each path:symbol, path:line, or path:start-end plus an optional note, resolved at the pinned commit. Once two or more weaknesses or confirmed findings exist, each must appear in the links of at least one chain hypothesis before the mission can complete.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "One-line name of the weakness."
+          },
+          "component": {
+            "type": "string",
+            "description": "Component, module, or file the weakness lives in."
+          },
+          "grants": {
+            "type": "string",
+            "description": "What an attacker gains from this weakness alone."
+          },
+          "requires": {
+            "type": "string",
+            "description": "What an attacker needs before the weakness is usable."
+          },
+          "sites": {
+            "type": "array",
+            "description": "Code sites as path:symbol, path:line, or path:start-end plus an optional note; at least one.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "finding_id": {
+            "type": "string",
+            "description": "The F-n finding that proved this weakness, when one exists."
+          },
+          "hypothesis_id": {
+            "type": "string",
+            "description": "The H-n hypothesis this weakness came from, when one exists."
+          }
+        },
+        "required": [
+          "title",
+          "component",
+          "grants",
+          "requires",
+          "sites"
         ]
       }
     },
@@ -448,7 +495,7 @@
     },
     {
       "name": "hard_status",
-      "description": "Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way.",
+      "description": "Read the coverage board and the remaining work without changing anything. view summary: how much work remains of each kind, the completion gate's blockers, the matrix axes, the modules the harness cannot screen, any configured exclusion, and the goal round. view cells: matrix cells with their verdict and who decided it, filtered by state (uncovered by default, or suspicious, cleared, all) and by module_prefix, paged with limit (default 50, at most 200) and offset; totalMatching says how many matched. A cell without a verdict still needs your read. A blind cell is a clear in a module the harness cannot screen: nothing but your own read stands behind it. view open-work: the full open-work list, paged the same way. view chains: every recorded weakness with what it grants and requires, the confirmed findings, every chain hypothesis with its links, and the material no chain hypothesis links yet.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -458,7 +505,8 @@
             "enum": [
               "summary",
               "cells",
-              "open-work"
+              "open-work",
+              "chains"
             ]
           },
           "filter": {
@@ -601,7 +649,7 @@
     },
     {
       "name": "hard_update_hypothesis",
-      "description": "Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell.",
+      "description": "Propose a new hypothesis, or move an existing one through its lifecycle: proposed, testing, confirmed, refuted, deferred. refuted and deferred require a concrete reason; an empty sweep only counts when it refutes a hypothesis or clears a coverage cell. A chain hypothesis also names links: two or more recorded weaknesses (W-n) or confirmed findings (F-n) it combines, where what one grants satisfies what another requires, and states the combined impact. Prove a chain with one PoC through hard_submit_finding citing its hypothesis id; a chain you rule out is refuted with the reason, which still counts as considering its links.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -627,6 +675,13 @@
           "reason": {
             "type": "string",
             "description": "Required for refuted and deferred: the evidence or retry condition."
+          },
+          "links": {
+            "type": "array",
+            "description": "For a chain hypothesis: the W-n weaknesses and F-n confirmed findings it combines, at least two; omit it when moving an existing hypothesis to keep its links.",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

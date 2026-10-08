@@ -24,7 +24,9 @@ import {
   openWorkCountsFromState,
   openWorkFromState,
   refutationBreakdownFromState,
+  unchainedMaterialFromState,
   uncoveredCellsFromState,
+  chainMaterialFromState,
 } from './aggregate.ts'
 import { classScope } from './scope.ts'
 import type {
@@ -44,6 +46,8 @@ import type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFlawData,
+  HardFlawId,
   HardFlowDocData,
   HardHypothesisId,
   HardHypothesisStateData,
@@ -68,6 +72,8 @@ export type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFlawData,
+  HardFlawId,
   HardFlowDocData,
   HardFlowDocSections,
   HardGateDecisionData,
@@ -85,6 +91,7 @@ export { applyHardLedgerProjection, emptyHardLedgerState, HARD_SWEEP_WINDOW, har
 export type { HardCoverageMatrix, HardLedgerProjectionState, HardLedgerFindingEntry } from './projection.ts'
 export {
   blindClearsFromState,
+  chainMaterialFromState,
   completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
@@ -94,6 +101,7 @@ export {
   openWorkCountsFromState,
   openWorkFromState,
   refutationBreakdownFromState,
+  unchainedMaterialFromState,
   uncoveredCellsFromState,
 } from './aggregate.ts'
 export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
@@ -372,13 +380,15 @@ export class HardLedger extends Service {
    * Propose a new hypothesis or transition an existing one through its lifecycle.
    * @param agent - the live agent whose session receives the record.
    * @param request - status, statement (omittable for an existing id, which keeps its
-   *   statement), optional existing id, and conditional reason.
+   *   statement), optional existing id, conditional reason, and the chain links
+   *   (omittable for an existing id, which keeps its links).
    * @returns the assigned or confirmed hypothesis id.
    */
   writeHypothesis(
     agent: Agent,
-    request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string },
+    request: { id?: string; statement?: string; status: HardHypothesisStatus; reason?: string; links?: readonly string[] },
   ): HardHypothesisId {
+    if (request.links !== undefined) this.assertChainLinks(agent, request.links)
     if (request.statement !== undefined) this.assertText('statement', request.statement)
     else if (request.id === undefined) {
       throw new HarnessError('proposing a hypothesis requires its statement', 'HARD_LEDGER_STATEMENT_REQUIRED')
@@ -404,18 +414,123 @@ export class HardLedger extends Service {
         throw new HarnessError(`unknown hypothesis id ${request.id}`, 'HARD_LEDGER_UNKNOWN_HYPOTHESIS')
       }
     }
-    // A transition without a statement keeps the one the hypothesis already carries.
-    const statement = request.statement ?? this.hypotheses(agent).findLast(hypothesis => hypothesis.id === id)?.statement
+    // A transition without a statement or links keeps the ones the hypothesis already carries.
+    const prior = this.hypotheses(agent).findLast(hypothesis => hypothesis.id === id)
+    const statement = request.statement ?? prior?.statement
     /* v8 ignore next -- defensive: a known id always has a recorded statement. */
     if (statement === undefined) throw new HarnessError(`hypothesis ${id} has no statement`, 'HARD_LEDGER_STATEMENT_REQUIRED')
+    const links = request.links ?? prior?.links
     const record: HardHypothesisStateData = {
       id,
       statement,
       status: request.status,
       ...(request.reason === undefined ? {} : { reason: request.reason }),
+      ...(links === undefined ? {} : { links: [...links] }),
     }
     agent.session.append('hard/hypothesis/state', record)
     return id
+  }
+
+  /**
+   * Reject chain links that do not name at least two distinct recorded
+   * weaknesses or confirmed findings: a chain combines material the ledger
+   * holds, never an id the model has not recorded or proven.
+   * @param agent - the live agent whose ledger holds the material.
+   * @param links - the `W-n` and `F-n` ids the chain names.
+   * @throws `HARD_LEDGER_INVALID_CHAIN` naming the problem.
+   */
+  private assertChainLinks(agent: Agent, links: readonly string[]): void {
+    if (new Set(links).size !== links.length || links.length < 2) {
+      throw new HarnessError('a chain links at least two distinct weaknesses or findings', 'HARD_LEDGER_INVALID_CHAIN')
+    }
+    const state = this.state(agent.session)
+    const flaws = new Set((state.flaws ?? []).map(flaw => flaw.id))
+    const confirmed = new Set(state.findings
+      .filter(entry => entry.verdict?.verdict === 'confirmed')
+      .map(entry => entry.proposed.id))
+    const unknown = links.filter(id => !flaws.has(id) && !confirmed.has(id))
+    if (unknown.length > 0) {
+      throw new HarnessError(
+        `chain links must name recorded weaknesses (W-n) or confirmed findings (F-n); not recorded: ${unknown.join(', ')}`,
+        'HARD_LEDGER_INVALID_CHAIN',
+      )
+    }
+  }
+
+  /**
+   * Append one weakness as chaining material and return its id. The caller
+   * resolves every site at the pinned commit before this append.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the weakness fields without the assigned id; a named finding or hypothesis id must be recorded.
+   * @returns the assigned weakness id.
+   */
+  recordFlaw(
+    agent: Agent,
+    request: Omit<HardFlawData, 'id' | 'findingId' | 'hypothesisId'> & { findingId?: string; hypothesisId?: string },
+  ): HardFlawId {
+    this.assertText('title', request.title)
+    this.assertText('component', request.component)
+    this.assertText('grants', request.grants)
+    this.assertText('requires', request.requires)
+    if (request.sites.length === 0) {
+      throw new HarnessError('a weakness cites at least one code site', 'HARD_LEDGER_SITES_REQUIRED')
+    }
+    for (const site of request.sites) this.assertText('sites[]', site)
+    const state = this.state(agent.session)
+    if (request.findingId !== undefined && !state.findings.some(entry => entry.proposed.id === request.findingId)) {
+      throw new HarnessError(`unknown finding id ${request.findingId}`, 'HARD_LEDGER_UNKNOWN_FINDING')
+    }
+    if (request.hypothesisId !== undefined && !state.hypotheses.some(entry => entry.id === request.hypothesisId)) {
+      throw new HarnessError(`unknown hypothesis id ${request.hypothesisId}`, 'HARD_LEDGER_UNKNOWN_HYPOTHESIS')
+    }
+    const id = brandString<HardFlawId>(`W-${(state.flaws ?? []).length + 1}`)
+    agent.session.append('hard/flaw/recorded', {
+      id,
+      title: request.title,
+      component: request.component,
+      grants: request.grants,
+      requires: request.requires,
+      sites: [...request.sites],
+      ...(request.findingId === undefined ? {} : { findingId: brandString<HardFindingId>(request.findingId) }),
+      ...(request.hypothesisId === undefined ? {} : { hypothesisId: brandString<HardHypothesisId>(request.hypothesisId) }),
+    })
+    return id
+  }
+
+  /**
+   * Recorded weaknesses in record order.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per weakness.
+   */
+  flaws(agent: Agent): readonly HardFlawData[] {
+    return (this.state(agent.session).flaws ?? []).map(({ id, findingId, hypothesisId, ...rest }) => ({
+      ...rest,
+      id: brandString<HardFlawId>(id),
+      ...(findingId === undefined ? {} : { findingId: brandString<HardFindingId>(findingId) }),
+      ...(hypothesisId === undefined ? {} : { hypothesisId: brandString<HardHypothesisId>(hypothesisId) }),
+    }))
+  }
+
+  /**
+   * The ids a chain hypothesis may link: every recorded weakness, then every
+   * confirmed finding no weakness already names. The math lives in
+   * `chainMaterialFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the `W-n` and `F-n` ids in record order.
+   */
+  chainMaterial(agent: Agent): readonly string[] {
+    return chainMaterialFromState(this.state(agent.session))
+  }
+
+  /**
+   * Chain material no hypothesis links yet; empty while fewer than two
+   * weaknesses and confirmed findings exist. The math lives in
+   * `unchainedMaterialFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the unlinked `W-n` and `F-n` ids.
+   */
+  unchainedMaterial(agent: Agent): readonly string[] {
+    return unchainedMaterialFromState(this.state(agent.session))
   }
 
   /**
@@ -759,6 +874,7 @@ export class HardLedger extends Service {
       statement,
       status,
       ...rest.reason === undefined ? {} : { reason: rest.reason },
+      ...rest.links === undefined ? {} : { links: rest.links },
     }))
   }
 

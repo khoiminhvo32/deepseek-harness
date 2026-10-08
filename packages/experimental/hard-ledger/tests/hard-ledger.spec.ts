@@ -381,6 +381,126 @@ describe('hard ledger flow documents', () => {
   })
 })
 
+describe('hard ledger weaknesses and chains', () => {
+  const weakness = {
+    title: 'Attachment re-parent skips edit_post on the target',
+    component: 'wp-includes/rest-api/endpoints/class-wp-rest-attachments-controller.php',
+    grants: 'set post_parent of an own attachment to any post id',
+    requires: 'an account with upload_files',
+    sites: ['src/media.php:972 type check only'],
+  }
+
+  function confirm(ctx: Context, agent: Agent, id: string): void {
+    ctx.hardLedger.recordVerdict(agent, {
+      id: id as never, verdict: 'confirmed', runs: 1, cvssComputed: 5, cvssMatch: true, reason: 'proved', fingerprint: FINGERPRINT,
+    })
+  }
+
+  it('assigns W ids, validates fields and referents, and folds weaknesses in record order', async () => {
+    const { ctx, root } = await harness()
+    const finding = ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    const hypothesis = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'parent leaks slug', status: 'proposed' })
+    expect(ctx.hardLedger.recordFlaw(root.agent, weakness)).toBe('W-1')
+    expect(ctx.hardLedger.recordFlaw(root.agent, { ...weakness, findingId: finding, hypothesisId: hypothesis })).toBe('W-2')
+    expect(ctx.hardLedger.flaws(root.agent)).toEqual([
+      { id: 'W-1', ...weakness },
+      { id: 'W-2', ...weakness, findingId: 'F-1', hypothesisId: 'H-1' },
+    ])
+    const code = (request: Parameters<typeof ctx.hardLedger.recordFlaw>[1]): unknown => {
+      try {
+        ctx.hardLedger.recordFlaw(root.agent, request)
+      } catch (error: unknown) {
+        return (error as { code?: string }).code
+      }
+      return undefined
+    }
+    expect(code({ ...weakness, grants: ' ' })).toBe('HARD_LEDGER_INVALID_TEXT')
+    expect(code({ ...weakness, sites: [] })).toBe('HARD_LEDGER_SITES_REQUIRED')
+    expect(code({ ...weakness, findingId: 'F-9' })).toBe('HARD_LEDGER_UNKNOWN_FINDING')
+    expect(code({ ...weakness, hypothesisId: 'H-9' })).toBe('HARD_LEDGER_UNKNOWN_HYPOTHESIS')
+    expect(ctx.hardLedger.flaws(root.agent)).toHaveLength(2)
+  })
+
+  it('owes no chain below two items, then lists every unlinked weakness and confirmed finding as open work', async () => {
+    const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual([])
+    const finding = ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    confirm(ctx, root.agent, finding)
+    // A second, unconfirmed finding is not chain material.
+    ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    expect(ctx.hardLedger.chainMaterial(root.agent)).toEqual(['W-1', 'F-1'])
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual(['W-1', 'F-1'])
+    expect(ctx.hardLedger.openWork(root.agent)).toContain(
+      'W-1 is in no chain hypothesis: link it with another weakness or finding, or propose that chain and refute it with the reason',
+    )
+    expect(ctx.hardLedger.openWorkCounts(root.agent).unchainedMaterial).toBe(2)
+    expect(ctx.hardLedger.completionAssessment(root.agent).blockers.join('\n')).toContain('F-1 is in no chain hypothesis')
+  })
+
+  it('chains two confirmed findings before any weakness exists, beside an ordinary hypothesis', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.flaws(root.agent)).toEqual([])
+    for (const id of [findingRequest(), findingRequest()].map(request => ctx.hardLedger.proposeFinding(root.agent, request))) {
+      confirm(ctx, root.agent, id)
+    }
+    ctx.hardLedger.writeHypothesis(root.agent, { statement: 'an ordinary hypothesis', status: 'proposed' })
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual(['F-1', 'F-2'])
+    ctx.hardLedger.writeHypothesis(root.agent, { statement: 'F-1 then F-2', status: 'proposed', links: ['F-1', 'F-2'] })
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual([])
+  })
+
+  it('counts a confirmed finding a weakness names only once, through the weakness', async () => {
+    const { ctx, root } = await harness()
+    const finding = ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    confirm(ctx, root.agent, finding)
+    ctx.hardLedger.recordFlaw(root.agent, { ...weakness, findingId: finding })
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    expect(ctx.hardLedger.chainMaterial(root.agent)).toEqual(['W-1', 'W-2'])
+  })
+
+  it('links a chain hypothesis to recorded material, keeps its links across transitions, and counts a refuted chain as considered', async () => {
+    const { ctx, root } = await harness()
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    ctx.hardLedger.recordFlaw(root.agent, weakness)
+    const finding = ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    confirm(ctx, root.agent, finding)
+    const chain = ctx.hardLedger.writeHypothesis(root.agent, {
+      statement: 'W-1 grants what F-1 requires', status: 'proposed', links: ['W-1', 'F-1'],
+    })
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual(['W-2'])
+    ctx.hardLedger.writeHypothesis(root.agent, { id: chain, status: 'testing' })
+    expect(ctx.hardLedger.hypotheses(root.agent)).toEqual([
+      { id: 'H-1', statement: 'W-1 grants what F-1 requires', status: 'testing', links: ['W-1', 'F-1'] },
+    ])
+    ctx.hardLedger.writeHypothesis(root.agent, {
+      statement: 'W-2 with W-1', status: 'refuted', reason: 'W-2 needs a role W-1 never grants', links: ['W-2', 'W-1'],
+    })
+    expect(ctx.hardLedger.unchainedMaterial(root.agent)).toEqual([])
+    const code = (links: readonly string[]): unknown => {
+      try {
+        ctx.hardLedger.writeHypothesis(root.agent, { statement: 'chain', status: 'proposed', links })
+      } catch (error: unknown) {
+        return (error as { code?: string; message: string }).message
+      }
+      return undefined
+    }
+    expect(code(['W-1'])).toBe('a chain links at least two distinct weaknesses or findings')
+    expect(code(['W-1', 'W-1'])).toBe('a chain links at least two distinct weaknesses or findings')
+    ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+    expect(code(['W-1', 'F-2', 'W-7'])).toBe(
+      'chain links must name recorded weaknesses (W-n) or confirmed findings (F-n); not recorded: F-2, W-7',
+    )
+  })
+
+  it('folds weakness records onto a cached state that predates them', () => {
+    const state = applyHardLedgerProjection(emptyHardLedgerState(), {
+      type: 'hard/flaw/recorded', data: { id: 'W-1', ...weakness },
+    } as never)
+    expect(state.flaws).toEqual([{ id: 'W-1', ...weakness }])
+  })
+})
+
 describe('hard ledger projection units', () => {
   it('ignores a verdict for an unknown finding id', async () => {
     const { ctx, root } = await harness()
@@ -1204,6 +1324,7 @@ describe('hard ledger aggregates over folded state', () => {
     ])
     expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100 })).toEqual({
       pendingFindings: 1, flakyFindings: 1, openHypotheses: 1, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 1,
+      unchainedMaterial: 0,
     })
     expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0 }).screenReReads).toBe(0)
   })

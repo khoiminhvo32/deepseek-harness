@@ -856,6 +856,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   HardSweepSummaryData: 'sweep payload is owned by packages/experimental/hard-ledger/README.md',
   HardMissionArmedData: 'mission arming payload is owned by packages/experimental/hard-ledger/README.md',
   HardFlowDocData: 'flow-document payload is owned by packages/experimental/hard-ledger/README.md',
+  HardFlawData: 'weakness payload is owned by packages/experimental/hard-ledger/README.md',
+  HardFlawId: 'weakness id brand is owned by packages/experimental/hard-ledger/README.md',
   HardLedgerFindingEntry: 'folded finding record is owned by packages/experimental/hard-ledger/README.md',
   HardCoverageMatrix: 'armed coverage matrix is owned by packages/experimental/hard-ledger/README.md',
   CoverageProgress: 'coverage aggregate shape is owned by packages/experimental/hard-ledger/README.md',

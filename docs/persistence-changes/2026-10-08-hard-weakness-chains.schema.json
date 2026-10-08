@@ -1,0 +1,335 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/flaw/recorded",
+      "kind": "event",
+      "event": "hard/flaw/recorded",
+      "surface": false,
+      "digest": "883e93df3e09e9bced9ebd4b2b89c040643b9b2a5d1ee6e7d207e44873eeaf6a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "component",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "findingId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "grants",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "hypothesisId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "requires",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sites",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "title",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/flaw/recorded"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/hypothesis/state",
+      "kind": "event",
+      "event": "hard/hypothesis/state",
+      "surface": false,
+      "digest": "11064b683a0aa59bf53f2f29e2ae178888f8a6b14989eed85879d6cc8d23cd69",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 10,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "links",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "statement",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "confirmed"
+          },
+          {
+            "kind": "literal",
+            "value": "deferred"
+          },
+          {
+            "kind": "literal",
+            "value": "proposed"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": "testing"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/hypothesis/state"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/round/start",
+      "kind": "event",
+      "event": "hard/round/start",
+      "surface": false,
+      "digest": "3454a1b61bdcf0c0a266f4f3ab44447a25194f021d8f10053794bf01095d80a2",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chaining",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "openWorkCount",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "round",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "A"
+          },
+          {
+            "kind": "literal",
+            "value": "B"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/round/start"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

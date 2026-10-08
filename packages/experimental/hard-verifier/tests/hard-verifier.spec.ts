@@ -452,9 +452,19 @@ describe('hard verifier coverage cross-check', () => {
       declaredSinks: ['src/auth/exec.ts:5: exec(userCmd)'],
       source: 'harness',
     })
-    expect(shell.runs[0]?.command).toContain('grep -rInE')
-    expect(shell.runs[0]?.command).toContain('src/auth')
+    expect(shell.runs[0]?.command).toMatch(new RegExp(`^git grep -I -n -E -e '.*' '${pinnedSha}' -- 'src/auth'$`, 'u'))
     expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
+  })
+
+  it('drops the commit prefix of pinned grep output and counts the undeclared matches it does not list', async () => {
+    const lines = Array.from({ length: 11 }, (_, index) => `${pinnedSha}:src/auth/run${String(index)}.ts:${String(index + 1)}:exec(cmd)`)
+    const { ctx } = await harness([{ exitCode: 0, stdoutText: `${lines.join('\n')}\n` }], { coverageSpotCheckPercent: 100 })
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, { ...clearedCell, declaredSinks: ['src/auth/run0.ts:1'] })
+    expect(reopened?.declaredSinks).toEqual([
+      ...Array.from({ length: 8 }, (_, index) => `src/auth/run${String(index + 1)}.ts:${String(index + 2)}:exec(cmd)`),
+      '2 more undeclared matches not shown; grep the module for the rest',
+    ])
   })
 
   it('leaves the cell alone when every match was declared or the grep found nothing', async () => {
@@ -743,49 +753,60 @@ describe('hard verifier declared-site citations', () => {
 })
 
 describe('hard verifier root module and repository classes', () => {
-  /** Run one command the verifier built under real bash in `cwd`, as the shell seam would. */
-  function runUnderBash(command: string, cwd: string): { status: number; stdout: string } {
+  it('greps the pinned commit, never files written into the target after the arming, and only root files for the root module', async () => {
+    const tree = await mkdtemp(join(tmpdir(), 'hard-pinned-grep-'))
     try {
-      return { status: 0, stdout: execFileSync('bash', ['-c', command], { cwd, encoding: 'utf8' }) }
-    } catch (error: unknown) {
-      const failed = error as { status: number; stdout: string }
-      return { status: failed.status, stdout: failed.stdout }
-    }
-  }
-
-  it('greps only the root files for the root module, under real bash', async () => {
-    const { ctx, shell } = await harness([{ exitCode: 1, stdoutText: '' }], { coverageSpotCheckPercent: 100 })
-    const root = armMatrix(ctx, '/tmp/hard-target')
-    expect(await ctx.hardVerifier.auditCoverage(root, { module: '.', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['app.js:1'] }))
-      .toBeUndefined()
-    const command = shell.runs[0]?.command ?? ''
-    expect(command).not.toContain('grep -rInE')
-    const tree = await mkdtemp(join(tmpdir(), 'hard-root-grep-'))
-    try {
-      // An empty root settles clean instead of letting grep read stdin.
-      expect(runUnderBash(command, tree)).toEqual({ status: 0, stdout: '' })
       await mkdir(join(tree, 'sub'))
       await writeFile(join(tree, 'sub/deep.js'), 'exec(cmd)\n')
       await writeFile(join(tree, '.hidden.js'), 'execSync(x)\n')
       await writeFile(join(tree, 'app.js'), 'const a = 1\nsystem(cmd)\n')
-      const found = runUnderBash(command, tree)
-      expect(found.status).toBe(0)
-      expect(found.stdout.split('\n').filter(Boolean).sort()).toEqual(['.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'])
+      const git = (...args: string[]) => execFileSync('git', ['-C', tree, ...args], {
+        encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      })
+      git('init', '--quiet')
+      git('add', '-A')
+      git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+      const commit = git('rev-parse', 'HEAD').trim()
+      // Written after the arming: a report quoting a sink, and a new sink in a tracked file.
+      await writeFile(join(tree, 'report.md'), 'found `exec(` in sub/deep.js\n')
+      await writeFile(join(tree, 'app.js'), 'const a = 1\nsystem(cmd)\nexecSync(late)\n')
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionProjectionRegistry)
+      await ctx.plugin(AgentRegistry)
+      new RealShell(ctx)
+      await ctx.plugin(HardLedger, {})
+      await ctx.plugin(HardVerifier, { coverageSpotCheckPercent: 100 })
+      const agentStub = stubAgent(`hard-verifier-pinned-grep-${Math.random()}`)
+      await ctx.agents.register(agentStub.agent)
+      ctx.hardLedger.recordMissionArmed(agentStub.agent, {
+        objective: 'hunt bugs', targetRepo: tree, commit, modules: ['.', 'sub'], bugClasses: ['cmdi'],
+      })
+      const reopened = await ctx.hardVerifier.auditCoverage(agentStub.agent, {
+        module: '.', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['app.js:1'],
+      })
+      expect(reopened?.declaredSinks).toEqual(['.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'])
+      expect(await ctx.hardVerifier.auditCoverage(agentStub.agent, {
+        module: '.', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['.hidden.js:1', 'app.js:2'],
+      })).toBeUndefined()
+      expect(await ctx.hardVerifier.screenModules(agentStub.agent, 'cmdi', ['sub', '.'], [])).toEqual({
+        clean: false, evidence: ['sub/deep.js:1:exec(cmd)', '.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'],
+      })
     } finally {
       await rm(tree, { recursive: true, force: true })
     }
   })
 
-  it('greps the whole tree for a repository class on any module and matches ./-prefixed paths to citations', async () => {
+  it('greps the whole tree for a repository class on any module and matches the paths to citations', async () => {
     const { ctx, shell } = await harness(
-      [{ exitCode: 0, stdoutText: './package.json:3:  "dependencies": {\n./vendor/lib/package.json:2:  "dependencies": {}\n' }],
+      [{ exitCode: 0, stdoutText: `${pinnedSha}:package.json:3:  "dependencies": {\n${pinnedSha}:vendor/lib/package.json:2:  "dependencies": {}\n` }],
       { coverageSpotCheckPercent: 100 },
     )
     const root = armMatrix(ctx, '/tmp/hard-target')
     const reopened = await ctx.hardVerifier.auditCoverage(root, {
       module: 'src/auth', bugClass: 'dependencies', verdict: 'cleared', declaredSinks: ['package.json:dependencies'],
     })
-    expect(shell.runs[0]?.command).toMatch(/^grep -rInE '.*' \.$/u)
+    expect(shell.runs[0]?.command).toMatch(new RegExp(`^git grep -I -n -E -e '.*' '${pinnedSha}'$`, 'u'))
     expect(reopened).toEqual({
       module: 'src/auth', bugClass: 'dependencies', verdict: 'suspicious',
       declaredSinks: ['vendor/lib/package.json:2:  "dependencies": {}'], source: 'harness',
@@ -800,8 +821,8 @@ describe('hard verifier root module and repository classes', () => {
     const root = armMatrix(ctx, '/tmp/hard-target')
     const screen = await ctx.hardVerifier.screenModules(root, 'cmdi', ['src/auth', '.'], ['spawn'])
     expect(screen).toEqual({ clean: false, evidence: ['src/auth/run.js:4:exec(cmd)', 'app.js:2:system(cmd)'] })
-    expect(shell.runs[0]?.command).toMatch(/^grep -rInE '.*' 'src\/auth'$/u)
-    expect(shell.runs[1]?.command).toContain('grep -HInE')
+    expect(shell.runs[0]?.command).toMatch(new RegExp(`^git grep -I -n -E -e '.*' '${pinnedSha}' -- 'src/auth'$`, 'u'))
+    expect(shell.runs[1]?.command).toContain('--max-depth 0 ')
     const rootOnly = await harness([{ exitCode: 1, stdoutText: '' }])
     const rootOnlyAgent = armMatrix(rootOnly.ctx, '/tmp/hard-target')
     expect(await rootOnly.ctx.hardVerifier.screenModules(rootOnlyAgent, 'cmdi', ['.'], ['spawn'])).toEqual({ clean: true, evidence: [] })

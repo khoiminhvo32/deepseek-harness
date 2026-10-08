@@ -369,8 +369,9 @@ assertVerifiable( agent: Agent, request: Pick<HardFindingRequest, 'fingerprint' 
  * undeclared sink sites surface. Guarded-surface classes (`authz`,
  * `authn-bypass`): re-grep for the exported operations and reopen when the
  * module still exports an operation the model never declared a guard for —
- * the reopening evidence is the missed operation names. Both greps run from
- * the pinned target repository the armed coverage matrix records, so the
+ * the reopening evidence is the missed operation names. Both greps read the
+ * commit the armed coverage matrix pins, never the working tree, so a file
+ * written into the target after the arming cannot reopen a cell, and the
  * module path is always target-repo relative: a repository-scoped class
  * greps the whole tree, and the root module `.` greps only the files at the
  * root. Sampling follows the
@@ -428,8 +429,8 @@ async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ reje
 
 /**
  * Mechanical screen behind the batch clear: grep the requested modules for
- * the union of the model's patterns and the class's fixed patterns,
- * anchored at the pinned target repository; the root module `.` greps only
+ * the union of the model's patterns and the class's fixed patterns at the
+ * pinned commit, never the working tree; the root module `.` greps only
  * the files at the root. The union means the model's
  * patterns can only ADD matches, never subtract — a narrow pattern choice
  * cannot sneak past the harness table. Any match fails the whole batch and

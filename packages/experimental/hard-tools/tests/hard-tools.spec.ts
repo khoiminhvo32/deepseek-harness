@@ -86,7 +86,7 @@ function citationAnswer(command: string, answers: CitationAnswers): ScriptedRun 
     return { exitCode: 0, stdoutText: path !== undefined && !(answers.untracked ?? []).includes(path) ? `${path}\n` : '' }
   }
   if (command.startsWith('git diff --numstat')) return { exitCode: 0, stdoutText: `1\t0\t${path ?? ''}\n` }
-  if (command.startsWith('git grep')) return { exitCode: 0, stdoutText: `sha:${path ?? ''}:1\n` }
+  if (command.startsWith('git grep -I -F')) return { exitCode: 0, stdoutText: `sha:${path ?? ''}:1\n` }
   if (command.includes("awk 'END")) return { exitCode: 0, stdoutText: '999\n' }
   return undefined
 }
@@ -445,7 +445,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(text).toContain('execSync (a declared site must be path:symbol, path:line, or path:start-end, optionally followed by a note)')
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
     // The cross-check never ran: the refusal precedes the record and the audit.
-    expect(shell.commands.some(command => command.startsWith('grep -rInE'))).toBe(false)
+    expect(shell.commands.some(command => command.includes(' grep -I -n -E '))).toBe(false)
   })
 
   it('resolves cleared sites only: a suspicious verdict records without any citation command', async () => {
@@ -549,7 +549,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(unresolved).toContain('hard_mark_module rejected')
     expect(unresolved).toContain('sqli: src/db/ghost.ts:exec (src/db/ghost.ts is not tracked at commit aaaaaaa)')
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
-    expect(shell.commands.some(command => command.startsWith('grep -rInE'))).toBe(false)
+    expect(shell.commands.some(command => command.includes(' grep -I -n -E '))).toBe(false)
   })
 
   it('keeps recording the other classes when one cross-check cannot run', async () => {

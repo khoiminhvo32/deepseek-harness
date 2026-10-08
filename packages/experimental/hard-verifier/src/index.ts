@@ -155,33 +155,70 @@ function assertGrepSettled(result: GrepOutcome, what: string, code: string): voi
   }
 }
 
+/** The armed matrix fields that address the pinned commit. */
+type PinnedTarget = Parameters<typeof pinnedGitArgs>[0] & { readonly commit: string }
+
 /**
- * The grep command over one coverage cell's code. A repository-scoped class
- * greps the whole tree whatever module recorded it; the root module of a
- * module-scoped class greps only the files directly at the root, because its
- * cell does not cover the subdirectories (their own modules do); any other
- * module greps its directory.
+ * The `git grep` over the pinned commit's tracked text files, so a file
+ * written into the target after the arming (a report, a PoC, a scratch note)
+ * never matches and every match is citable at that commit. Each output line
+ * reads `<commit>:<path>:<line>:<text>`; {@link grepLines} drops the commit.
+ * @param target - the armed matrix whose snapshot and commit the grep reads.
+ * @param pattern - the shell-quoted extended-regex alternation.
+ * @param options - extra `git grep` options placed before the pattern.
+ * @returns the command line, run from the target repository root.
+ */
+function pinnedGrep(target: PinnedTarget, pattern: string, options = ''): string {
+  return `${pinnedGit(target)} grep -I -n -E ${options}-e ${pattern} ${shellQuote(target.commit)}`
+}
+
+/**
+ * The grep over one coverage cell's code at the pinned commit. A
+ * repository-scoped class greps the whole tree whatever module recorded it;
+ * the root module of a module-scoped class greps only the files directly at
+ * the root, because its cell does not cover the subdirectories (their own
+ * modules do); any other module greps its directory.
+ * @param target - the armed matrix whose snapshot and commit the grep reads.
  * @param pattern - the shell-quoted extended-regex alternation.
  * @param module - the cell's module.
  * @param bugClass - the cell's bug class.
  * @returns the command line, run from the target repository root.
  */
-function cellGrep(pattern: string, module: string, bugClass: string): string {
-  if (classScope(bugClass) === 'repo') return `grep -rInE ${pattern} .`
-  if (module !== '.') return `grep -rInE ${pattern} ${shellQuote(module)}`
-  return 'set --; for f in * .[!.]* ..?*; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done; '
-    + `if [ "$#" -gt 0 ]; then grep -HInE ${pattern} -- "$@"; fi`
+function cellGrep(target: PinnedTarget, pattern: string, module: string, bugClass: string): string {
+  if (classScope(bugClass) === 'repo') return pinnedGrep(target, pattern)
+  if (module !== '.') return `${pinnedGrep(target, pattern)} -- ${shellQuote(module)}`
+  return pinnedGrep(target, pattern, '--max-depth 0 ')
 }
 
 /**
- * The non-empty lines of one grep's output, with the `./` a recursive grep
- * over `.` prefixes to every path removed so the paths compare with
+ * The non-empty lines of one pinned grep's output, with the `<commit>:` prefix
+ * `git grep` puts on every match removed so the paths compare with
  * target-relative citations.
  * @param stdout - the grep's stdout.
- * @returns the trimmed match lines.
+ * @param commit - the pinned commit the grep read.
+ * @returns the trimmed `path:line:text` match lines.
  */
-function grepLines(stdout: string): string[] {
-  return stdout.split('\n').map(line => line.trim().replace(/^\.\//u, '')).filter(line => line.length > 0)
+function grepLines(stdout: string, commit: string): string[] {
+  const prefix = `${commit}:`
+  return stdout.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => line.startsWith(prefix) ? line.slice(prefix.length) : line)
+}
+
+/** Undeclared matches one reopening lists; any further ones are counted in a closing note. */
+const REOPEN_EVIDENCE_LIMIT = 8
+
+/**
+ * Cap one reopening's evidence, closing it with a count of the undeclared
+ * matches left out so the model clears them all in one pass.
+ * @param missed - every undeclared match, in grep order.
+ * @returns at most {@link REOPEN_EVIDENCE_LIMIT} matches, plus the count note when some were left out.
+ */
+function reopenEvidence(missed: readonly string[]): string[] {
+  const shown = missed.slice(0, REOPEN_EVIDENCE_LIMIT)
+  const hidden = missed.length - shown.length
+  return hidden === 0 ? shown : [...shown, `${String(hidden)} more undeclared matches not shown; grep the module for the rest`]
 }
 
 /** Characters of one grep match kept as recorded or returned evidence; a minified bundle line can run to megabytes. */
@@ -412,8 +449,9 @@ export class HardVerifier extends Service {
    * undeclared sink sites surface. Guarded-surface classes (`authz`,
    * `authn-bypass`): re-grep for the exported operations and reopen when the
    * module still exports an operation the model never declared a guard for —
-   * the reopening evidence is the missed operation names. Both greps run from
-   * the pinned target repository the armed coverage matrix records, so the
+   * the reopening evidence is the missed operation names. Both greps read the
+   * commit the armed coverage matrix pins, never the working tree, so a file
+   * written into the target after the arming cannot reopen a cell, and the
    * module path is always target-repo relative: a repository-scoped class
    * greps the whole tree, and the root module `.` greps only the files at the
    * root. Sampling follows the
@@ -435,24 +473,23 @@ export class HardVerifier extends Service {
     const patterns = SINK_PATTERNS[cell.bugClass]
     if (patterns === undefined || patterns.length === 0) return undefined
     if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
-    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
-    if (targetRepo === undefined) return undefined
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
-      command: cellGrep(shellQuote(patterns.join('|')), cell.module, cell.bugClass),
+      command: cellGrep(matrix, shellQuote(patterns.join('|')), cell.module, cell.bugClass),
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
-      workdir: targetRepo,
+      workdir: matrix.targetRepo,
     })
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = grepLines(result.stdout.text)
+    const missed = grepLines(result.stdout.text, matrix.commit)
       .filter(line => !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
-      .slice(0, 8)
       .map(boundedEvidence)
     if (missed.length === 0) return undefined
-    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: reopenEvidence(missed), source: 'harness' }
   }
 
   /**
@@ -475,25 +512,24 @@ export class HardVerifier extends Service {
     patterns: readonly string[],
   ): Promise<CoverageReopenRecord | undefined> {
     if (!sampleCellForSpotCheck(cell, this.resolved.coverageSpotCheckPercent)) return undefined
-    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
-    if (targetRepo === undefined) return undefined
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) return undefined
     const config = this.resolved
     const spec = this.ctx.shell.resolve({
-      command: cellGrep(shellQuote(patterns.join('|')), cell.module, cell.bugClass),
+      command: cellGrep(matrix, shellQuote(patterns.join('|')), cell.module, cell.bugClass),
       timeoutMs: config.timeoutSeconds * 1000,
       stdoutMaxBytes: config.stdoutMaxBytes,
-      workdir: targetRepo,
+      workdir: matrix.targetRepo,
     })
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = [...new Set(grepLines(result.stdout.text).flatMap(line => surfaceOperands(line)))]
+    const missed = [...new Set(grepLines(result.stdout.text, matrix.commit).flatMap(line => surfaceOperands(line)))]
       // An operation named by its location (`path:line`) is also covered by a line or range citation of that line.
       .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)
         || (/:\d+$/u.test(operand) && declarationCoversLine(declaration, `${operand}:`))))
-      .slice(0, 8)
     if (missed.length === 0) return undefined
-    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
+    return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: reopenEvidence(missed), source: 'harness' }
   }
 
   /**
@@ -696,8 +732,8 @@ export class HardVerifier extends Service {
 
   /**
    * Mechanical screen behind the batch clear: grep the requested modules for
-   * the union of the model's patterns and the class's fixed patterns,
-   * anchored at the pinned target repository; the root module `.` greps only
+   * the union of the model's patterns and the class's fixed patterns at the
+   * pinned commit, never the working tree; the root module `.` greps only
    * the files at the root. The union means the model's
    * patterns can only ADD matches, never subtract — a narrow pattern choice
    * cannot sneak past the harness table. Any match fails the whole batch and
@@ -738,16 +774,16 @@ export class HardVerifier extends Service {
         'HARD_VERIFIER_ABSENCE_CLASS',
       )
     }
-    const targetRepo = this.ctx.hardLedger.coverageMatrix(agent)?.targetRepo
-    if (targetRepo === undefined) {
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) {
       throw new HarnessError('hard screen: no armed coverage matrix', 'HARD_VERIFIER_NO_MATRIX')
     }
     const pattern = shellQuote([...new Set([...patterns, ...classPatterns])].join('|'))
     // The root module greps only its own files, so it runs apart from the directory modules.
     const directories = modules.filter(module => module !== '.')
     const commands = [
-      ...directories.length === 0 ? [] : [`grep -rInE ${pattern} ${directories.map(shellQuote).join(' ')}`],
-      ...modules.includes('.') ? [cellGrep(pattern, '.', bugClass)] : [],
+      ...directories.length === 0 ? [] : [`${pinnedGrep(matrix, pattern)} -- ${directories.map(shellQuote).join(' ')}`],
+      ...modules.includes('.') ? [cellGrep(matrix, pattern, '.', bugClass)] : [],
     ]
     const evidence: string[] = []
     for (const command of commands) {
@@ -755,12 +791,12 @@ export class HardVerifier extends Service {
         command,
         timeoutMs: this.resolved.timeoutSeconds * 1000,
         stdoutMaxBytes: this.resolved.stdoutMaxBytes,
-        workdir: targetRepo,
+        workdir: matrix.targetRepo,
       })
       const execution = await this.ctx.shell.execute(spec)
       const result = await execution.result()
       assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
-      evidence.push(...grepLines(result.stdout.text).map(boundedEvidence))
+      evidence.push(...grepLines(result.stdout.text, matrix.commit).map(boundedEvidence))
     }
     return { clean: evidence.length === 0, evidence: evidence.slice(0, 8) }
   }

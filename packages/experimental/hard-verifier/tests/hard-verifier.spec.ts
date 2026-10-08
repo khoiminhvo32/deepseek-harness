@@ -791,6 +791,24 @@ describe('hard verifier root module and repository classes', () => {
     expect(rootOnly.shell.runs).toHaveLength(1)
   })
 
+  it('bounds each grep match it records or returns, so a minified bundle line cannot overflow the ledger', async () => {
+    const minified = `src/auth/app.min.js:1:${'x'.repeat(5000)}redirect(u)`
+    const { ctx } = await harness([{ exitCode: 0, stdoutText: `${minified}\n` }, { exitCode: 0, stdoutText: `${minified}\n` }], { coverageSpotCheckPercent: 100 })
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, { module: 'src/auth', bugClass: 'open-redirect', verdict: 'cleared', declaredSinks: ['src/auth/login.ts:10'] })
+    const recorded = reopened?.declaredSinks[0] ?? ''
+    expect(recorded).toHaveLength(301)
+    expect(recorded.startsWith('src/auth/app.min.js:1:')).toBe(true)
+    expect(recorded.endsWith('…')).toBe(true)
+    // The ledger accepts the reopening the cross-check produced.
+    expect(reopened).toBeDefined()
+    if (reopened !== undefined) {
+      expect(() => { ctx.hardLedger.markCoverage(root, { ...reopened, declaredSinks: [...reopened.declaredSinks] }) }).not.toThrow()
+    }
+    const screen = await ctx.hardVerifier.screenModules(root, 'open-redirect', ['src/auth'], ['redirect'])
+    expect(screen.evidence[0]).toHaveLength(301)
+  })
+
   it('refuses an undecidable proposal before it is recorded', async () => {
     const claim = 'Checked before the proposal exists.'
     const { ctx, root, shell } = await harness([benignFail, { exitCode: 0, stdoutText: `HARD-PASS ${claimHash(claim)}` }], { runs: 1 })

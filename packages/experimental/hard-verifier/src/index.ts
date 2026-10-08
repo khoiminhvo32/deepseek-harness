@@ -184,6 +184,19 @@ function grepLines(stdout: string): string[] {
   return stdout.split('\n').map(line => line.trim().replace(/^\.\//u, '')).filter(line => line.length > 0)
 }
 
+/** Characters of one grep match kept as recorded or returned evidence; a minified bundle line can run to megabytes. */
+const EVIDENCE_LINE_LIMIT = 300
+
+/**
+ * Bound one grep match for storage and display, keeping its `path:line:`
+ * location whole so the evidence still points at the code.
+ * @param line - one full match line.
+ * @returns the line, cut to {@link EVIDENCE_LINE_LIMIT} characters plus an ellipsis.
+ */
+function boundedEvidence(line: string): string {
+  return line.length <= EVIDENCE_LINE_LIMIT ? line : `${line.slice(0, EVIDENCE_LINE_LIMIT)}…`
+}
+
 /** Deterministically recompute the score and compare with the model's claim. */
 function recomputeCvss(proposed: Pick<HardFindingProposedData, 'cvssVector' | 'cvssClaimed'>, subject: string): { computed: number; match: boolean } {
   let computed: number
@@ -437,6 +450,7 @@ export class HardVerifier extends Service {
     const missed = grepLines(result.stdout.text)
       .filter(line => !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
       .slice(0, 8)
+      .map(boundedEvidence)
     if (missed.length === 0) return undefined
     return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }
   }
@@ -744,7 +758,7 @@ export class HardVerifier extends Service {
       const execution = await this.ctx.shell.execute(spec)
       const result = await execution.result()
       assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
-      evidence.push(...grepLines(result.stdout.text))
+      evidence.push(...grepLines(result.stdout.text).map(boundedEvidence))
     }
     return { clean: evidence.length === 0, evidence: evidence.slice(0, 8) }
   }

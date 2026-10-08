@@ -999,7 +999,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-audit`
 
 - `inject`: `agents` · `sessionProjections` · `subagents` · `shell` · `hardLedger` · `hardVerifier`
-- `source`: [`packages/experimental/hard-audit/src/index.ts:102`](../packages/experimental/hard-audit/src/index.ts)
+- `source`: [`packages/experimental/hard-audit/src/index.ts:105`](../packages/experimental/hard-audit/src/index.ts)
 
 ```ts config-catalog
 /** Audit plugin config. */
@@ -1047,6 +1047,13 @@ export interface Config {
   auditTimeoutMinutes?: number
   /** Wall-clock budget of one workspace git check in seconds. */
   gitTimeoutSeconds?: number
+  /**
+   * Minutes a request stays parked after its reader stopped on provider
+   * quota. A parked request records no result and charges nothing; it runs
+   * again on the first mission-agent reply after the wait, which shows the
+   * quota is back, or when the session resumes.
+   */
+  quotaRetryMinutes?: number
   /**
    * Keep an idle mission agent busy until its pending audits settle. A
    * one-shot headless run exits when the agent idles, so without the hold the

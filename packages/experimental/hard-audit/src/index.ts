@@ -19,7 +19,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 // Loads the declaration-merged `Context` keys this plugin injects.
 import type {} from '@deepseek-ai/dsh-agent'
-import { HarnessError } from '@deepseek-ai/dsh-llm'
+import { ACCOUNT_QUOTA_EXCEEDED_CODE, HarnessError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-shell'
@@ -86,6 +86,9 @@ export const DEFAULT_AUDIT_TIMEOUT_MINUTES = 20
 /** Default wall-clock budget of one workspace git check, in seconds. */
 export const DEFAULT_GIT_TIMEOUT_SECONDS = 60
 
+/** Default wait before a reader stopped by provider quota is retried. */
+export const DEFAULT_QUOTA_RETRY_MINUTES = 5
+
 /** Largest git output one workspace check reads; a longer output fails the check closed. */
 const GIT_STDOUT_MAX_BYTES = 1_048_576
 
@@ -144,6 +147,13 @@ export interface Config {
   /** Wall-clock budget of one workspace git check in seconds. */
   gitTimeoutSeconds?: number
   /**
+   * Minutes a request stays parked after its reader stopped on provider
+   * quota. A parked request records no result and charges nothing; it runs
+   * again on the first mission-agent reply after the wait, which shows the
+   * quota is back, or when the session resumes.
+   */
+  quotaRetryMinutes?: number
+  /**
    * Keep an idle mission agent busy until its pending audits settle. A
    * one-shot headless run exits when the agent idles, so without the hold the
    * last audits never record a result. The hold delays, never changes, what
@@ -169,6 +179,7 @@ export const Config: z<Config> = z.object({
   maxConcurrentAudits: z.number().step(1).min(1).max(8).default(DEFAULT_MAX_CONCURRENT_AUDITS),
   auditTimeoutMinutes: z.number().step(1).min(1).default(DEFAULT_AUDIT_TIMEOUT_MINUTES),
   gitTimeoutSeconds: z.number().step(1).min(1).default(DEFAULT_GIT_TIMEOUT_SECONDS),
+  quotaRetryMinutes: z.number().step(1).min(1).default(DEFAULT_QUOTA_RETRY_MINUTES),
   drainWhenIdle: z.boolean().default(true),
 })
 
@@ -183,6 +194,7 @@ interface ResolvedConfig {
   readonly maxConcurrentAudits: number
   readonly auditTimeoutMs: number
   readonly gitTimeoutMs: number
+  readonly quotaRetryMs: number
   readonly drainWhenIdle: boolean
 }
 
@@ -228,6 +240,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxConcurrentAudits: integerIn('maxConcurrentAudits', config.maxConcurrentAudits ?? DEFAULT_MAX_CONCURRENT_AUDITS, 1, 8),
     auditTimeoutMs: integerIn('auditTimeoutMinutes', config.auditTimeoutMinutes ?? DEFAULT_AUDIT_TIMEOUT_MINUTES, 1, unbounded) * 60_000,
     gitTimeoutMs: integerIn('gitTimeoutSeconds', config.gitTimeoutSeconds ?? DEFAULT_GIT_TIMEOUT_SECONDS, 1, unbounded) * 1_000,
+    quotaRetryMs: integerIn('quotaRetryMinutes', config.quotaRetryMinutes ?? DEFAULT_QUOTA_RETRY_MINUTES, 1, unbounded) * 60_000,
     drainWhenIdle: config.drainWhenIdle ?? true,
   }
 }
@@ -298,6 +311,13 @@ interface ReaderObservation {
   readonly accesses: ReaderAccess[]
   readonly ownOutputs: Set<string>
   readonly usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }
+  /** Whether the reader's turn ended on a provider quota failure, which measures nothing about the cell. */
+  quota: boolean
+}
+
+/** Whether one model failure code is provider quota exhaustion. */
+function isQuotaFailure(code: string): boolean {
+  return code === QUOTA_EXCEEDED_CODE || code === ACCOUNT_QUOTA_EXCEEDED_CODE
 }
 
 /** One queued audit: the mission agent and the request it recorded. */
@@ -324,6 +344,8 @@ export function apply(ctx: Context, config: Config): void {
   const labeled = new Map<string, ReaderObservation>()
   /** Reader observations by child session id. */
   const readers = new Map<SessionId, ReaderObservation>()
+  /** Requests whose reader stopped on provider quota, by mission agent, with the time they parked. */
+  const parked = new Map<SessionId, { readonly job: AuditJob; readonly at: number }[]>()
   /** Drains waiting for one mission agent's audits to settle. */
   const drains = new Map<SessionId, (() => void)[]>()
 
@@ -358,6 +380,7 @@ export function apply(ctx: Context, config: Config): void {
     running.clear()
     queue.length = 0
     known.clear()
+    parked.clear()
   }, 'hard-audit: cancel running readers')
 
   /** The mission's folded audit state. */
@@ -510,7 +533,7 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   /** Read one cell independently and settle its result; undefined when the mission agent is gone. */
-  async function audit(job: AuditJob, signal: AbortSignal): Promise<HardAuditResultData | undefined> {
+  async function audit(job: AuditJob, signal: AbortSignal): Promise<HardAuditResultData | 'quota' | undefined> {
     const agent = ctx.agents.get(job.agentId)
     if (agent === undefined) return undefined
     const { request } = job
@@ -541,6 +564,7 @@ export function apply(ctx: Context, config: Config): void {
       accesses: [],
       ownOutputs: new Set(),
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      quota: false,
     }
     let reader: Awaited<ReturnType<typeof runReader>>
     let contaminating: string | undefined
@@ -557,6 +581,8 @@ export function apply(ctx: Context, config: Config): void {
         readers.delete(reader.run.id)
       }
       if (signal.aborted) return undefined
+      // A quota stop read nothing: the request waits for the quota instead of spending a measurement.
+      if (observation.quota) return 'quota'
       // Checked while the worktree exists, so symlinks inside it still resolve.
       contaminating = await firstContaminatingRead(observation.accesses, {
         cwd: reader.run.localAgent?.session.header.cwd ?? tree,
@@ -613,6 +639,10 @@ export function apply(ctx: Context, config: Config): void {
       void audit(job, controller.signal).then(
         (result) => {
           if (result === undefined || controller.signal.aborted) return
+          if (result === 'quota') {
+            parked.set(job.agentId, [...parked.get(job.agentId) ?? [], { job, at: Date.now() }])
+            return
+          }
           ctx.agents.get(job.agentId)?.session.append('hard/audit/result', result)
         },
         (error: unknown) => {
@@ -625,6 +655,17 @@ export function apply(ctx: Context, config: Config): void {
         settleDrains(job.agentId)
       })
     }
+  }
+
+  /** Re-queue one mission agent's parked requests whose quota wait has passed. */
+  function retryParked(agentId: SessionId): void {
+    const waiting = parked.get(agentId)
+    if (waiting === undefined) return
+    const now = Date.now()
+    const due = waiting.filter(entry => now - entry.at >= resolved.quotaRetryMs)
+    if (due.length === 0) return
+    parked.set(agentId, waiting.filter(entry => !due.includes(entry)))
+    for (const entry of due) enqueue(entry.job)
   }
 
   /** Queue one recorded request once per process. */
@@ -680,7 +721,15 @@ export function apply(ctx: Context, config: Config): void {
         }
         return
       }
+      case 'turn/end': {
+        const observation = readers.get(session.id)
+        const reason = event.data.reason
+        if (observation !== undefined && reason.kind === 'error' && isQuotaFailure(reason.error.code)) observation.quota = true
+        return
+      }
       case 'assistant/message': {
+        // A mission-agent reply shows the provider answers again, so parked readers may retry.
+        retryParked(session.id)
         const usage = event.data.usage
         const observation = readers.get(session.id)
         if (observation === undefined || usage === undefined) return
@@ -735,6 +784,7 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   ctx.on('agent/disposed', ({ agent }) => {
+    parked.delete(agent.id)
     for (let index = queue.length - 1; index >= 0; index -= 1) {
       const job = queue[index] as AuditJob
       if (job.agentId !== agent.id) continue

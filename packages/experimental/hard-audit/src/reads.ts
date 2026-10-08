@@ -56,10 +56,11 @@ export function readAccessOf(tool: string, args: string): ReaderAccess | undefin
  * Absolute paths named in one tool result's text, so a later read of the
  * reader's own spill file is recognized as its own output.
  * @param text - the model-facing text of one tool result.
- * @returns every absolute POSIX path token in the text.
+ * @returns every absolute POSIX path token in the text, without trailing sentence punctuation.
  */
 export function namedPaths(text: string): string[] {
-  return [...text.matchAll(/(?:^|[\s'"`(])(\/[^\s'"`)]+)/gu)].map(match => match[1] as string)
+  // Sentence punctuation after a path ("stored at: /tmp/x.txt.") belongs to the prose, not the path.
+  return [...text.matchAll(/(?:^|[\s'"`(])(\/[^\s'"`)]+)/gu)].map(match => (match[1] as string).replace(/[.,;:!?]+$/u, ''))
 }
 
 /** Where the reader may read. */

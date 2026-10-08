@@ -150,6 +150,8 @@ interface ScriptedReader {
   readonly fault?: Error
   /** Leave the final message without usage, as a provider that reports none would. */
   readonly noFinalUsage?: boolean
+  /** End the reader's turn on this provider quota failure code before it reads anything. */
+  readonly quota?: 'QUOTA' | 'ACCOUNT_QUOTA'
 }
 
 /** Build one registry-compatible agent stub over a session already entered in `ctx`. */
@@ -174,6 +176,10 @@ function stubAgent(ctx: Context, session: Session, options: Agent['options'] = {
 /** Commit one reader turn into the child session exactly as the agent loop would. */
 function replayReader(child: Session, script: ScriptedReader): void {
   child.append('turn/start', { turn: 1 })
+  if (script.quota !== undefined) {
+    child.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: '429: insufficient balance', code: script.quota } } })
+    return
+  }
   for (const [index, call] of (script.calls ?? []).entries()) {
     const callId = ToolCallId(`reader-${index}`)
     const args = JSON.stringify(call.args)
@@ -683,6 +689,47 @@ describe('hard-audit unavailable results', () => {
 })
 
 describe('hard-audit lifecycle', () => {
+  it('parks a reader stopped by provider quota without a result or a charge, and retries it once the mission agent answers again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { ctx, root, subagents } = await harness({ maxAuditsPerMission: 1, quotaRetryMinutes: 5 })
+      subagents.scripts.push({ quota: 'QUOTA', stopReason: 'error' }, { quota: 'ACCOUNT_QUOTA', stopReason: 'error' }, { calls: [], structured: CLEAN_SRC })
+      clear(ctx, root, 'src')
+      for (let attempt = 0; attempt < 400 && subagents.disposed.length === 0; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(root.session.snapshotEvents().filter(event => event.type === 'hard/audit/result')).toEqual([])
+      expect(subagents.starts).toHaveLength(1)
+      const reply = (): void => {
+        root.session.append('assistant/message', {
+          stream: [], turn: 2, step: 1,
+          message: createAssistantMessage({ content: [{ type: 'text', text: 'working' }], source: { provider: 'test-provider', model: 'test-model' } }),
+        }, { surfaceOp: 'append' })
+      }
+      // Before the wait has passed, a reply leaves the request parked.
+      reply()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(subagents.starts).toHaveLength(1)
+      vi.setSystemTime(Date.now() + 5 * 60_000)
+      reply()
+      // The retry meets an account-level quota stop and parks again.
+      for (let attempt = 0; attempt < 400 && subagents.disposed.length < 2; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(root.session.snapshotEvents().filter(event => event.type === 'hard/audit/result')).toEqual([])
+      vi.setSystemTime(Date.now() + 5 * 60_000)
+      reply()
+      const [settled] = await results(root, 1)
+      expect(settled).toMatchObject({ outcome: 'corroborated' })
+      // The quota stops charged nothing, so the single-audit budget still covered the retry.
+      expect(subagents.starts).toHaveLength(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('restarts pending audits on resume and refuses an unusable provider at agent creation', async () => {
     const { ctx, root, subagents } = await harness()
     const seq = clear(ctx, root, 'lib', 'cmdi', 'harness')
@@ -935,6 +982,10 @@ describe('hard-audit reads', () => {
   it('names absolute paths in tool output', () => {
     expect(hardAudit.namedPaths('saved to /tmp/a.txt and "/var/b" (/c)')).toEqual(['/tmp/a.txt', '/var/b', '/c'])
     expect(hardAudit.namedPaths('relative a/b only')).toEqual([])
+    // A spill notice ends its sentence right after the path; the period is prose.
+    expect(hardAudit.namedPaths('Full sorted result stored at: /var/folders/T/dsh-spill-x/af-glob-results.txt. Use read with offset/limit'))
+      .toEqual(['/var/folders/T/dsh-spill-x/af-glob-results.txt'])
+    expect(hardAudit.namedPaths('see /tmp/a, /tmp/b; and /tmp/c!')).toEqual(['/tmp/a', '/tmp/b', '/tmp/c'])
   })
 
   it('finds the first read outside the worktree, through symlinks and the home directory', async () => {

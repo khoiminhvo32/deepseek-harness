@@ -55,6 +55,7 @@ Each reader works in its own temporary worktree of the pinned snapshot, so the m
 - **Binary cells.** A module holding a non-inert binary at the pinned commit is `binary` without a reader, because the reader has no decompiler.
 - **Resolved reports only.** Every location or examined symbol must resolve at the pinned commit through the verifier's citation check, and at least one must lie in the audited cell; otherwise the result is `citation`.
 - **Held at idle.** When the mission agent goes idle with audits still queued or running, the plugin claims the agent's maintenance slot in the idle transition until they settle, so a one-shot headless run, which exits when the agent idles, records them first. Input that wakes the agent during the hold waits; nothing the mission agent sees changes. `drainWhenIdle: false` turns the hold off.
+- **Quota stops wait instead of measuring.** A reader whose turn ends on provider quota (`QUOTA` or `ACCOUNT_QUOTA`) read nothing, so its request records no result and charges nothing against `maxAuditsPerMission`. It parks for `quotaRetryMinutes` (default 5) and runs again on the first mission-agent reply after that wait, which shows the provider answers again, or when the session resumes.
 - **Durable and resumable.** The `hardAudit` projection folds the latest verdict seq per cell, pending requests, and the charged budget. A resumed mission restarts pending audits; a request whose cell was marked again before its reader started settles as `superseded`.
 
 ### Source map

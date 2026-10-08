@@ -327,7 +327,7 @@ describe('hard mission target pinning', () => {
     expect(hardMission.DEFAULT_EXCLUDE_GLOBS).toEqual([])
   })
 
-  it('marks a PHP module unscreened: the fixed patterns match none of five real WordPress holes', async () => {
+  it('screens a PHP module: the fixed table covers the WordPress hook, database, include, file, and command APIs', async () => {
     const php = await mkdtemp(join(tmpdir(), 'hard-mission-php-'))
     try {
       const repo = join(php, 'repo')
@@ -349,7 +349,7 @@ describe('hard mission target pinning', () => {
       ].join('\n'))
       seedGitRepo(repo)
       const { ctx, root } = await harness(missionConfig({ target: { repoPath: repo } }))
-      expect(ctx.hardLedger.coverageMatrix(root.agent)?.unscreenedModules).toEqual(['wp/admin'])
+      expect(ctx.hardLedger.coverageMatrix(root.agent)?.unscreenedModules).toEqual([])
     } finally {
       await rm(php, { recursive: true, force: true })
     }
@@ -364,7 +364,7 @@ describe('hard mission target pinning', () => {
       await writeFile(join(repo, 'bin', 'blob.js'), Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x01, 0x02]))
       await writeFile(join(repo, 'odd', 'thing.xyz'), 'run(x)\n')
       await writeFile(join(repo, 'mix', 'a.ts'), 'export {}\n')
-      await writeFile(join(repo, 'mix', 'b.php'), '<?php echo 1;\n')
+      await writeFile(join(repo, 'mix', 'b.rb'), 'puts 1\n')
       await writeFile(join(repo, 'web', 'page.ts'), 'export {}\n')
       await writeFile(join(repo, 'web', 'notes.md'), '# notes\n')
       // Translation catalogs reach rendered pages, so they are no longer inert.

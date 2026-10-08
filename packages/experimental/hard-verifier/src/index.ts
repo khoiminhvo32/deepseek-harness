@@ -488,7 +488,9 @@ export class HardVerifier extends Service {
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
     const missed = [...new Set(grepLines(result.stdout.text).flatMap(line => surfaceOperands(line)))]
-      .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)))
+      // An operation named by its location (`path:line`) is also covered by a line or range citation of that line.
+      .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)
+        || (/:\d+$/u.test(operand) && declarationCoversLine(declaration, `${operand}:`))))
       .slice(0, 8)
     if (missed.length === 0) return undefined
     return { module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: missed, source: 'harness' }

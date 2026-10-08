@@ -1,6 +1,6 @@
 /** The verifier executes proofs of effect through a scripted shell and records durable verdicts. */
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -371,6 +371,14 @@ function armMatrix(ctx: Context, targetRepo: string): Agent {
 }
 
 describe('hard verifier coverage cross-check', () => {
+  it('compiles every class alternation under the host grep -E', () => {
+    for (const [bugClass, patterns] of [...Object.entries(SINK_PATTERNS), ...Object.entries(GUARDED_SURFACE_PATTERNS)]) {
+      // Exit 1 is "no match"; exit 2 is a pattern the grep could not parse.
+      const result = spawnSync('grep', ['-E', patterns.join('|'), '/dev/null'])
+      expect(result.status, bugClass).toBe(1)
+    }
+  })
+
   it('keeps every sink and surface pattern single-line so a shell-quoted grep parses', () => {
     for (const [bugClass, patterns] of Object.entries(SINK_PATTERNS)) {
       for (const pattern of patterns) {
@@ -398,6 +406,15 @@ describe('hard verifier coverage cross-check', () => {
     expect(surfaceOperands('src/api.ts:5:@Get')).toEqual(['Get'])
     // A line no extractor recognizes falls back to the whole matched line.
     expect(surfaceOperands('src/odd.js:1:some unmatched line')).toEqual(['src/odd.js:1:some unmatched line'])
+    // An extractor that names nothing falls through to the next one, then to the whole line.
+    expect(surfaceOperands('src/empty.js:1:module.exports = {}')).toEqual(['src/empty.js:1:module.exports = {}'])
+    // WordPress: literal hooks, shortcodes, and routes name themselves; built or multi-line ones are named by location.
+    expect(surfaceOperands("wp-admin/admin-ajax.php:171:add_action( 'wp_ajax_nopriv_heartbeat', 'wp_ajax_nopriv_heartbeat', 1 );")).toEqual(['wp_ajax_nopriv_heartbeat'])
+    expect(surfaceOperands("wp-admin/admin-post.php:9:add_action( 'admin_post_export', 'export' );")).toEqual(['admin_post_export'])
+    expect(surfaceOperands("wp-includes/media.php:2775:add_shortcode( 'gallery', 'gallery_shortcode' );")).toEqual(['gallery'])
+    expect(surfaceOperands("wp-content/plugins/x/api.php:4:register_rest_route( 'x/v1', '/items', array(")).toEqual(['/items'])
+    expect(surfaceOperands('wp-includes/rest-api/a.php:51:\t\tregister_rest_route(')).toEqual(['wp-includes/rest-api/a.php:51'])
+    expect(surfaceOperands("wp-admin/admin-ajax.php:162:\tadd_action( 'wp_ajax_' . $_GET['action'], 'cb', 1 );")).toEqual(['wp-admin/admin-ajax.php:162'])
   })
 
 
@@ -807,6 +824,18 @@ describe('hard verifier root module and repository classes', () => {
     }
     const screen = await ctx.hardVerifier.screenModules(root, 'open-redirect', ['src/auth'], ['redirect'])
     expect(screen.evidence[0]).toHaveLength(301)
+  })
+
+  it('covers a location-named operation with a line or range citation of that line', async () => {
+    const { ctx } = await harness([
+      { exitCode: 0, stdoutText: 'src/auth/api.php:51:\t\tregister_rest_route(\nsrc/auth/api.php:90:\t\tregister_rest_route(\n' },
+    ], { coverageSpotCheckPercent: 100 })
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    const reopened = await ctx.hardVerifier.auditCoverage(root, {
+      module: 'src/auth', bugClass: 'authz', verdict: 'cleared',
+      declaredSinks: ['src/auth/api.php:45-60 permission_callback requires edit_theme_options'],
+    })
+    expect(reopened?.declaredSinks).toEqual(['src/auth/api.php:90'])
   })
 
   it('refuses an undecidable proposal before it is recorded', async () => {

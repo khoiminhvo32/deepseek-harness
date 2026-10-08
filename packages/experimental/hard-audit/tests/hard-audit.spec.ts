@@ -1016,7 +1016,7 @@ describe('hard-audit prompt', () => {
 
 describe('hard-audit projection', () => {
   it('folds clears, requests, and results into the pending set and the charged budget', () => {
-    const empty = { cells: {}, pending: [], requested: 0, budgetRefused: 0 }
+    const empty = { cells: {}, pending: [], requested: 0, uncharged: 0 }
     const event = (type: string, seq: number, data: unknown) => ({ type, seq, time: 0, data }) as never
     let state = hardAudit.applyHardAuditProjection(empty, event('hard/coverage/cell', 4, { module: 'src', bugClass: 'cmdi', verdict: 'cleared', declaredSinks: ['a'] }))
     expect(state.cells).toEqual({ [hardAudit.auditCellKey({ module: 'src', bugClass: 'cmdi' })]: 4 })
@@ -1028,7 +1028,11 @@ describe('hard-audit projection', () => {
     state = hardAudit.applyHardAuditProjection(state, event('hard/audit/result', 8, { module: 'lib', bugClass: 'cmdi', auditedSeq: 4, outcome: 'corroborated', reason: 'x' }))
     expect(state.pending).toEqual([])
     expect(hardAudit.chargedAudits(state)).toBe(1)
-    expect(hardAudit.applyHardAuditProjection(state, event('turn/start', 9, { turn: 1 }))).toBe(state)
+    // A request whose cell was marked again before its reader started charges nothing either.
+    state = hardAudit.applyHardAuditProjection(state, event('hard/audit/requested', 9, { module: 'src', bugClass: 'cmdi', auditedSeq: 8, tier: 'per-cell' }))
+    state = hardAudit.applyHardAuditProjection(state, event('hard/audit/result', 10, { module: 'src', bugClass: 'cmdi', auditedSeq: 8, outcome: 'unavailable', cause: 'superseded', reason: 'x' }))
+    expect(hardAudit.chargedAudits(state)).toBe(1)
+    expect(hardAudit.applyHardAuditProjection(state, event('turn/start', 11, { turn: 1 }))).toBe(state)
     expect(hardAuditProjection.stateSchema.safeParse(state).success).toBe(true)
   })
 })

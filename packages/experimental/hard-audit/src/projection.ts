@@ -25,8 +25,11 @@ export const hardAuditStateSchema = zod.object({
   pending: zod.array(requestSchema),
   /** Requests ever appended. */
   requested: zod.number().int().min(0),
-  /** Results that refused a request for budget; those requests charge nothing. */
-  budgetRefused: zod.number().int().min(0),
+  /**
+   * Results that measured nothing and charge nothing: refused for budget, or
+   * superseded because the cell was marked again before its reader started.
+   */
+  uncharged: zod.number().int().min(0),
 })
 
 /** Host-side audit state restored at resume and maintained incrementally. */
@@ -42,13 +45,14 @@ export function auditCellKey(cell: { readonly module: string; readonly bugClass:
 }
 
 /**
- * The audit budget one mission has charged: every request except those its
- * result refused for budget.
+ * The audit budget one mission has charged: every request except those whose
+ * result refused it for budget or found it superseded, so a model that marks
+ * the same cell again spends one audit, not one per mark.
  * @param state - the folded audit state.
  * @returns the number of charged requests.
  */
 export function chargedAudits(state: HardAuditProjectionState): number {
-  return state.requested - state.budgetRefused
+  return state.requested - state.uncharged
 }
 
 /**
@@ -70,8 +74,8 @@ export function applyHardAuditProjection(
       const { data } = event
       const pending = state.pending.filter(request =>
         request.auditedSeq !== data.auditedSeq || auditCellKey(request) !== auditCellKey(data))
-      const budgetRefused = state.budgetRefused + (data.cause === 'budget' ? 1 : 0)
-      return { ...state, pending, budgetRefused }
+      const uncharged = state.uncharged + (data.cause === 'budget' || data.cause === 'superseded' ? 1 : 0)
+      return { ...state, pending, uncharged }
     }
     default:
       return state
@@ -82,9 +86,10 @@ export function applyHardAuditProjection(
 export const hardAuditProjectionDefinition = {
   key: 'hardAudit',
   stateSchema: hardAuditStateSchema,
-  init: (): HardAuditProjectionState => ({ cells: {}, pending: [], requested: 0, budgetRefused: 0 }),
+  init: (): HardAuditProjectionState => ({ cells: {}, pending: [], requested: 0, uncharged: 0 }),
   apply: applyHardAuditProjection,
-  stateVersion: 1,
+  // Version 2 renames the budget refusals to `uncharged` and adds superseded results to it; the bump rebuilds from the log.
+  stateVersion: 2,
 } satisfies ProjectionDefinition<'hardAudit', HardAuditProjectionState>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

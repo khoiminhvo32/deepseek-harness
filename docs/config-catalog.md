@@ -1244,7 +1244,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-standby`
 
 - `inject`: `agents` · `goals` · `sessionProjections`
-- `source`: [`packages/experimental/hard-standby/src/index.ts:60`](../packages/experimental/hard-standby/src/index.ts)
+- `source`: [`packages/experimental/hard-standby/src/index.ts:76`](../packages/experimental/hard-standby/src/index.ts)
 
 ```ts config-catalog
 /** Standby plugin config. */
@@ -1264,6 +1264,12 @@ export interface Config {
    * names a reset time, the cap is also the retry cadence.
    */
   maxStandbyHours?: number
+  /**
+   * Minutes to wait after a transient provider failure (a rate limit, a
+   * server error, a timeout, or a broken transport) that names no retry
+   * delay; the provider's delay wins when present. Bounded by the standby cap.
+   */
+  transientRetryMinutes?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-standby -->

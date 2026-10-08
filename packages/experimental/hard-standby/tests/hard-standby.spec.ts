@@ -201,11 +201,36 @@ describe('hard standby scheduling', () => {
     expect(root.followed).toHaveLength(0)
   })
 
-  it('ignores non-quota failures, non-root agents, and inactive goals', async () => {
+  it('waits out a transient failure after the configured retry, re-arming the disarmed goal', async () => {
+    vi.useFakeTimers()
+    const { ctx, root } = await harness({ transientRetryMinutes: 3 })
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    const scheduledOf = recordStandbyEvents(ctx, root.session, 'hard/standby/scheduled')
+    const now = Date.now()
+    await failRequest(ctx, root.agent, { code: 'RATE_LIMIT' })
+    expect(scheduledOf()).toEqual([{ reason: 'outage', wakeAt: now + 3 * MINUTE_MS, providerCode: 'RATE_LIMIT' }])
+    // The goal driver disarms a goal on any turn error.
+    ctx.goals.disarm(root.agent)
+    await vi.advanceTimersByTimeAsync(3 * MINUTE_MS + 1)
+    expect(ctx.goals.get(root.agent)?.activation).toBe('armed')
+    expect(root.followed).toEqual([expect.stringContaining('The provider failure that stopped this session has been waited out (code RATE_LIMIT).')])
+  })
+
+  it('prefers the provider delay for a transient failure and bounds it by the standby cap', async () => {
+    vi.useFakeTimers()
+    const { ctx, root } = await harness({ maxStandbyHours: 1 })
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    const scheduledOf = recordStandbyEvents(ctx, root.session, 'hard/standby/scheduled')
+    const now = Date.now()
+    await failRequest(ctx, root.agent, { code: 'SERVER', providerRetryAfterMs: 2 * HOUR_MS })
+    expect(scheduledOf()).toEqual([{ reason: 'outage', wakeAt: now + HOUR_MS, providerCode: 'SERVER', providerRetryAfterMs: 2 * HOUR_MS }])
+  })
+
+  it('ignores failures no wait cures, non-root agents, and inactive goals', async () => {
     const { ctx, root } = await harness()
     const child = stubAgent(`hard-standby-child-${Math.random()}`, ctx)
     ctx.goals.create(root.agent, { objective: 'find bugs' })
-    await failRequest(ctx, root.agent, { code: 'RATE_LIMIT' })
+    await failRequest(ctx, root.agent, { code: 'AUTH' })
     await failRequest(ctx, child.agent, { code: 'QUOTA' })
     const goal = ctx.goals.get(root.agent)
     ctx.goals.pause(root.agent, { id: goal!.id, revision: goal!.revision })
@@ -252,11 +277,17 @@ describe('hard standby scheduling', () => {
     expect(wokeOf()).toEqual([])
 
     await agentEvents(ctx, root.agent).serial('agent/created', { source: 'resume' })
+    // A second resume while the wake is pending arms nothing more.
+    await agentEvents(ctx, root.agent).serial('agent/created', { source: 'resume' })
     await vi.advanceTimersByTimeAsync(24 * HOUR_MS + 1)
     expect(wokeOf()).toEqual([
       expect.objectContaining({ delivered: true }),
     ])
     expect(root.followed[0]).toContain('code QUOTA')
+    // Once woken, nothing is scheduled, so a later resume arms nothing.
+    await agentEvents(ctx, root.agent).serial('agent/created', { source: 'resume' })
+    await vi.advanceTimersByTimeAsync(24 * HOUR_MS + 1)
+    expect(wokeOf()).toHaveLength(1)
   })
 
   it('closes a pending wait once the provider answers before the wake, and never wakes it later', async () => {
@@ -321,8 +352,10 @@ describe('hard standby scheduling', () => {
     quotaEnd(child)
     quotaEnd(child)
     quotaEnd(grandchild)
-    // Other failures and a root's own quota stop are not delegated stops.
-    child.session.append('turn/end', { turn: 2, reason: { kind: 'error', error: { message: 'boom', code: 'SERVER' } } })
+    // An outage stops a delegated agent too; other failures and a root's own stop do not count.
+    const sibling = delegated(`sibling-${Math.random()}`, root.agent)
+    sibling.session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: '429: rate limit', code: 'RATE_LIMIT' } } })
+    child.session.append('turn/end', { turn: 2, reason: { kind: 'error', error: { message: 'bad key', code: 'AUTH' } } })
     child.session.append('turn/end', { turn: 3, reason: { kind: 'completed' } })
     quotaEnd(root.agent)
     const reply = (agent: Agent): void => {
@@ -338,7 +371,7 @@ describe('hard standby scheduling', () => {
     reply(root.agent)
     await vi.advanceTimersByTimeAsync(0)
     expect(injected).toHaveLength(1)
-    expect(injected[0]).toBe(`These delegated agents stopped on provider quota before finishing: ${child.id}, ${grandchild.id}. `
+    expect(injected[0]).toBe(`These delegated agents stopped on a provider quota or outage before finishing: ${child.id}, ${grandchild.id}, ${sibling.id}. `
       + 'The provider answers again. Continue each one with send_message to its agent id (it keeps its transcript), '
       + 'or reassign its work; do not wait for their completion notices.')
     // Delivered once.
@@ -370,6 +403,7 @@ describe('hard standby scheduling', () => {
     const bare = new Context()
     expect(() => { hardStandby.apply(bare, { quotaResetCron: 'not a cron' }) }).toThrow('five fields')
     expect(() => { hardStandby.apply(bare, { maxStandbyHours: 0 }) }).toThrow('maxStandbyHours must be a positive safe integer')
+    expect(() => { hardStandby.apply(bare, { transientRetryMinutes: 0 }) }).toThrow('transientRetryMinutes must be a positive safe integer')
 
     const ctx = new Context()
     await ctx.plugin(SessionProjectionRegistry)

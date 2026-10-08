@@ -1,5 +1,5 @@
 ---
-description: "hard-standby 插件：面向 hard 组合，等待终端配额耗尽的窗口关闭，并在重置时刻唤醒任务。"
+description: "hard-standby 插件：面向 hard 组合，等待终端配额耗尽与暂时性 provider 故障过去，并在之后唤醒任务。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-experimental-hard-standby` 让 hard harness 会话熬过 provider 配额耗尽。当拥有活跃目标的 root agent 遇到终端 `QUOTA` 失败时，插件安排一次唤醒——优先使用 provider 的重置延迟，否则取配置的重置 cron 的下一次匹配，否则等待至上限——把等待记录为持久的 `hard/standby/scheduled` 事件，并让失败的 turn 自然结束。唤醒时刻，它重新武装处于活跃但已解除武装状态的目标，记录 `hard/standby/woke`，并投递续作 follow-up，使任务以有界的节奏恢复，而不是无声停滞。
+`dsh-experimental-hard-standby` 让 hard harness 会话熬过 provider 配额耗尽与暂时性 provider 故障。当拥有活跃目标的 root agent 遇到终端 `QUOTA` 失败时，插件在 provider 的重置延迟、配置的重置 cron 或待命上限处安排唤醒；遇到 `RATE_LIMIT`、`SERVER`、`TIMEOUT` 或 `TRANSPORT` 时，它在 provider 的延迟或 `transientRetryMinutes` 之后唤醒。它把等待记录为 `hard/standby/scheduled`，并让失败的 turn 结束。唤醒时，它重新武装活跃但已解除武装的目标，记录 `hard/standby/woke`，并投递续作 follow-up。
 
 ## 目录
 
@@ -32,11 +32,12 @@ kind: "package-reference"
   config:
     quotaResetCron: '0 9 * * *'
     maxStandbyHours: 24
+    transientRetryMinutes: 5
 ```
 
 `enabled: false` 时不挂载任何内容：会话在配额失败时像无管理会话一样结束。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-standby)是每个可接受字段的穷尽来源。
 
-唤醒时刻按固定顺序解析：adapter 报告了 provider 的 `Retry-After` 延迟时以其为准；否则取 `quotaResetCron`（五段 Vixie 格式，按 UTC、分钟粒度求值）的下一次匹配作为窗口；否则等待至 `maxStandbyHours`。每次等待都以 `maxStandbyHours` 为上限；当两个来源都不给出重置时间时，上限同时充当重试节奏，让无管理的配额中断以有界节奏重试，而不是无声停滞。
+唤醒时刻按固定顺序解析：adapter 报告了 provider 的 `Retry-After` 延迟时以其为准；否则取 `quotaResetCron`（五段 Vixie 格式，按 UTC、分钟粒度求值）的下一次匹配作为窗口；否则等待至 `maxStandbyHours`。每次等待都以 `maxStandbyHours` 为上限；当两个来源都不给出重置时间时，上限同时充当重试节奏，让无管理的配额中断以有界节奏重试，而不是无声停滞。暂时性故障从不等待 cron 或上限：它在 provider 的延迟之后唤醒，provider 未给出延迟时在 `transientRetryMinutes`（默认 5）之后唤醒，仍以 `maxStandbyHours` 为上限。目标驱动会在任何 turn 错误时解除目标武装，因此没有这次唤醒，一个被限流的 turn 会让任务闲置到有人手动恢复为止。
 
 -----
 
@@ -50,7 +51,7 @@ kind: "package-reference"
 
 - **瀑布观察者，从不重试。** `agent/request-error` 监听器只做调度：记录 standby 事件、武装唤醒计时器，并始终调用 `next()`，让失败保持终端。短暂抖动仍归重试策略管。
 - **持久状态机。** `hardStandby` 会话投影把 `hard/standby/scheduled` 折叠为挂起的等待，把 `hard/standby/woke` 折叠回空闲；框架在恢复时重建投影，因此等待中途重启的会话会在 agent 以 `resume` 源重建时重新武装剩余等待。等待挂起期间，根 agent 的一次模型回复说明配额窗口已提前结束（已充值，或用户手动恢复了会话），因此插件会取消计时器，并以未投递的 `hard/standby/woke` 关闭等待；否则停止门会一直把会话当作仍在待命，直到过时的唤醒时间。
-- **因配额停止的委派 agent 会被报告而不会被自动恢复。** 只有根 agent 携带待命会恢复的目标，因此回合以 `QUOTA` 或 `ACCOUNT_QUOTA` 结束的委派 agent 会保持未完成。插件在其根 agent 下记住它的 id，并在根 agent 之后的第一次模型回复时注入一条 `hard-standby` 通知，列出这些 agent，并告诉模型用 `send_message` 继续每一个（agent 保留其记录）或重新分配其工作。该列表保存在 Host 进程中：在那次回复之前重启会丢失它。
+- **因配额或故障停止的委派 agent 会被报告而不会被自动恢复。** 只有根 agent 携带待命会恢复的目标，因此回合以配额或暂时性故障结束的委派 agent 会保持未完成。插件在其根 agent 下记住它的 id，并在根 agent 之后的第一次模型回复时注入一条 `hard-standby` 通知，列出这些 agent，并告诉模型用 `send_message` 继续每一个（agent 保留其记录）或重新分配其工作。该列表保存在 Host 进程中：在那次回复之前重启会丢失它。
 - **投递尊重目标权威。** 唤醒时，活跃且已武装的目标直接收到 follow-up；活跃但已解除武装的目标先经目标服务 resume。paused、blocked、complete 的目标绝不被复活——只有活跃阶段会继续；到达轮次上限的目标保持解除武装并记录跳过原因。
 - **有界计时器。** 超过单个 `setTimeout` 上限的等待按上限链式分段；agent 释放会取消计时器，插件卸载会取消所有挂起的唤醒。
 
@@ -62,7 +63,7 @@ kind: "package-reference"
 | [`src/cron.ts`](src/cron.ts) | 五段 UTC cron 解析与下一次匹配运算 |
 | [`src/wake.ts`](src/wake.ts) | 纯唤醒时刻解析：provider 延迟、cron 窗口、上限 |
 | [`src/projection.ts`](src/projection.ts) | 会话投影单元：纯折叠、状态 schema、定义 |
-| [`src/index.ts`](src/index.ts) | 插件：配额监听、唤醒计时器、投递决策 |
+| [`src/index.ts`](src/index.ts) | 插件：配额与故障监听、唤醒计时器、投递决策 |
 
 </details>
 
@@ -90,7 +91,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 
 - **进程内等待** — 唤醒计时器存在于 Host 进程内；等待中途退出的进程依赖持久的 `scheduled` 记录和其后的 `resume` 重新武装。在配额窗口之间完全停止的长驻组合不会自行启动。
-- **仅配额族** — 只有 `QUOTA` 与 `ACCOUNT_QUOTA` 会安排等待；`outage` 是保留词汇，直到 provider 级故障类有自己的触发条件。
+- **固定的故障族** — `QUOTA` 与 `ACCOUNT_QUOTA` 安排配额等待，`RATE_LIMIT`、`SERVER`、`TIMEOUT` 与 `TRANSPORT` 安排故障等待；其他代码（如 `AUTH` 或 `CONTEXT_WINDOW_EXCEEDED`）照旧结束会话，因为等待无法解决它们。
 - **仅 UTC cron** — `quotaResetCron` 不支持时区；依赖时区重置窗口的地区需要在表达式中写死偏移。
 
 <a id="dev-note"></a>

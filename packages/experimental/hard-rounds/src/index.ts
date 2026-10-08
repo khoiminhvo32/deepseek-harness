@@ -122,7 +122,7 @@ export function phaseFor(round: number, deepReadEveryN: number): 'A' | 'B' {
 /** The phase's model-facing instruction for one round. */
 function phaseOrder(phase: 'A' | 'B'): string {
   return phase === 'A'
-    ? 'Phase A: continue the systematic source-to-sink sweep, one coverage cell at a time.'
+    ? 'Phase A: continue the systematic source-to-sink sweep module by module: read a module once, then record every class you swept there with hard_mark_module.'
     : 'Phase B: run the deep-reading pass — model dataflow, trust boundaries, and state machines, then propose or test hypotheses.'
 }
 

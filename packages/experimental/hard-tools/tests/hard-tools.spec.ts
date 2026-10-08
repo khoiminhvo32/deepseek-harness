@@ -177,9 +177,9 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('hard tools registration', () => {
-  it('registers the seven tools and disposes them with the fiber', async () => {
+  it('registers the eight tools and disposes them with the fiber', async () => {
     const { ctx, fiber } = await harness(SUBMIT_SCRIPT(PASS_OUTPUT))
-    const names = ['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_sweep_summary', 'hard_clear_modules', 'hard_status']
+    const names = ['hard_submit_finding', 'hard_update_hypothesis', 'hard_record_flow', 'hard_mark_coverage', 'hard_mark_module', 'hard_sweep_summary', 'hard_clear_modules', 'hard_status']
     expect(names.map(name => ctx.tools.get(name)?.name)).toEqual(names)
     await fiber.dispose()
     expect(ctx.tools.get('hard_submit_finding')).toBeUndefined()
@@ -202,6 +202,7 @@ describe('hard tools agentless and presentation', () => {
       ['hard_submit_finding', { title: 'x', bug_class: 'sqli', component: 'c', claim: 'x', cvss_vector: VECTOR, cvss_score: 9.3, poc_path: 'p', payload: "x' OR 1=1 --" }],
       ['hard_update_hypothesis', { statement: 'x', status: 'proposed' }],
       ['hard_mark_coverage', { module: 'm', bug_class: 'sqli', verdict: 'suspicious', declared_sinks: [] }],
+      ['hard_mark_module', { module: 'm', cells: [{ bug_class: 'sqli', verdict: 'suspicious' }] }],
       ['hard_record_flow', { module: 'm', entry_points: [], dataflows: [], trust_boundaries: [], state_machines: [], assumptions: [], quirks: [] }],
       ['hard_sweep_summary', { phase: 'A', cells_touched: 1, new_findings: 1 }],
       ['hard_status', { view: 'summary' }],
@@ -486,6 +487,95 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent)).toEqual([
       expect.objectContaining({ verdict: 'suspicious', declaredSinks: [], source: 'harness' }),
     ])
+  })
+
+  /** Arm a two-module matrix over the scripted target. */
+  function armModules(ctx: Context, agent: Agent): void {
+    ctx.hardLedger.recordMissionArmed(agent, {
+      objective: 'hunt bugs in the target repository',
+      targetRepo: '/tmp/hard-target',
+      commit: 'a'.repeat(40),
+      modules: ['docs', 'src/db'],
+      bugClasses: ['cmdi', 'sqli', 'xss', 'dependencies'],
+      inertModules: ['docs'],
+    })
+  }
+
+  it('records several classes of one module in one call, cross-checking each', async () => {
+    const { ctx, root } = await harness({ exitCode: 0, stdoutText: 'src/db/exec.ts:9: exec(userCmd)\n' }, { runs: 1, coverageSpotCheckPercent: 100 }, {})
+    armModules(ctx, root.agent)
+    const value = resultJson(await execute(ctx, 'hard_mark_module', {
+      module: 'src/db',
+      cells: [
+        { bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/query.ts:42 rawQuery()'] },
+        { bug_class: 'xss', verdict: 'suspicious', declared_sinks: ['the template echoes input'] },
+        { bug_class: 'dependencies', verdict: 'uncovered' },
+      ],
+    }, root.agent))
+    expect(value).toEqual({
+      module: 'src/db',
+      cells: [
+        { bugClass: 'cmdi', verdict: 'suspicious', reopenedSinks: ['src/db/exec.ts:9: exec(userCmd)'] },
+        { bugClass: 'xss', verdict: 'suspicious', reopenedSinks: [] },
+        { bugClass: 'dependencies', verdict: 'uncovered', reopenedSinks: [] },
+      ],
+    })
+    expect(ctx.hardLedger.coverage(root.agent).map(cell => [cell.bugClass, cell.verdict, cell.source ?? 'model'])).toEqual([
+      ['cmdi', 'suspicious', 'harness'], ['xss', 'suspicious', 'model'], ['dependencies', 'uncovered', 'model'],
+    ])
+    expect(ctx.tools.get('hard_mark_module')?.presentCall?.({ module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'uncovered' }, { bug_class: 'xss', verdict: 'uncovered' }] }))
+      .toMatchObject({ title: 'Coverage src/db: 2 classes' })
+  })
+
+  it('refuses the whole call naming the bad entry, and records nothing', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 100 }, { untracked: ['src/db/ghost.ts'] })
+    armModules(ctx, root.agent)
+    const refused = async (args: unknown): Promise<string> => {
+      const result = await execute(ctx, 'hard_mark_module', args, root.agent)
+      expect(result.isError).toBe(true)
+      return (result.content[0] as { type: string; text: string }).text
+    }
+    const good = { bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/query.ts:run'] }
+    expect(await refused({ module: 'src/db', cells: [] })).toContain('cells must list between 1 and 32 entries')
+    expect(await refused({ module: 'src/db', cells: [good, 'x'] })).toContain('"cells[1]" must be an object')
+    expect(await refused({ module: 'src/db', cells: [good, good] })).toContain('cells name bug_class cmdi more than once')
+    expect(await refused({ module: 'src/db', cells: [{ bug_class: 'sqli', verdict: 'cleared', declared_sinks: [] }] }))
+      .toContain('sqli: cleared requires the declared sinks inspected for this cell')
+    expect(await refused({ module: 'docs', cells: [{ bug_class: 'xss', verdict: 'cleared', declared_sinks: ['docs/a.txt:1'] }] }))
+      .toContain('xss: module "docs" is inert')
+    expect(await refused({ module: 'poc', cells: [{ bug_class: 'xss', verdict: 'suspicious' }] }))
+      .toContain('xss: module "poc" is not in the armed coverage matrix')
+    const unresolved = await refused({ module: 'src/db', cells: [good, { bug_class: 'sqli', verdict: 'cleared', declared_sinks: ['src/db/ghost.ts:exec'] }] })
+    expect(unresolved).toContain('hard_mark_module rejected')
+    expect(unresolved).toContain('sqli: src/db/ghost.ts:exec (src/db/ghost.ts is not tracked at commit aaaaaaa)')
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+    expect(shell.commands.some(command => command.startsWith('grep -rInE'))).toBe(false)
+  })
+
+  it('keeps recording the other classes when one cross-check cannot run', async () => {
+    const { ctx, root } = await harness({ exitCode: 2, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 100 }, {})
+    armModules(ctx, root.agent)
+    const value = resultJson(await execute(ctx, 'hard_mark_module', {
+      module: 'src/db',
+      cells: [
+        { bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/query.ts:42'] },
+        { bug_class: 'sqli', verdict: 'suspicious', declared_sinks: ['raw query'] },
+      ],
+    }, root.agent))
+    expect(value.cells).toEqual([
+      { bugClass: 'cmdi', verdict: 'suspicious', reopenedSinks: [], crossCheckFailed: expect.stringContaining('failed with exit 2') as unknown },
+      { bugClass: 'sqli', verdict: 'suspicious', reopenedSinks: [] },
+    ])
+    expect(ctx.hardLedger.coverage(root.agent).find(cell => cell.bugClass === 'cmdi')).toMatchObject({ verdict: 'suspicious', source: 'harness' })
+  })
+
+  it('records without resolving sites when no matrix pins a commit', async () => {
+    const { ctx, root, shell } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1, coverageSpotCheckPercent: 0 }, {})
+    const value = resultJson(await execute(ctx, 'hard_mark_module', {
+      module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/query.ts:42'] }],
+    }, root.agent))
+    expect(value.cells).toEqual([{ bugClass: 'cmdi', verdict: 'cleared', reopenedSinks: [] }])
+    expect(shell.commands).toEqual([])
   })
 
   it('batch-clears modules the harness grep proves clean, as model-verified', async () => {

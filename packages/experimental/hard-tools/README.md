@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-tools` registers the seven model-facing tools of the hard harness: `hard_submit_finding` returns the verifier's executed verdict on a claim; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_record_flow` records a module's flow document behind citation resolution at the pinned commit; `hard_mark_coverage` records one coverage cell; `hard_clear_modules` batch-screens one class behind a grep that can only refuse; `hard_sweep_summary` records a pass, citing evidence when it found nothing; `hard_status` reads the board and the remaining work back. The ledger checks every proof at record time.
+`dsh-experimental-hard-tools` registers the eight model-facing tools of the hard harness: `hard_submit_finding` returns the verifier's executed verdict on a claim; `hard_update_hypothesis` drives the hypothesis lifecycle; `hard_record_flow` records a module's flow document behind citation resolution at the pinned commit; `hard_mark_coverage` records one coverage cell; `hard_mark_module` records several classes of one module read once, checking every entry before recording any; `hard_clear_modules` batch-screens one class behind a grep that can only refuse; `hard_sweep_summary` records a pass, citing evidence when it found nothing; `hard_status` reads the board and the remaining work back. The ledger checks every proof at record time.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ Mount the plugin with the hard ledger and verifier.
   name: '@deepseek-ai/dsh-experimental-hard-tools'
 ```
 
-All seven tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`, and a submission refused for a duplicate root cause or an unparsable vector records no proposal. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
+All eight tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`, and a submission refused for a duplicate root cause or an unparsable vector records no proposal. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
 
 -----
 
@@ -63,7 +63,7 @@ All seven tools require a live agent and return compact JSON. Submit results car
 
 #### What the model sees
 
-The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_record_flow`, `hard_mark_coverage`, `hard_clear_modules`, `hard_sweep_summary`, and `hard_status` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded flow document (or the rejected citations naming every failed cite), the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), the recorded sweep summary, or a status view: per-kind open-work counts, the gate, and the matrix axes — counts, never a ratio, so no progress number invites clearing for its own sake — a page of board cells with the total that matched, or a page of the open-work list.
+The generated [`hard_submit_finding`, `hard_update_hypothesis`, `hard_record_flow`, `hard_mark_coverage`, `hard_mark_module`, `hard_clear_modules`, `hard_sweep_summary`, and `hard_status` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools). Successful results are compact JSON: the finding's id, claim hash, and fingerprint plus the executed verdict, the new or transitioned hypothesis id and status, the recorded flow document (or the rejected citations naming every failed cite), the recorded coverage cell, the batch clear's cleared-cell list (or the grep evidence that blocked it), the recorded sweep summary, or a status view: per-kind open-work counts, the gate, and the matrix axes — counts, never a ratio, so no progress number invites clearing for its own sake — a page of board cells with the total that matched, or a page of the open-work list.
 
 #### Token effect
 

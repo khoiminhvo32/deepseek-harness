@@ -45,7 +45,7 @@
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 9 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
-| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_record_flow`、`hard_status`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/flow/doc`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
+| `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`、`hard_mark_coverage`、`hard_mark_module`、`hard_record_flow`、`hard_status`、`hard_submit_finding`、`hard_sweep_summary`、`hard_update_hypothesis` | `ctx.tools`、`ctx.hardLedger`、`ctx.hardVerifier`、`ctx.shell`（证明执行）`、一个存活 Agent` | `tool/call`、`hard/finding/proposed`、`hard/finding/verdict`、`hard/hypothesis/state`、`hard/flow/doc`、`hard/coverage/cell`、`hard/sweep/summary`、`tool/result` | - | hard_submit_finding 通过 shell seam 同步验证，从不信任模型自行运行的证明；hard_update_hypothesis 驱动假设生命周期，coverage 与 sweep 工具记录方法论状态并强制空扫描证明。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
@@ -1465,6 +1465,62 @@ Record one coverage cell verdict for the systematic pass: a module swept for one
 ```
 
 Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
+
+### `hard_mark_module`
+
+Record several bug classes for one module after reading it once: one entry per class with its verdict and declared sites, under the same rules as hard_mark_coverage for each entry. Every entry is checked, and every cleared site resolved at the pinned commit, before any is recorded, so one bad entry refuses the whole call naming it. Each recorded class may then be re-grepped and reopened exactly as hard_mark_coverage would. Prefer it to one hard_mark_coverage call per class whenever you swept a module for more than one class.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "string",
+      "description": "Module swept, target-repo relative."
+    },
+    "cells": {
+      "type": "array",
+      "description": "One entry per bug class swept in this module.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bug_class": {
+            "type": "string",
+            "description": "Bug class of this entry; each class at most once."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "Verdict for this class.",
+            "enum": [
+              "cleared",
+              "suspicious",
+              "uncovered"
+            ]
+          },
+          "declared_sinks": {
+            "type": "array",
+            "description": "Code sites inspected for this class, as in hard_mark_coverage; required for cleared.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "bug_class",
+          "verdict"
+        ]
+      }
+    }
+  },
+  "required": [
+    "module",
+    "cells"
+  ]
+}
+```
+
+来源： [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 ### `hard_record_flow`
 

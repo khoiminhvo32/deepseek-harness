@@ -242,6 +242,57 @@
       }
     },
     {
+      "name": "hard_mark_module",
+      "description": "Record several bug classes for one module after reading it once: one entry per class with its verdict and declared sites, under the same rules as hard_mark_coverage for each entry. Every entry is checked, and every cleared site resolved at the pinned commit, before any is recorded, so one bad entry refuses the whole call naming it. Each recorded class may then be re-grepped and reopened exactly as hard_mark_coverage would. Prefer it to one hard_mark_coverage call per class whenever you swept a module for more than one class.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "description": "Module swept, target-repo relative."
+          },
+          "cells": {
+            "type": "array",
+            "description": "One entry per bug class swept in this module.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bug_class": {
+                  "type": "string",
+                  "description": "Bug class of this entry; each class at most once."
+                },
+                "verdict": {
+                  "type": "string",
+                  "description": "Verdict for this class.",
+                  "enum": [
+                    "cleared",
+                    "suspicious",
+                    "uncovered"
+                  ]
+                },
+                "declared_sinks": {
+                  "type": "array",
+                  "description": "Code sites inspected for this class, as in hard_mark_coverage; required for cleared.",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "bug_class",
+                "verdict"
+              ]
+            }
+          }
+        },
+        "required": [
+          "module",
+          "cells"
+        ]
+      }
+    },
+    {
       "name": "hard_record_flow",
       "description": "Record one flow document for a module after the deep-reading pass. All six sections are required; an empty section means you explicitly found nothing, not that you skipped it. Every entry carries cite, snippet, and note: cite is a path:line or path:line-line reference into the target repository, snippet is the short source text at those lines, note is your reading of them. The harness resolves every citation against the pinned commit — never the working tree — and rejects the whole record naming the failed cites, so copy snippets from what you actually read. Each quirk entry automatically opens a proposed hypothesis.",
       "parameters": {

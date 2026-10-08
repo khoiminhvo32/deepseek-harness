@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: 7af2c9575e64b877
-  zh: 9b1ed6acd249fdba
+  en: 3ac7556fdaf85128
+  zh: 7b90904bd7406234
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -179,6 +179,9 @@
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-mark-coverage:
   en: 655b15ff40b84f64
   zh: 655b15ff40b84f64
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-mark-module:
+  en: 0c7ca84058e6977c
+  zh: a8d74747ae026962
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-tools/hard-record-flow:
   en: f0ba66ed4deb5523
   zh: f0ba66ed4deb5523

@@ -57,6 +57,15 @@ const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systemati
   + 'or state that it is deliberately unguarded with the reason. The harness reopens the cell naming any '
   + 'operation none of your declarations mention.'
 
+const MARK_MODULE_DESCRIPTION = 'Record several bug classes for one module after reading it once: one entry per class '
+  + 'with its verdict and declared sites, under the same rules as hard_mark_coverage for each entry. Every entry is '
+  + 'checked, and every cleared site resolved at the pinned commit, before any is recorded, so one bad entry refuses '
+  + 'the whole call naming it. Each recorded class may then be re-grepped and reopened exactly as hard_mark_coverage '
+  + 'would. Prefer it to one hard_mark_coverage call per class whenever you swept a module for more than one class.'
+
+/** The most classes one hard_mark_module call records. */
+const MARK_MODULE_CELL_LIMIT = 32
+
 const CLEAR_MODULES_DESCRIPTION = 'Batch-screen one bug class across several modules without reading them cell by '
   + 'cell. Provide extended-regex patterns for this class\'s sinks; the harness greps each module for the union of '
   + 'your patterns and its own fixed table, so your patterns can only add matches, never subtract. Any match clears '
@@ -216,9 +225,66 @@ function readFlowSections(args: Record<FlowSectionKey, unknown>): Record<FlowSec
   return sections
 }
 
-/** Register the seven hard-harness tools. */
+/**
+ * Validate the entries of one hard_mark_module call beyond what the argument
+ * schema checks: between one and {@link MARK_MODULE_CELL_LIMIT} entries, each
+ * bug class at most once, and declared sites for every cleared entry.
+ * @param module - the module every entry belongs to.
+ * @param entries - the schema-checked `cells` argument.
+ * @returns one coverage cell per entry, in argument order.
+ */
+function readModuleCells(
+  module: string,
+  entries: readonly { readonly bug_class: string; readonly verdict: 'cleared' | 'suspicious' | 'uncovered'; readonly declared_sinks?: readonly string[] }[],
+): { module: string; bugClass: string; verdict: 'cleared' | 'suspicious' | 'uncovered'; declaredSinks: string[] }[] {
+  if (entries.length === 0 || entries.length > MARK_MODULE_CELL_LIMIT) {
+    throw new Error(`cells must list between 1 and ${MARK_MODULE_CELL_LIMIT} entries`)
+  }
+  const seen = new Set<string>()
+  return entries.map((entry) => {
+    const bugClass = entry.bug_class
+    if (seen.has(bugClass)) throw new Error(`cells name bug_class ${bugClass} more than once`)
+    seen.add(bugClass)
+    const declaredSinks = [...entry.declared_sinks ?? []]
+    if (entry.verdict === 'cleared' && declaredSinks.length === 0) {
+      throw new HarnessError(`${bugClass}: cleared requires the declared sinks inspected for this cell`, 'HARD_LEDGER_SINKS_REQUIRED')
+    }
+    return { module, bugClass, verdict: entry.verdict, declaredSinks }
+  })
+}
+
+/** Register the eight hard-harness tools. */
 export function apply(ctx: Context, _config: Config): void {  const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
+
+  /**
+   * Record one checked coverage verdict, then run the cross-check over it. A
+   * cross-check that cannot run fails closed: the cell is re-recorded as a
+   * harness-decided suspicious verdict and the failure rethrown.
+   */
+  async function recordAndCrossCheck(
+    agent: NonNullable<Parameters<typeof ledger.markCoverage>[0]>,
+    cell: { module: string; bugClass: string; verdict: 'cleared' | 'suspicious' | 'uncovered'; declaredSinks: string[] },
+  ): Promise<{ coverage: { module: string; bugClass: string; verdict: string }; reopenedSinks: string[] }> {
+    ledger.markCoverage(agent, cell)
+    let reopened
+    try {
+      reopened = await verifier.auditCoverage(agent, cell)
+    } catch (error: unknown) {
+      /* v8 ignore next -- defensive: auditCoverage fails only with HARD_VERIFIER_AUDIT_FAILED. */
+      if (!(error instanceof HarnessError) || error.code !== 'HARD_VERIFIER_AUDIT_FAILED') throw error
+      ledger.markCoverage(agent, {
+        module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: [], source: 'harness',
+      })
+      throw error
+    }
+    if (reopened !== undefined) ledger.markCoverage(agent, reopened)
+    const decided = reopened ?? cell
+    return {
+      coverage: { module: decided.module, bugClass: decided.bugClass, verdict: decided.verdict },
+      reopenedSinks: reopened === undefined ? [] : [...reopened.declaredSinks],
+    }
+  }
 
   ctx.tools.register(defineTool({
     name: 'hard_submit_finding',
@@ -403,29 +469,96 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
           throw new Error('hard_mark_coverage rejected — every declared site must resolve at the pinned commit: '
             + rejected.map(entry => `${entry.sink} (${entry.reason})`).join('; '))
         }
-        ledger.markCoverage(agent, cell)
-        return verifier.auditCoverage(agent, cell)
-      }).then((reopened) => {
-        if (reopened !== undefined) ledger.markCoverage(agent, reopened)
-        const coverage = reopened === undefined
-          ? { module: cell.module, bugClass: cell.bugClass, verdict: cell.verdict }
-          : { module: reopened.module, bugClass: reopened.bugClass, verdict: reopened.verdict }
-        return {
-          coverage,
-          reopenedSinks: reopened === undefined ? [] : [...reopened.declaredSinks],
-        }
-      }).catch((error: unknown) => {
-        // Fail closed: a cross-check that could not run must not leave the
-        // cell standing cleared in the durable ledger. The cell is
-        // harness-decided here, so it is attributed like a reopen.
-        if (!(error instanceof HarnessError) || error.code !== 'HARD_VERIFIER_AUDIT_FAILED') throw error
-        ledger.markCoverage(agent, {
-          module: cell.module, bugClass: cell.bugClass, verdict: 'suspicious', declaredSinks: [], source: 'harness',
-        })
-        throw error
+        return recordAndCrossCheck(agent, cell)
       })
     },
     presentCall: args => present(`Coverage ${args.module} x ${args.bug_class}: ${args.verdict}`, args.module),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'hard_mark_module',
+    description: MARK_MODULE_DESCRIPTION,
+    parameters: {
+      module: { type: 'string', required: true, description: 'Module swept, target-repo relative.' },
+      cells: {
+        type: 'array', required: true,
+        description: 'One entry per bug class swept in this module.',
+        items: {
+          type: 'object', additionalProperties: false,
+          properties: {
+            bug_class: { type: 'string', required: true, description: 'Bug class of this entry; each class at most once.' },
+            verdict: { type: 'string', required: true, enum: ['cleared', 'suspicious', 'uncovered'], description: 'Verdict for this class.' },
+            declared_sinks: {
+              type: 'array', items: { type: 'string' },
+              description: 'Code sites inspected for this class, as in hard_mark_coverage; required for cleared.',
+            },
+          },
+        },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          module: { type: 'string', required: true },
+          cells: {
+            type: 'array', required: true,
+            description: 'Per class: the recorded verdict, any sinks the cross-check reopened it with, and a cross-check failure.',
+            items: {
+              type: 'object', additionalProperties: false,
+              properties: {
+                bugClass: { type: 'string', required: true },
+                verdict: { type: 'string', required: true },
+                reopenedSinks: { type: 'array', required: true, items: { type: 'string' } },
+                crossCheckFailed: { type: 'string' },
+              },
+            },
+          },
+        },
+      } as const,
+      render: renderJson,
+    },
+    async execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('hard_mark_module requires a live agent')
+      const cells = readModuleCells(args.module, args.cells)
+      // Every entry is checked before any is recorded, so a refusal leaves the ledger untouched.
+      for (const cell of cells) {
+        try {
+          ledger.assertCoverageCell(agent, cell)
+        } catch (error: unknown) {
+          /* v8 ignore next -- defensive: assertCoverageCell fails only with a HarnessError. */
+          if (!(error instanceof HarnessError)) throw error
+          throw new HarnessError(`${cell.bugClass}: ${error.message}`, error.code)
+        }
+      }
+      const cleared = cells.filter(cell => cell.verdict === 'cleared')
+      const sinks = [...new Set(cleared.flatMap(cell => cell.declaredSinks))]
+      if (sinks.length > 0 && ledger.coverageMatrix(agent) !== undefined) {
+        const { rejected } = await verifier.checkSinkCitations(agent, sinks)
+        if (rejected.length > 0) {
+          const reasons = new Map(rejected.map(entry => [entry.sink, entry.reason]))
+          const named = cleared.flatMap(cell => cell.declaredSinks
+            .filter(sink => reasons.has(sink))
+            .map(sink => `${cell.bugClass}: ${sink} (${String(reasons.get(sink))})`))
+          throw new Error(`hard_mark_module rejected — every declared site must resolve at the pinned commit: ${named.join('; ')}`)
+        }
+      }
+      const recorded: { bugClass: string; verdict: string; reopenedSinks: string[]; crossCheckFailed?: string }[] = []
+      for (const cell of cells) {
+        try {
+          const { coverage, reopenedSinks } = await recordAndCrossCheck(agent, cell)
+          recorded.push({ bugClass: coverage.bugClass, verdict: coverage.verdict, reopenedSinks })
+        } catch (error: unknown) {
+          // A failed cross-check already re-recorded this class as suspicious; the other classes still record.
+          /* v8 ignore next -- defensive: recordAndCrossCheck fails only with HARD_VERIFIER_AUDIT_FAILED once its entry is checked. */
+          if (!(error instanceof HarnessError) || error.code !== 'HARD_VERIFIER_AUDIT_FAILED') throw error
+          recorded.push({ bugClass: cell.bugClass, verdict: 'suspicious', reopenedSinks: [], crossCheckFailed: error.message })
+        }
+      }
+      return { module: args.module, cells: recorded }
+    },
+    presentCall: args => present(`Coverage ${args.module}: ${args.cells.length} classes`, args.module),
   }))
 
   ctx.tools.register(defineTool({

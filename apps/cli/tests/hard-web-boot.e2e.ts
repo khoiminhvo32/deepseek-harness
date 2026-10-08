@@ -157,6 +157,7 @@ describe('the hard bundle boots the hard harness inside the Web composition', ()
         .filter(name => name.startsWith('hard_')).sort()).toEqual([
         'hard_clear_modules',
         'hard_mark_coverage',
+        'hard_mark_module',
         'hard_record_flow',
         'hard_status',
         'hard_submit_finding',

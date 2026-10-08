@@ -297,6 +297,70 @@ describe('hard standby scheduling', () => {
     expect(ctx.sessionProjections.stateOf(root.session, 'hardStandby')?.scheduled).not.toBeNull()
   })
 
+  it('tells the root which delegated agents a quota stop left unfinished once the provider answers again', async () => {
+    vi.useFakeTimers()
+    const { ctx, root } = await harness()
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    const injected: string[] = []
+    root.agent.inject = (message) => {
+      const block = message.content[0]
+      if (block?.type === 'text') injected.push(block.text)
+    }
+    /** One live delegated agent under `parent`, registered as its runtime child. */
+    const delegated = (raw: string, parent: Agent): Agent => {
+      const session = ctx.sessions.create(SessionId(raw), { meta: { parentSession: parent.session.id } })
+      const child: Agent = { ...stubAgent(`${raw}-shell`, ctx).agent, id: session.id, session }
+      ctx.agents.enter(child, parent)
+      return child
+    }
+    const quotaEnd = (agent: Agent): void => {
+      agent.session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: '429: usage limit reached', code: 'QUOTA' } } })
+    }
+    const child = delegated(`child-${Math.random()}`, root.agent)
+    const grandchild = delegated(`grandchild-${Math.random()}`, child)
+    quotaEnd(child)
+    quotaEnd(child)
+    quotaEnd(grandchild)
+    // Other failures and a root's own quota stop are not delegated stops.
+    child.session.append('turn/end', { turn: 2, reason: { kind: 'error', error: { message: 'boom', code: 'SERVER' } } })
+    child.session.append('turn/end', { turn: 3, reason: { kind: 'completed' } })
+    quotaEnd(root.agent)
+    const reply = (agent: Agent): void => {
+      agent.session.append('assistant/message', {
+        stream: [], turn: 4, step: 1,
+        message: createAssistantMessage({ content: [{ type: 'text', text: 'back' }], source: { provider: 'test-provider', model: 'test-model' } }),
+      }, { surfaceOp: 'append' })
+    }
+    // A delegated agent's own reply does not deliver the notice.
+    reply(child)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(injected).toEqual([])
+    reply(root.agent)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(injected).toHaveLength(1)
+    expect(injected[0]).toBe(`These delegated agents stopped on provider quota before finishing: ${child.id}, ${grandchild.id}. `
+      + 'The provider answers again. Continue each one with send_message to its agent id (it keeps its transcript), '
+      + 'or reassign its work; do not wait for their completion notices.')
+    // Delivered once.
+    reply(root.agent)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(injected).toHaveLength(1)
+    // A delegated session without a live parent has no root to tell.
+    const orphan = ctx.sessions.create(SessionId(`orphan-${Math.random()}`), { meta: { parentSession: SessionId('gone') } })
+    ctx.agents.enter({ ...stubAgent(`orphan-shell-${Math.random()}`, ctx).agent, id: orphan.id, session: orphan }, root.agent)
+    orphan.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'quota', code: 'ACCOUNT_QUOTA' } } })
+    // A delegated agent whose session names no parent has no root either.
+    const unparented = ctx.sessions.create(SessionId(`unparented-${Math.random()}`))
+    ctx.agents.enter({ ...stubAgent(`unparented-shell-${Math.random()}`, ctx).agent, id: unparented.id, session: unparented }, root.agent)
+    unparented.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'quota', code: 'QUOTA' } } })
+    const loose = ctx.sessions.create(SessionId(`loose-${Math.random()}`))
+    loose.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'quota', code: 'QUOTA' } } })
+    reply(root.agent)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(injected).toHaveLength(1)
+    agentEvents(ctx, root.agent).emit('agent/disposed', {})
+  })
+
   it('validates config loudly', async () => {
     await expect(harness({ maxStandbyHours: 0 })).rejects.toThrow()
     await expect(harness({ quotaResetCron: 'not a cron' })).rejects.toThrow()

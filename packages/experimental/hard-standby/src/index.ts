@@ -130,6 +130,14 @@ function wakeDecision(
   return { deliver: true, resume: false }
 }
 
+/** The model-facing notice naming the delegated agents a quota stop left unfinished. */
+function stoppedChildrenOrder(children: readonly string[]): string {
+  const listed = children.join(', ')
+  return `These delegated agents stopped on provider quota before finishing: ${listed}. `
+    + 'The provider answers again. Continue each one with send_message to its agent id (it keeps its transcript), '
+    + 'or reassign its work; do not wait for their completion notices.'
+}
+
 /** One pending wake: its timer cancellation and the provider code to report. */
 interface PendingWake {
   cancel: () => void
@@ -146,6 +154,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => () => {
     for (const pending of timers.values()) pending.cancel()
     timers.clear()
+    stoppedChildren.clear()
   }, 'hard-standby: clear wake timers')
 
   function arm(id: Agent['id'], delayMs: number, providerCode: string): void {
@@ -220,15 +229,56 @@ export function apply(ctx: Context, config: Config): void {
     arm(agent.id, Math.max(wakeAt - Date.now(), 0), providerCode)
   })
 
+  /** Delegated agents stopped on quota, by the root agent that must hear about them. */
+  const stoppedChildren = new Map<Agent['id'], Agent['id'][]>()
+
+  /** The root agent above one delegated session, walking its parent links. */
+  function rootAbove(session: Agent['session']): Agent | undefined {
+    let current = session
+    for (let depth = 0; depth < 16; depth += 1) {
+      const parentId = current.header.parentSession
+      const parent = parentId === undefined ? undefined : ctx.agents.get(parentId)
+      if (parent === undefined) return undefined
+      if (ctx.agents.roots().includes(parent)) return parent
+      current = parent.session
+    }
+    /* v8 ignore next -- defensive: delegation depth is bounded far below the walk limit. */
+    return undefined
+  }
+
+  // A delegated agent whose turn ends on quota stays unfinished; its root hears
+  // about it once the provider answers again, because only the root carries the
+  // goal the standby resumes.
+  ctx.on('session/event', (session, event) => {
+    if (event.type !== 'turn/end') return
+    const reason = event.data.reason
+    if (reason.kind !== 'error' || !isQuotaFailure(reason.error.code)) return
+    const agent = ctx.agents.get(session.id)
+    if (agent === undefined || ctx.agents.roots().includes(agent)) return
+    const root = rootAbove(session)
+    if (root === undefined) return
+    const known = stoppedChildren.get(root.id) ?? []
+    if (!known.includes(agent.id)) stoppedChildren.set(root.id, [...known, agent.id])
+  })
+
   /** Sessions whose pending wait is being closed; the close appends one microtask later. */
   const closing = new Set<Agent['session']>()
   // A model reply proves the quota window ended before the wake: the user or a
   // recharge resumed the session. Close the wait, or the stop gate keeps
   // treating the session as standing by until the stale wake time.
   ctx.on('session/event', (session, event) => {
-    if (event.type !== 'assistant/message' || closing.has(session)) return
+    if (event.type !== 'assistant/message') return
     const agent = ctx.agents.get(session.id)
     if (agent === undefined || !ctx.agents.roots().includes(agent)) return
+    const children = stoppedChildren.get(agent.id)
+    if (children !== undefined) {
+      stoppedChildren.delete(agent.id)
+      // The post-commit append feed forbids reentrant appends.
+      queueMicrotask(() => {
+        agent.inject(createUserMessage({ content: [{ type: 'text', text: stoppedChildrenOrder(children) }], source: { kind: 'hard-standby' } }))
+      })
+    }
+    if (closing.has(session)) return
     if (ctx.sessionProjections.stateOf(session, 'hardStandby')?.scheduled == null) return
     timers.get(agent.id)?.cancel()
     timers.delete(agent.id)
@@ -241,6 +291,7 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   ctx.on('agent/disposed', ({ agent }) => {
+    stoppedChildren.delete(agent.id)
     const pending = timers.get(agent.id)
     if (pending === undefined) return
     timers.delete(agent.id)

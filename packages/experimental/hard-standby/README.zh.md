@@ -50,6 +50,7 @@ kind: "package-reference"
 
 - **瀑布观察者，从不重试。** `agent/request-error` 监听器只做调度：记录 standby 事件、武装唤醒计时器，并始终调用 `next()`，让失败保持终端。短暂抖动仍归重试策略管。
 - **持久状态机。** `hardStandby` 会话投影把 `hard/standby/scheduled` 折叠为挂起的等待，把 `hard/standby/woke` 折叠回空闲；框架在恢复时重建投影，因此等待中途重启的会话会在 agent 以 `resume` 源重建时重新武装剩余等待。等待挂起期间，根 agent 的一次模型回复说明配额窗口已提前结束（已充值，或用户手动恢复了会话），因此插件会取消计时器，并以未投递的 `hard/standby/woke` 关闭等待；否则停止门会一直把会话当作仍在待命，直到过时的唤醒时间。
+- **因配额停止的委派 agent 会被报告而不会被自动恢复。** 只有根 agent 携带待命会恢复的目标，因此回合以 `QUOTA` 或 `ACCOUNT_QUOTA` 结束的委派 agent 会保持未完成。插件在其根 agent 下记住它的 id，并在根 agent 之后的第一次模型回复时注入一条 `hard-standby` 通知，列出这些 agent，并告诉模型用 `send_message` 继续每一个（agent 保留其记录）或重新分配其工作。该列表保存在 Host 进程中：在那次回复之前重启会丢失它。
 - **投递尊重目标权威。** 唤醒时，活跃且已武装的目标直接收到 follow-up；活跃但已解除武装的目标先经目标服务 resume。paused、blocked、complete 的目标绝不被复活——只有活跃阶段会继续；到达轮次上限的目标保持解除武装并记录跳过原因。
 - **有界计时器。** 超过单个 `setTimeout` 上限的等待按上限链式分段；agent 释放会取消计时器，插件卸载会取消所有挂起的唤醒。
 

@@ -49,7 +49,7 @@ Wake times resolve in a fixed order: the provider's `Retry-After` delay wins whe
 ### Design
 
 - **Waterfall observer, never a retry.** The `agent/request-error` listener only schedules: it records the standby event, arms the wake timer, and always calls `next()`, leaving the failure terminal. Transient noise stays the retry policy's business.
-- **Durable state machine.** The `hardStandby` session projection folds `hard/standby/scheduled` into a pending wait and `hard/standby/woke` back to idle; the framework restores it at resume, so a session that restarts mid-wait re-arms its remaining wait when the agent is recreated from a `resume` source.
+- **Durable state machine.** The `hardStandby` session projection folds `hard/standby/scheduled` into a pending wait and `hard/standby/woke` back to idle; the framework restores it at resume, so a session that restarts mid-wait re-arms its remaining wait when the agent is recreated from a `resume` source. A root agent's model reply during a pending wait proves the quota window ended early (a recharge, or a user who resumed by hand), so the plugin cancels the timer and closes the wait with an undelivered `hard/standby/woke`; otherwise the stop gate would keep treating the session as standing by until the stale wake time.
 - **Delivery respects goal authority.** At wake, a live active goal is followed up directly when armed; an active disarmed goal is resumed first through the goal service. Paused, blocked, and completed goals are never revived — only the active phase continues, and a goal at its round cap is left disarmed with the skip recorded.
 - **Bounded timers.** Waits longer than one `setTimeout` bound chain through it; agent disposal cancels the timer, and plugin unload cancels every pending wake.
 

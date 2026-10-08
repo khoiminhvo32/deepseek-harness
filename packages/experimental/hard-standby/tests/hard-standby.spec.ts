@@ -5,7 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus, Inbox } from '@deepseek-ai/dsh-agent'
 import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as hardStandby from '@deepseek-ai/dsh-experimental-hard-standby'
@@ -257,6 +257,44 @@ describe('hard standby scheduling', () => {
       expect.objectContaining({ delivered: true }),
     ])
     expect(root.followed[0]).toContain('code QUOTA')
+  })
+
+  it('closes a pending wait once the provider answers before the wake, and never wakes it later', async () => {
+    vi.useFakeTimers()
+    const { ctx, root } = await harness()
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    const wokeOf = recordStandbyEvents(ctx, root.session, 'hard/standby/woke')
+    await failRequest(ctx, root.agent, { code: 'QUOTA' })
+    const reply = (step: number): void => {
+      root.session.append('assistant/message', {
+        stream: [], turn: 2, step,
+        message: createAssistantMessage({ content: [{ type: 'text', text: 'resuming' }], source: { provider: 'test-provider', model: 'test-model' } }),
+      }, { surfaceOp: 'append' })
+    }
+    reply(1)
+    reply(2)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(wokeOf()).toEqual([{ at: Date.now(), delivered: false, skip: 'the provider answered before the wake time' }])
+    expect(ctx.sessionProjections.stateOf(root.session, 'hardStandby')?.scheduled).toBeNull()
+    // A later reply with no wait pending appends nothing, and the stale wake never fires.
+    reply(3)
+    await vi.advanceTimersByTimeAsync(24 * HOUR_MS + 1)
+    expect(wokeOf()).toHaveLength(1)
+    expect(root.followed).toEqual([])
+  })
+
+  it('leaves a delegated child alone when it answers', async () => {
+    vi.useFakeTimers()
+    const { ctx, root } = await harness()
+    ctx.goals.create(root.agent, { objective: 'find bugs' })
+    await failRequest(ctx, root.agent, { code: 'QUOTA' })
+    const child = stubAgent(`hard-standby-child-${Math.random()}`, ctx)
+    child.session.append('assistant/message', {
+      stream: [], turn: 1, step: 1,
+      message: createAssistantMessage({ content: [{ type: 'text', text: 'child' }], source: { provider: 'test-provider', model: 'test-model' } }),
+    }, { surfaceOp: 'append' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ctx.sessionProjections.stateOf(root.session, 'hardStandby')?.scheduled).not.toBeNull()
   })
 
   it('validates config loudly', async () => {

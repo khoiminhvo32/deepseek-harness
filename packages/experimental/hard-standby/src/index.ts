@@ -220,6 +220,26 @@ export function apply(ctx: Context, config: Config): void {
     arm(agent.id, Math.max(wakeAt - Date.now(), 0), providerCode)
   })
 
+  /** Sessions whose pending wait is being closed; the close appends one microtask later. */
+  const closing = new Set<Agent['session']>()
+  // A model reply proves the quota window ended before the wake: the user or a
+  // recharge resumed the session. Close the wait, or the stop gate keeps
+  // treating the session as standing by until the stale wake time.
+  ctx.on('session/event', (session, event) => {
+    if (event.type !== 'assistant/message' || closing.has(session)) return
+    const agent = ctx.agents.get(session.id)
+    if (agent === undefined || !ctx.agents.roots().includes(agent)) return
+    if (ctx.sessionProjections.stateOf(session, 'hardStandby')?.scheduled == null) return
+    timers.get(agent.id)?.cancel()
+    timers.delete(agent.id)
+    closing.add(session)
+    // The post-commit append feed forbids reentrant appends.
+    queueMicrotask(() => {
+      closing.delete(session)
+      session.append('hard/standby/woke', { at: Date.now(), delivered: false, skip: 'the provider answered before the wake time' })
+    })
+  })
+
   ctx.on('agent/disposed', ({ agent }) => {
     const pending = timers.get(agent.id)
     if (pending === undefined) return

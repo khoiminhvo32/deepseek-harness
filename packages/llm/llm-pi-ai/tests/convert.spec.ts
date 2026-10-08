@@ -8,7 +8,7 @@ import { transformMessages } from '@earendil-works/pi-ai/api/transform-messages'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { toPiContext } from '../src/context.ts'
 import { toPiReplayState } from '../src/replay.ts'
-import { mapStopReason, mapUsage, toStreamChunks } from '../src/stream.ts'
+import { mapStopReason, mapUsage, toStreamChunks, zaiQuotaResetDelayMs } from '../src/stream.ts'
 
 function usage(input = 0, output = 0, cacheRead = 0, cacheWrite = 0): Usage {
   return {
@@ -856,6 +856,37 @@ describe('toStreamChunks', () => {
     }
 
     await expect(collect(toStreamChunks(failedSdkStream()))).rejects.toBe(original)
+  })
+})
+
+describe('zaiQuotaResetDelayMs', () => {
+  const notice = '429: {"code":"1308","message":"Usage limit reached for 5 hour. Your limit will reset at 2026-10-08 15:34:29"}'
+  // 15:34:29 on Z.ai's UTC+8 clock is 07:34:29 UTC.
+  const reset = Date.UTC(2026, 9, 8, 7, 34, 29)
+
+  it('reads the reset time of a Z.ai quota notice on the platform clock', () => {
+    expect(zaiQuotaResetDelayMs('zai', notice, reset - 60_000)).toBe(60_000)
+    expect(zaiQuotaResetDelayMs('zai-coding-cn', notice, reset - 1)).toBe(1)
+  })
+
+  it('ignores other providers, notices without a reset time, and a reset already past', () => {
+    expect(zaiQuotaResetDelayMs('openai', notice, reset - 60_000)).toBeUndefined()
+    expect(zaiQuotaResetDelayMs('zai', '429: insufficient balance', reset - 60_000)).toBeUndefined()
+    expect(zaiQuotaResetDelayMs('zai', notice, reset)).toBeUndefined()
+  })
+
+  it('carries the delay on a quota failure from a Z.ai route', () => {
+    vi.useFakeTimers({ now: reset - 120_000 })
+    try {
+      expect(mapStopReason(assistant({ provider: 'zai', stopReason: 'error', errorMessage: notice }))).toEqual({
+        kind: 'error', failure: { message: notice, code: 'QUOTA', providerRetryAfterMs: 120_000 },
+      })
+      expect(mapStopReason(assistant({ provider: 'zai', stopReason: 'error', errorMessage: '429: rate limit' }))).toEqual({
+        kind: 'error', failure: { message: '429: rate limit', code: 'RATE_LIMIT' },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

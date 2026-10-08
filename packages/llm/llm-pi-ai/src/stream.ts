@@ -68,6 +68,32 @@ function classifyPiAiError(message: string): string {
 }
 
 /**
+ * Z.ai quota notices name the window reset as `reset at YYYY-MM-DD HH:MM:SS`
+ * on the platform's clock, China Standard Time (UTC+8), with no zone in the
+ * text (`Usage limit reached for 5 hour. Your limit will reset at …`).
+ */
+const ZAI_QUOTA_RESET = /\breset at (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})\b/u
+
+/** Z.ai's platform clock offset from UTC. */
+const ZAI_CLOCK_OFFSET_MS = 8 * 3_600_000
+
+/**
+ * The delay until a Z.ai quota window resets, read from its notice.
+ * @param provider - the pi-ai provider that produced the failure.
+ * @param text - the failure text.
+ * @param now - the current time in epoch milliseconds.
+ * @returns the positive delay in milliseconds, or undefined for another provider, no reset time, or a reset already past.
+ */
+export function zaiQuotaResetDelayMs(provider: string, text: string, now: number): number | undefined {
+  if (provider !== 'zai' && !provider.startsWith('zai-')) return undefined
+  const match = ZAI_QUOTA_RESET.exec(text)
+  if (match === null) return undefined
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number) as [number, number, number, number, number, number]
+  const delay = Date.UTC(year, month - 1, day, hour, minute, second) - ZAI_CLOCK_OFFSET_MS - now
+  return delay > 0 ? delay : undefined
+}
+
+/**
  * Map a terminal pi-ai event to the harness finish reason.
  * @param message - the assistant message carried by the `done` or `error` event.
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
@@ -122,7 +148,9 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
     }
     case 'error': {
       const text = message.errorMessage ?? 'pi-ai stream error'
-      return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
+      const code = classifyPiAiError(text)
+      const retryAfter = code === QUOTA_EXCEEDED_CODE ? zaiQuotaResetDelayMs(message.provider, text, Date.now()) : undefined
+      return { kind: 'error', failure: { message: text, code, ...retryAfter === undefined ? {} : { providerRetryAfterMs: retryAfter } } }
     }
   }
 }

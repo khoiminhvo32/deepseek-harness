@@ -665,7 +665,7 @@ export class HardVerifier extends Service {
           lineCounts.set(path, count)
         }
         const last = citation.lines.last
-        if (last > count) rejected.push({ sink, reason: `${path} has no line ${last} at commit ${short}` })
+        if (last > count) rejected.push({ sink, reason: `${path} has ${count} lines at commit ${short}, so no line ${last}` })
         continue
       }
       const found = await this.gitAt(

@@ -728,8 +728,8 @@ describe('hard verifier declared-site citations', () => {
       ])
       expect(result.rejected).toEqual([
         { sink: 'src/store.js:fndUser', reason: `src/store.js has no fndUser at commit ${short}` },
-        { sink: 'src/store.js:5', reason: `src/store.js has no line 5 at commit ${short}` },
-        { sink: 'src/store.js:3-6', reason: `src/store.js has no line 6 at commit ${short}` },
+        { sink: 'src/store.js:5', reason: `src/store.js has 4 lines at commit ${short}, so no line 5` },
+        { sink: 'src/store.js:3-6', reason: `src/store.js has 4 lines at commit ${short}, so no line 6` },
         { sink: 'src/ghost.js:readDoc', reason: `src/ghost.js is not tracked at commit ${short}` },
         { sink: 'execSync', reason: 'a declared site must be path:symbol, path:line, or path:start-end, optionally followed by a note' },
       ])

@@ -573,7 +573,7 @@ describe('hard-audit unavailable results', () => {
       [{ outcome: 'flagged', locations: [], examined: [], reason: 'x' }, 'a flagged report named no location'],
       [{ outcome: 'flagged', locations: [{ path: '../etc/passwd', line: 1 }], examined: [], reason: 'x' }, '../etc/passwd is not a repository-relative path with a positive line'],
       [{ outcome: 'flagged', locations: [{ path: 'src/app.js', line: 0 }], examined: [], reason: 'x' }, 'src/app.js is not a repository-relative path with a positive line'],
-      [{ outcome: 'flagged', locations: [{ path: 'src/app.js', line: 90 }], examined: [], reason: 'x' }, `src/app.js has no line 90 at commit ${targetSha.slice(0, 7)}`],
+      [{ outcome: 'flagged', locations: [{ path: 'src/app.js', line: 90 }], examined: [], reason: 'x' }, `src/app.js has 5 lines at commit ${targetSha.slice(0, 7)}, so no line 90`],
     ]
     for (const [index, [structured]] of cases.entries()) {
       subagents.scripts.push({ structured })

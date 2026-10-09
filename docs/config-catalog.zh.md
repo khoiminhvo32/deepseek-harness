@@ -1303,11 +1303,24 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-tools`
 
 - `inject`: `tools` · `hardLedger` · `hardVerifier`
-- `source`: [`packages/experimental/hard-tools/src/index.ts:26`](../packages/experimental/hard-tools/src/index.ts)
+- `source`: [`packages/experimental/hard-tools/src/index.ts:32`](../packages/experimental/hard-tools/src/index.ts)
 
 ```ts config-catalog
-/** Tool policy config; reserved for future thresholds. */
-export interface Config {}
+/** Tool policy config: the evidence a cleared coverage cell must carry. */
+export interface Config {
+  /**
+   * Longest line range one declared site of a cleared cell may cite. A wider
+   * range claims a read of a whole file that nothing checks, so the clear is
+   * refused until it cites the function or the lines actually read.
+   */
+  maxCitedRangeLines?: number
+  /**
+   * Distinct files of the module a cleared module-scoped cell must cite,
+   * capped by the module's file count at the pinned commit, so a large
+   * module is never cleared on one line.
+   */
+  minClearedFiles?: number
+}
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-tools -->
 

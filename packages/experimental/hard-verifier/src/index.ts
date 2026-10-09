@@ -616,6 +616,29 @@ export class HardVerifier extends Service {
   }
 
   /**
+   * Count the files one coverage module holds at the pinned commit: every
+   * tracked file under its directory, or the files directly at the root for
+   * the root module `.`, which does not cover the subdirectories.
+   * @param agent - the live agent whose ledger matrix carries the pinned commit.
+   * @param module - the target-repo-relative module.
+   * @returns the module's file count at the pinned commit.
+   * @throws `HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.
+   * @throws `HARD_VERIFIER_CITATION_FAILED` when the git invocation does not settle cleanly.
+   */
+  async moduleFileCount(agent: Agent, module: string): Promise<number> {
+    const matrix = this.ctx.hardLedger.coverageMatrix(agent)
+    if (matrix === undefined) {
+      throw new HarnessError('hard module files: no armed coverage matrix pins a commit', 'HARD_VERIFIER_NO_MATRIX')
+    }
+    const git = pinnedGit(matrix)
+    const commit = shellQuote(matrix.commit)
+    const command = module === '.'
+      ? `set -o pipefail; ${git} ls-tree ${commit} | awk '$2 == "blob" { n++ } END { print n + 0 }'`
+      : `set -o pipefail; ${git} ls-tree -r --name-only ${commit} -- ${shellQuote(module)} | awk 'END { print NR }'`
+    return Number((await this.gitAt(matrix.targetRepo, command, `module files: ls-tree over ${module}`)).trim())
+  }
+
+  /**
    * Resolve every declared site of a `cleared` coverage cell against the
    * pinned commit, through git alone so the outcome does not depend on the
    * host's `grep`. A site passes when its path is tracked at the commit and,

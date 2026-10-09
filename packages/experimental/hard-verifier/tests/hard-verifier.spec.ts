@@ -751,6 +751,8 @@ describe('hard verifier declared-site citations', () => {
     const missing = await bare.ctx.hardVerifier.checkSinkCitations(root0Agent(bare.ctx), ['src/a.ts:run'])
       .catch((error: unknown) => error)
     expect((missing as { code?: string }).code).toBe('HARD_VERIFIER_NO_MATRIX')
+    const countless = await bare.ctx.hardVerifier.moduleFileCount(root0Agent(bare.ctx), 'src').catch((error: unknown) => error)
+    expect((countless as { code?: string }).code).toBe('HARD_VERIFIER_NO_MATRIX')
   })
 })
 
@@ -799,6 +801,9 @@ describe('hard verifier root module and repository classes', () => {
       expect(await ctx.hardVerifier.screenModules(agentStub.agent, 'cmdi', ['sub', '.'], [])).toEqual({
         clean: false, evidence: ['sub/deep.js:1:exec(cmd)', '.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'],
       })
+      // Module sizes come from the pinned commit too: the report written afterwards is not counted.
+      expect(await ctx.hardVerifier.moduleFileCount(agentStub.agent, '.')).toBe(2)
+      expect(await ctx.hardVerifier.moduleFileCount(agentStub.agent, 'sub')).toBe(1)
     } finally {
       await rm(tree, { recursive: true, force: true })
     }

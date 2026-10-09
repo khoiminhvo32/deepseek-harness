@@ -88,6 +88,7 @@ function citationAnswer(command: string, answers: CitationAnswers): ScriptedRun 
   if (command.startsWith('git diff --numstat')) return { exitCode: 0, stdoutText: `1\t0\t${path ?? ''}\n` }
   if (command.startsWith('git grep -I -F')) return { exitCode: 0, stdoutText: `sha:${path ?? ''}:1\n` }
   if (command.includes("awk 'END")) return { exitCode: 0, stdoutText: '999\n' }
+  if (command.includes('awk \'$2 == "blob"')) return { exitCode: 0, stdoutText: '2\n' }
   return undefined
 }
 
@@ -138,6 +139,8 @@ async function harness(
   scripted: ScriptedRun | readonly ScriptedRun[],
   verifyConfig: VerifierConfig = { runs: 1 },
   citations?: CitationAnswers,
+  // One required file keeps the file count out of the scripted shell; the clear-evidence suite sets its own.
+  toolsConfig: hardTools.Config = { minClearedFiles: 1 },
 ) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
@@ -148,7 +151,7 @@ async function harness(
   await ctx.plugin(HardLedger, {})
   const shell = new SingleRunShell(ctx, Array.isArray(scripted) ? scripted : [scripted], citations)
   await ctx.plugin(HardVerifier, verifyConfig)
-  const fiber = await ctx.plugin(hardTools, {})
+  const fiber = await ctx.plugin(hardTools, toolsConfig)
   const root = stubAgent(`hard-tools-root-${Math.random()}`)
   await ctx.agents.register(root.agent)
   return { ctx, fiber, root, shell }
@@ -927,6 +930,78 @@ describe('weaknesses, chains, and logic clears', () => {
     // A suspicious logic cell needs no invariants.
     expect(resultJson(await execute(ctx, 'hard_mark_coverage', { module: 'src/db', bug_class: 'logic', verdict: 'suspicious' }, root.agent)))
       .toMatchObject({ coverage: { verdict: 'suspicious' } })
+  })
+})
+
+describe('clear evidence policy', () => {
+  function arm(ctx: Context, agent: Agent): void {
+    ctx.hardLedger.recordMissionArmed(agent, {
+      objective: 'hunt bugs in the target repository', targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['src/db'], bugClasses: ['sqli', 'cmdi', 'dependencies'],
+    })
+  }
+  const text = (result: ToolExecutionResult): string => (result.content[0] as { type: string; text: string }).text
+
+  it('refuses a cleared site citing more lines than the limit, in both coverage tools', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1 }, {}, { minClearedFiles: 1, maxCitedRangeLines: 300 })
+    arm(ctx, root.agent)
+    const wide = await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'sqli', verdict: 'cleared', declared_sinks: ['src/db/query.ts:1-301 whole file read'],
+    }, root.agent)
+    expect(text(wide)).toContain('src/db/query.ts:1-301 whole file read cites 301 lines; a clear cites the function or the lines you read, at most 300 lines per site')
+    const batch = await execute(ctx, 'hard_mark_module', {
+      module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/run.ts:10-900'] }],
+    }, root.agent)
+    expect(text(batch)).toContain('cmdi: src/db/run.ts:10-900 cites 891 lines')
+    expect(ctx.hardLedger.coverage(root.agent)).toEqual([])
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'sqli', verdict: 'cleared', declared_sinks: ['src/db/query.ts:1-300 read in full'],
+    }, root.agent))).toMatchObject({ coverage: { verdict: 'cleared' } })
+  })
+
+  it('requires sites in several module files, capped by the module size, and counts only files inside the module', async () => {
+    const { ctx, root } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1 }, {}, { minClearedFiles: 3 })
+    arm(ctx, root.agent)
+    const thin = await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'sqli', verdict: 'cleared',
+      declared_sinks: ['src/db/a.ts:1 prepared', 'src/db/b.ts:2 prepared', 'src/api/c.ts:3 outside the module'],
+    }, root.agent)
+    expect(text(thin)).toContain('a clear of module "src/db" cites sites in 2 of its files; cite the sites you inspected in at least 3 different files of the module')
+    const batch = await execute(ctx, 'hard_mark_module', {
+      module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/a.ts:1'] }],
+    }, root.agent)
+    expect(text(batch)).toContain('cmdi: a clear of module "src/db" cites sites in 1 of its files')
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'sqli', verdict: 'cleared',
+      declared_sinks: ['src/db/a.ts:1 prepared', 'src/db/b.ts:2 prepared', 'src/db/c.ts:3 prepared'],
+    }, root.agent))).toMatchObject({ coverage: { verdict: 'cleared' } })
+    // The root module holds only root files: a nested path does not count toward its clear.
+    ctx.hardLedger.recordMissionArmed(root.agent, {
+      objective: 'hunt bugs in the target repository', targetRepo: '/tmp/hard-target', commit: 'a'.repeat(40),
+      modules: ['.', 'src/db'], bugClasses: ['sqli', 'cmdi', 'dependencies'],
+    })
+    expect(text(await execute(ctx, 'hard_mark_coverage', {
+      module: '.', bug_class: 'sqli', verdict: 'cleared', declared_sinks: ['index.php:1 entry', 'src/db/a.ts:1 nested'],
+    }, root.agent))).toContain('a clear of module "." cites sites in 1 of its files')
+    // A repository-scoped class and a suspicious verdict carry no file requirement.
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', {
+      module: 'src/db', bug_class: 'dependencies', verdict: 'cleared', declared_sinks: ['package.json:dependencies'],
+    }, root.agent))).toMatchObject({ coverage: { verdict: 'cleared' } })
+    expect(resultJson(await execute(ctx, 'hard_mark_coverage', { module: 'src/db', bug_class: 'cmdi', verdict: 'suspicious' }, root.agent)))
+      .toMatchObject({ coverage: { verdict: 'suspicious' } })
+  })
+
+  it('states the deployment limits in both coverage tool descriptions and validates them', async () => {
+    const { ctx } = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1 }, undefined, { maxCitedRangeLines: 120, minClearedFiles: 4 })
+    for (const name of ['hard_mark_coverage', 'hard_mark_module']) {
+      expect(ctx.tools.get(name)?.description).toContain('at most 120 lines per site, never a whole file — in at least 4 different files of the module')
+    }
+    const defaults = await harness({ exitCode: 1, stdoutText: '' }, { runs: 1 }, undefined, {})
+    expect(defaults.ctx.tools.get('hard_mark_coverage')?.description)
+      .toContain('at most 300 lines per site, never a whole file — in at least 3 different files of the module')
+    const bare = new Context()
+    expect(() => { hardTools.apply(bare, { maxCitedRangeLines: 0 }) }).toThrow('maxCitedRangeLines must be a positive safe integer')
+    expect(() => { hardTools.apply(bare, { minClearedFiles: 1.5 }) }).toThrow('minClearedFiles must be a positive safe integer')
   })
 })
 

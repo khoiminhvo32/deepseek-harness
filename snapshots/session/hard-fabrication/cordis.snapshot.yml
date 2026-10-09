@@ -29,6 +29,10 @@
         coverageSpotCheckPercent: 100
     - id: hard-tools
       name: '@deepseek-ai/dsh-experimental-hard-tools'
+      # The recorded script clears the two-file src module citing one file;
+      # this scenario exercises the cross-check, not the clear-evidence policy.
+      config:
+        minClearedFiles: 1
     - id: hard-mission
       name: '@deepseek-ai/dsh-experimental-hard-mission'
       config:

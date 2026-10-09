@@ -114,6 +114,11 @@ describe('dsh --profile hard fabrication traps', () => {
         '- id: hard-verifier',
         '  config:',
         '    coverageSpotCheckPercent: 100',
+        // The scripted clears cite one file of the two-file src module; the
+        // fixture exercises the cross-check, not the clear-evidence policy.
+        '- id: hard-tools',
+        '  config:',
+        '    minClearedFiles: 1',
         '- id: hard-ledger',
         '  config:',
         '    screenSpotCheckPercent: 0',

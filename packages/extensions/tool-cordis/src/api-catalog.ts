@@ -1464,6 +1464,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['`HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.', '`HARD_VERIFIER_CITATION_FAILED` when a git invocation does not settle cleanly.'],
       },
       {
+        signature: 'async moduleFileCount(agent: Agent, module: string): Promise<number>',
+        description: 'Count the files one coverage module holds at the pinned commit: every tracked file under its directory, or the files directly at the root for the root module `.`, which does not cover the subdirectories.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the pinned commit.' }, { name: 'module', description: 'the target-repo-relative module.' }],
+        returns: 'the module\'s file count at the pinned commit.',
+        throws: ['`HARD_VERIFIER_NO_MATRIX` when no coverage matrix is armed.', '`HARD_VERIFIER_CITATION_FAILED` when the git invocation does not settle cleanly.'],
+      },
+      {
         signature: 'async checkSinkCitations(agent: Agent, sinks: readonly string[]): Promise<{ rejected: readonly SinkCitationReject[] }>',
         description: 'Resolve every declared site of a `cleared` coverage cell against the pinned commit, through git alone so the outcome does not depend on the host\'s `grep`. A site passes when its path is tracked at the commit and, for a text file, the commit\'s file has the cited line or contains the cited symbol (`git grep -I -F`). A binary — classified by a numstat diff against the empty tree, the content test `grep -I` applies — passes the path check without its content being read as resolved: its module is unscreened, so the clear stands as a blind clear. A symbol match can sit in a comment; this guards against citing code that does not exist, not against a wrong clear. It fails closed: a git invocation that errors, times out, or is aborted throws instead of reading as a verdict.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger matrix carries the pinned commit.' }, { name: 'sinks', description: 'the declared-site strings, in any order.' }],

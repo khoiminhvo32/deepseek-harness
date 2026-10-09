@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
-import { ABSENCE_SINK_CLASSES, claimHash, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
+import { ABSENCE_SINK_CLASSES, claimHash, parseSinkCitation, rootFingerprint } from '@deepseek-ai/dsh-experimental-hard-verifier'
 import type { HardEmptySweepProof, HardHypothesisStatus, HardMatrixBoardCell } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { classScope } from '@deepseek-ai/dsh-experimental-hard-ledger'
 // Loads the declaration-merged `goals` Context key read through `ctx.get`.
@@ -22,11 +22,57 @@ import { HarnessError } from '@deepseek-ai/dsh-llm'
 export const name = 'hard-tools'
 export const inject = ['tools', 'hardLedger', 'hardVerifier']
 
-/** Tool policy config; reserved for future thresholds. */
-export interface Config {}
+/** Default longest line range one site of a cleared cell may cite. */
+export const DEFAULT_MAX_CITED_RANGE_LINES = 300
+
+/** Default number of distinct module files a cleared cell must cite. */
+export const DEFAULT_MIN_CLEARED_FILES = 3
+
+/** Tool policy config: the evidence a cleared coverage cell must carry. */
+export interface Config {
+  /**
+   * Longest line range one declared site of a cleared cell may cite. A wider
+   * range claims a read of a whole file that nothing checks, so the clear is
+   * refused until it cites the function or the lines actually read.
+   */
+  maxCitedRangeLines?: number
+  /**
+   * Distinct files of the module a cleared module-scoped cell must cite,
+   * capped by the module's file count at the pinned commit, so a large
+   * module is never cleared on one line.
+   */
+  minClearedFiles?: number
+}
 
 /** Schemastery config for the hard tools. */
-export const Config: z<Config> = z.object({})
+export const Config: z<Config> = z.object({
+  maxCitedRangeLines: z.number().step(1).min(1).default(DEFAULT_MAX_CITED_RANGE_LINES),
+  minClearedFiles: z.number().step(1).min(1).default(DEFAULT_MIN_CLEARED_FILES),
+})
+
+/** Fully materialized tool policy. */
+interface ResolvedConfig {
+  readonly maxCitedRangeLines: number
+  readonly minClearedFiles: number
+}
+
+/** Validate config even when apply is called directly outside Loader normalization. */
+function resolveConfig(config: Config): ResolvedConfig {
+  const maxCitedRangeLines = config.maxCitedRangeLines ?? DEFAULT_MAX_CITED_RANGE_LINES
+  if (!Number.isSafeInteger(maxCitedRangeLines) || maxCitedRangeLines < 1) {
+    throw new TypeError('maxCitedRangeLines must be a positive safe integer')
+  }
+  const minClearedFiles = config.minClearedFiles ?? DEFAULT_MIN_CLEARED_FILES
+  if (!Number.isSafeInteger(minClearedFiles) || minClearedFiles < 1) {
+    throw new TypeError('minClearedFiles must be a positive safe integer')
+  }
+  return { maxCitedRangeLines, minClearedFiles }
+}
+
+/** Whether one target-relative path lies in one coverage module; the root module holds only root files. */
+function inModule(path: string, module: string): boolean {
+  return module === '.' ? !path.includes('/') : path.startsWith(`${module}/`)
+}
 
 const HYPOTHESIS_STATUSES: readonly HardHypothesisStatus[] = ['proposed', 'testing', 'confirmed', 'refuted', 'deferred']
 
@@ -72,6 +118,17 @@ const COVERAGE_DESCRIPTION = 'Record one coverage cell verdict for the systemati
   + 'skips a step, a limit enforced on one path but not its sibling, a value trusted after it was checked. A logic '
   + 'clear declares at least two sites, each with a note stating the invariant it upholds, and compares sibling '
   + 'paths that perform the same operation; the harness cannot grep it, so nothing but your read stands behind it.'
+
+/**
+ * The evidence rule a cleared cell meets, worded with the deployment's limits.
+ * @param policy - the resolved tool policy.
+ * @returns the sentence both coverage tools append to their description.
+ */
+function clearEvidenceRule(policy: ResolvedConfig): string {
+  return ` A clear of a module-scoped class cites the function or the lines you read — at most ${String(policy.maxCitedRangeLines)} `
+    + `lines per site, never a whole file — in at least ${String(policy.minClearedFiles)} different files of the module `
+    + '(every file when it has fewer); a clear that falls short is refused naming the limit.'
+}
 
 const MARK_MODULE_DESCRIPTION = 'Record several bug classes for one module after reading it once: one entry per class '
   + 'with its verdict and declared sites, under the same rules as hard_mark_coverage for each entry. Every entry is '
@@ -292,8 +349,55 @@ function readModuleCells(
 }
 
 /** Register the nine hard-harness tools. */
-export function apply(ctx: Context, _config: Config): void {  const ledger = ctx.hardLedger
+export function apply(ctx: Context, config: Config): void {  const ledger = ctx.hardLedger
   const verifier = ctx.hardVerifier
+  const policy = resolveConfig(config)
+
+  /**
+   * Refuse cleared module-scoped cells whose sites do not show a real read:
+   * a site citing more than `maxCitedRangeLines` lines, or fewer distinct
+   * module files than `minClearedFiles` allows for the module's size. Every
+   * cell belongs to one module, so the file count is read once.
+   * @param agent - the live agent whose matrix pins the commit.
+   * @param cells - the cells about to be recorded, all in one module.
+   * @param prefix - names the offending cell in a multi-cell refusal.
+   * @throws `HARD_TOOLS_CLEAR_EVIDENCE` naming the first cell that falls short.
+   */
+  async function assertClearEvidence(
+    agent: Parameters<typeof ledger.markCoverage>[0],
+    cells: readonly { module: string; bugClass: string; verdict: string; declaredSinks: readonly string[] }[],
+    prefix: (cell: { bugClass: string }) => string,
+  ): Promise<void> {
+    const clears = cells.filter(cell => cell.verdict === 'cleared' && classScope(cell.bugClass) === 'module')
+    for (const cell of clears) {
+      for (const sink of cell.declaredSinks) {
+        const lines = parseSinkCitation(sink)?.lines
+        if (lines === undefined || lines.last - lines.first + 1 <= policy.maxCitedRangeLines) continue
+        throw new HarnessError(
+          `${prefix(cell)}${sink} cites ${String(lines.last - lines.first + 1)} lines; a clear cites the function or the lines `
+          + `you read, at most ${String(policy.maxCitedRangeLines)} lines per site`,
+          'HARD_TOOLS_CLEAR_EVIDENCE',
+        )
+      }
+    }
+    const [first] = clears
+    if (first === undefined || ledger.coverageMatrix(agent) === undefined) return
+    // One file is the floor every module meets, so it needs no count.
+    const required = policy.minClearedFiles > 1
+      ? Math.min(policy.minClearedFiles, await verifier.moduleFileCount(agent, first.module))
+      : 1
+    for (const cell of clears) {
+      const files = new Set(cell.declaredSinks
+        .map(sink => parseSinkCitation(sink)?.path)
+        .filter((path): path is string => path !== undefined && inModule(path, cell.module)))
+      if (files.size >= required) continue
+      throw new HarnessError(
+        `${prefix(cell)}a clear of module "${cell.module}" cites sites in ${String(files.size)} of its files; `
+        + `cite the sites you inspected in at least ${String(required)} different files of the module`,
+        'HARD_TOOLS_CLEAR_EVIDENCE',
+      )
+    }
+  }
 
   /**
    * Record one checked coverage verdict, then run the cross-check over it. A
@@ -520,7 +624,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
 
   ctx.tools.register(defineTool({
     name: 'hard_mark_coverage',
-    description: COVERAGE_DESCRIPTION,
+    description: COVERAGE_DESCRIPTION + clearEvidenceRule(policy),
     parameters: {
       module: { type: 'string', required: true, description: 'Module or directory swept, target-repo relative.' },
       bug_class: { type: 'string', required: true, description: 'Bug class swept in this cell.' },
@@ -558,9 +662,10 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
       // A clear claims the cited code was read: resolve every site at the
       // pinned commit before the record exists. Without an armed matrix there
       // is no commit to resolve against, and the merge-extensible default holds.
-      const resolved = args.verdict === 'cleared' && declaredSinks.length > 0 && ledger.coverageMatrix(agent) !== undefined
-        ? verifier.checkSinkCitations(agent, declaredSinks)
-        : Promise.resolve({ rejected: [] })
+      const resolved = assertClearEvidence(agent, [cell], () => '').then(() =>
+        args.verdict === 'cleared' && declaredSinks.length > 0 && ledger.coverageMatrix(agent) !== undefined
+          ? verifier.checkSinkCitations(agent, declaredSinks)
+          : { rejected: [] })
       return resolved.then(({ rejected }) => {
         if (rejected.length > 0) {
           throw new Error('hard_mark_coverage rejected — every declared site must resolve at the pinned commit: '
@@ -574,7 +679,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
 
   ctx.tools.register(defineTool({
     name: 'hard_mark_module',
-    description: MARK_MODULE_DESCRIPTION,
+    description: MARK_MODULE_DESCRIPTION + clearEvidenceRule(policy),
     parameters: {
       module: { type: 'string', required: true, description: 'Module swept, target-repo relative.' },
       cells: {
@@ -630,6 +735,7 @@ export function apply(ctx: Context, _config: Config): void {  const ledger = ctx
           throw new HarnessError(`${cell.bugClass}: ${error.message}`, error.code)
         }
       }
+      await assertClearEvidence(agent, cells, cell => `${cell.bugClass}: `)
       const cleared = cells.filter(cell => cell.verdict === 'cleared')
       const sinks = [...new Set(cleared.flatMap(cell => cell.declaredSinks))]
       if (sinks.length > 0 && ledger.coverageMatrix(agent) !== undefined) {

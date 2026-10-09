@@ -29,7 +29,12 @@ Mount the plugin with the hard ledger and verifier.
 ```yaml
 - id: hard-tools
   name: '@deepseek-ai/dsh-experimental-hard-tools'
+  config:
+    maxCitedRangeLines: 300
+    minClearedFiles: 3
 ```
+
+The two fields set the evidence a cleared module-scoped cell must carry in `hard_mark_coverage` and `hard_mark_module`: no declared site may cite more than `maxCitedRangeLines` lines, and the sites must fall in at least `minClearedFiles` different files of the module, or in every file when the module has fewer at the pinned commit. Both tool descriptions state the configured values, and a clear that falls short is refused with `HARD_TOOLS_CLEAR_EVIDENCE` before anything is recorded.
 
 All nine tools require a live agent and return compact JSON. Submit results carry `verdict.verdict`, the run count, the recomputed score, whether the claimed score matched, and a bounded reason; rejections surface stable codes such as `HARD_VERIFIER_DUPLICATE`, and a submission refused for a duplicate root cause or an unparsable vector records no proposal. The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-tools) is the exact schemas the model receives.
 

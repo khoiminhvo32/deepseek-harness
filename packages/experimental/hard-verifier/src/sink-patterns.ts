@@ -197,6 +197,16 @@ const OPERAND_PATTERNS: readonly { readonly regex: RegExp; readonly operand: (ma
 ]
 
 /**
+ * Bug classes whose cross-check and batch screen skip CSS stylesheets. Their
+ * patterns are keywords (configuration words, crypto names, OAuth and state
+ * words) that stylesheets carry in selectors, comments, and embedded base64
+ * fonts, while a stylesheet can neither configure the server, hold a key, nor
+ * run an authentication flow — so a CSS match only reopens a cell no
+ * citation can clear.
+ */
+export const CSS_EXCLUDED_CLASSES: ReadonlySet<string> = new Set(['misconfig', 'crypto-misuse', 'oauth-bypass'])
+
+/**
  * Name the exported operations one matched surface line declares, so the
  * cross-check can compare them with the operations the model declared. A line
  * whose shape no extractor recognizes falls back to its `path:line` location,

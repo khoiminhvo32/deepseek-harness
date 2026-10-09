@@ -18,7 +18,7 @@ import type {
 } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { cellSampledForPercent, classScope, pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { parseVector, scoreVector } from './cvss4.ts'
-import { GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
+import { CSS_EXCLUDED_CLASSES, GUARDED_SURFACE_PATTERNS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 import { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
 
 /**
@@ -173,11 +173,22 @@ function pinnedGrep(target: PinnedTarget, pattern: string, options = ''): string
 }
 
 /**
+ * The pathspecs one class's grep excludes: CSS stylesheets for the
+ * {@link CSS_EXCLUDED_CLASSES}, nothing for the rest.
+ * @param bugClass - the bug class being grepped.
+ * @returns the shell-quoted exclude pathspecs, each preceded by a space; empty when nothing is excluded.
+ */
+function excludedPathspecs(bugClass: string): string {
+  return CSS_EXCLUDED_CLASSES.has(bugClass) ? ` ${shellQuote(':(exclude)*.css')}` : ''
+}
+
+/**
  * The grep over one coverage cell's code at the pinned commit. A
  * repository-scoped class greps the whole tree whatever module recorded it;
  * the root module of a module-scoped class greps only the files directly at
  * the root, because its cell does not cover the subdirectories (their own
- * modules do); any other module greps its directory.
+ * modules do); any other module greps its directory. CSS stylesheets are left
+ * out for the {@link CSS_EXCLUDED_CLASSES}.
  * @param target - the armed matrix whose snapshot and commit the grep reads.
  * @param pattern - the shell-quoted extended-regex alternation.
  * @param module - the cell's module.
@@ -185,9 +196,11 @@ function pinnedGrep(target: PinnedTarget, pattern: string, options = ''): string
  * @returns the command line, run from the target repository root.
  */
 function cellGrep(target: PinnedTarget, pattern: string, module: string, bugClass: string): string {
-  if (classScope(bugClass) === 'repo') return pinnedGrep(target, pattern)
-  if (module !== '.') return `${pinnedGrep(target, pattern)} -- ${shellQuote(module)}`
-  return pinnedGrep(target, pattern, '--max-depth 0 ')
+  const excluded = excludedPathspecs(bugClass)
+  const tail = excluded === '' ? '' : ` --${excluded}`
+  if (classScope(bugClass) === 'repo') return `${pinnedGrep(target, pattern)}${tail}`
+  if (module !== '.') return `${pinnedGrep(target, pattern)} -- ${shellQuote(module)}${excluded}`
+  return `${pinnedGrep(target, pattern, '--max-depth 0 ')}${tail}`
 }
 
 /**
@@ -782,7 +795,7 @@ export class HardVerifier extends Service {
     // The root module greps only its own files, so it runs apart from the directory modules.
     const directories = modules.filter(module => module !== '.')
     const commands = [
-      ...directories.length === 0 ? [] : [`${pinnedGrep(matrix, pattern)} -- ${directories.map(shellQuote).join(' ')}`],
+      ...directories.length === 0 ? [] : [`${pinnedGrep(matrix, pattern)} -- ${directories.map(shellQuote).join(' ')}${excludedPathspecs(bugClass)}`],
       ...modules.includes('.') ? [cellGrep(matrix, pattern, '.', bugClass)] : [],
     ]
     const evidence: string[] = []
@@ -803,7 +816,7 @@ export class HardVerifier extends Service {
 }
 
 export { parseVector, scoreVector, macroVector, severityBand } from './cvss4.ts'
-export { GUARDED_SURFACE_PATTERNS, SCREENED_EXTENSIONS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
+export { CSS_EXCLUDED_CLASSES, GUARDED_SURFACE_PATTERNS, SCREENED_EXTENSIONS, SINK_PATTERNS, surfaceOperands } from './sink-patterns.ts'
 export { declarationCoversLine, parseSinkCitation } from './sink-citation.ts'
 export type { SinkCitation } from './sink-citation.ts'
 export { claimHash, rootFingerprint } from './fingerprint.ts'

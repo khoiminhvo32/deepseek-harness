@@ -755,6 +755,13 @@ describe('hard verifier declared-site citations', () => {
 })
 
 describe('hard verifier root module and repository classes', () => {
+  /** A git runner for one temporary repository, isolated from the host's git configuration. */
+  function gitIn(tree: string): (...args: string[]) => string {
+    return (...args) => execFileSync('git', ['-C', tree, ...args], {
+      encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+    })
+  }
+
   it('greps the pinned commit, never files written into the target after the arming, and only root files for the root module', async () => {
     const tree = await mkdtemp(join(tmpdir(), 'hard-pinned-grep-'))
     try {
@@ -762,9 +769,7 @@ describe('hard verifier root module and repository classes', () => {
       await writeFile(join(tree, 'sub/deep.js'), 'exec(cmd)\n')
       await writeFile(join(tree, '.hidden.js'), 'execSync(x)\n')
       await writeFile(join(tree, 'app.js'), 'const a = 1\nsystem(cmd)\n')
-      const git = (...args: string[]) => execFileSync('git', ['-C', tree, ...args], {
-        encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
-      })
+      const git = gitIn(tree)
       git('init', '--quiet')
       git('add', '-A')
       git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
@@ -793,6 +798,44 @@ describe('hard verifier root module and repository classes', () => {
       })).toBeUndefined()
       expect(await ctx.hardVerifier.screenModules(agentStub.agent, 'cmdi', ['sub', '.'], [])).toEqual({
         clean: false, evidence: ['sub/deep.js:1:exec(cmd)', '.hidden.js:1:execSync(x)', 'app.js:2:system(cmd)'],
+      })
+    } finally {
+      await rm(tree, { recursive: true, force: true })
+    }
+  })
+
+  it('skips CSS stylesheets for the keyword classes at every scope, and keeps them for the rest', async () => {
+    const tree = await mkdtemp(join(tmpdir(), 'hard-css-grep-'))
+    try {
+      await mkdir(join(tree, 'src'))
+      await writeFile(join(tree, 'src/app.js'), 'const h = md5(x)\n')
+      await writeFile(join(tree, 'src/theme.css'), '/* md5( */ .a { display_errors: 1 }\n')
+      await writeFile(join(tree, 'root.css'), '/* md5( WP_DEBUG */\n')
+      await writeFile(join(tree, 'boot.php'), "<?php ini_set('display_errors', 1); md5($x);\n")
+      const git = gitIn(tree)
+      git('init', '--quiet')
+      git('add', '-A')
+      git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+      const commit = git('rev-parse', 'HEAD').trim()
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionProjectionRegistry)
+      await ctx.plugin(AgentRegistry)
+      new RealShell(ctx)
+      await ctx.plugin(HardLedger, {})
+      await ctx.plugin(HardVerifier, { coverageSpotCheckPercent: 100 })
+      const agentStub = stubAgent(`hard-verifier-css-${Math.random()}`)
+      await ctx.agents.register(agentStub.agent)
+      ctx.hardLedger.recordMissionArmed(agentStub.agent, {
+        objective: 'hunt bugs', targetRepo: tree, commit, modules: ['.', 'src'], bugClasses: ['crypto-misuse', 'misconfig'],
+      })
+      const reopened = async (module: string, bugClass: string): Promise<readonly string[] | undefined> =>
+        (await ctx.hardVerifier.auditCoverage(agentStub.agent, { module, bugClass, verdict: 'cleared', declaredSinks: ['x.ts:1'] }))?.declaredSinks
+      expect(await reopened('src', 'crypto-misuse')).toEqual(['src/app.js:1:const h = md5(x)'])
+      expect(await reopened('.', 'crypto-misuse')).toEqual(["boot.php:1:<?php ini_set('display_errors', 1); md5($x);"])
+      expect(await reopened('src', 'misconfig')).toEqual(["boot.php:1:<?php ini_set('display_errors', 1); md5($x);"])
+      expect(await ctx.hardVerifier.screenModules(agentStub.agent, 'crypto-misuse', ['src', '.'], [])).toEqual({
+        clean: false, evidence: ['src/app.js:1:const h = md5(x)', "boot.php:1:<?php ini_set('display_errors', 1); md5($x);"],
       })
     } finally {
       await rm(tree, { recursive: true, force: true })

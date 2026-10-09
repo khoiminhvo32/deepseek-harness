@@ -100,6 +100,8 @@ export function isQuotaExceededError(detail: string): boolean {
     || /\bexceed(?:ed|s)?[\s_-]+(?:(?:your|the)[\s_-]+)?(?:current[\s_-]+)?quota\b/i.test(detail)
     || /\b(?:balance|credits?)[\s_-]+(?:exhausted|depleted)\b/i.test(detail)
     || /\bout[\s_-]+of[\s_-]+(?:credits?|budget)\b/i.test(detail)
+    // A plan's calendar window, e.g. Z.ai's "Weekly/Monthly Limit Exhausted".
+    || /\b(?:daily|weekly|monthly)(?:\/(?:daily|weekly|monthly))?[\s_-]+limit[\s_-]+(?:exceeded|exhausted|reached)\b/i.test(detail)
 }
 
 /**

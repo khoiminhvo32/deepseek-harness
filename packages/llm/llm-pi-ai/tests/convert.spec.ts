@@ -881,6 +881,11 @@ describe('zaiQuotaResetDelayMs', () => {
       expect(mapStopReason(assistant({ provider: 'zai', stopReason: 'error', errorMessage: notice }))).toEqual({
         kind: 'error', failure: { message: notice, code: 'QUOTA', providerRetryAfterMs: 120_000 },
       })
+      // The weekly plan window is a quota too, waited out to its own reset time.
+      const weekly = '429: {"code":"1310","message":"Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-10-08 15:34:29"}'
+      expect(mapStopReason(assistant({ provider: 'zai', stopReason: 'error', errorMessage: weekly }))).toEqual({
+        kind: 'error', failure: { message: weekly, code: 'QUOTA', providerRetryAfterMs: 120_000 },
+      })
       expect(mapStopReason(assistant({ provider: 'zai', stopReason: 'error', errorMessage: '429: rate limit' }))).toEqual({
         kind: 'error', failure: { message: '429: rate limit', code: 'RATE_LIMIT' },
       })

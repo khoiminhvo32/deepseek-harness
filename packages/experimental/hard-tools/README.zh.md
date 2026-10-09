@@ -34,7 +34,7 @@ kind: "package-reference"
     minClearedFiles: 3
 ```
 
-这两个字段规定 `hard_mark_coverage` 与 `hard_mark_module` 中已清除的模块级单元必须携带的证据：任何声明位置引用的行数都不能超过 `maxCitedRangeLines`，且这些位置必须落在该模块至少 `minClearedFiles` 个不同文件中；当模块在被钉住的提交处的文件更少时，必须覆盖每个文件。两个工具的描述都会写明所配置的值，不满足要求的清除会在记录任何内容之前以 `HARD_TOOLS_CLEAR_EVIDENCE` 被拒绝。
+这两个字段规定 `hard_mark_coverage` 与 `hard_mark_module` 中已清除的模块级单元必须携带的证据：任何声明位置引用的行数都不能超过 `maxCitedRangeLines`，且这些位置必须落在该模块至少 `minClearedFiles` 个不同文件中；当模块在被钉住的提交处的文件更少时，必须覆盖每个文件。两个工具的描述都会写明所配置的值，不满足要求的清除会在记录任何内容之前以 `HARD_TOOLS_CLEAR_EVIDENCE` 被拒绝，并点名每个不满足要求的位置与条目，使一次修正后的调用即可通过。
 
 九个工具都要求存活代理并返回紧凑 JSON。提交结果携带 `verdict.verdict`、运行次数、重算分数、声称分数是否匹配以及有界的 reason；拒绝以 `HARD_VERIFIER_DUPLICATE` 等稳定代码浮现；因根因重复或向量无法解析而被拒绝的提交不会记录任何提案。生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-tools)是模型收到的确切 schema。
 

@@ -361,7 +361,7 @@ export function apply(ctx: Context, config: Config): void {  const ledger = ctx.
    * @param agent - the live agent whose matrix pins the commit.
    * @param cells - the cells about to be recorded, all in one module.
    * @param prefix - names the offending cell in a multi-cell refusal.
-   * @throws `HARD_TOOLS_CLEAR_EVIDENCE` naming the first cell that falls short.
+   * @throws `HARD_TOOLS_CLEAR_EVIDENCE` naming every site and cell that falls short, so one corrected call can pass.
    */
   async function assertClearEvidence(
     agent: Parameters<typeof ledger.markCoverage>[0],
@@ -369,34 +369,31 @@ export function apply(ctx: Context, config: Config): void {  const ledger = ctx.
     prefix: (cell: { bugClass: string }) => string,
   ): Promise<void> {
     const clears = cells.filter(cell => cell.verdict === 'cleared' && classScope(cell.bugClass) === 'module')
+    const shortfalls: string[] = []
     for (const cell of clears) {
       for (const sink of cell.declaredSinks) {
         const lines = parseSinkCitation(sink)?.lines
         if (lines === undefined || lines.last - lines.first + 1 <= policy.maxCitedRangeLines) continue
-        throw new HarnessError(
-          `${prefix(cell)}${sink} cites ${String(lines.last - lines.first + 1)} lines; a clear cites the function or the lines `
-          + `you read, at most ${String(policy.maxCitedRangeLines)} lines per site`,
-          'HARD_TOOLS_CLEAR_EVIDENCE',
-        )
+        shortfalls.push(`${prefix(cell)}${sink} cites ${String(lines.last - lines.first + 1)} lines; a clear cites the function `
+          + `or the lines you read, at most ${String(policy.maxCitedRangeLines)} lines per site`)
       }
     }
     const [first] = clears
-    if (first === undefined || ledger.coverageMatrix(agent) === undefined) return
-    // One file is the floor every module meets, so it needs no count.
-    const required = policy.minClearedFiles > 1
-      ? Math.min(policy.minClearedFiles, await verifier.moduleFileCount(agent, first.module))
-      : 1
-    for (const cell of clears) {
-      const files = new Set(cell.declaredSinks
-        .map(sink => parseSinkCitation(sink)?.path)
-        .filter((path): path is string => path !== undefined && inModule(path, cell.module)))
-      if (files.size >= required) continue
-      throw new HarnessError(
-        `${prefix(cell)}a clear of module "${cell.module}" cites sites in ${String(files.size)} of its files; `
-        + `cite the sites you inspected in at least ${String(required)} different files of the module`,
-        'HARD_TOOLS_CLEAR_EVIDENCE',
-      )
+    if (first !== undefined && ledger.coverageMatrix(agent) !== undefined) {
+      // One file is the floor every module meets, so it needs no count.
+      const required = policy.minClearedFiles > 1
+        ? Math.min(policy.minClearedFiles, await verifier.moduleFileCount(agent, first.module))
+        : 1
+      for (const cell of clears) {
+        const files = new Set(cell.declaredSinks
+          .map(sink => parseSinkCitation(sink)?.path)
+          .filter((path): path is string => path !== undefined && inModule(path, cell.module)))
+        if (files.size >= required) continue
+        shortfalls.push(`${prefix(cell)}a clear of module "${cell.module}" cites sites in ${String(files.size)} of its files; `
+          + `cite the sites you inspected in at least ${String(required)} different files of the module`)
+      }
     }
+    if (shortfalls.length > 0) throw new HarnessError(shortfalls.join('; '), 'HARD_TOOLS_CLEAR_EVIDENCE')
   }
 
   /**

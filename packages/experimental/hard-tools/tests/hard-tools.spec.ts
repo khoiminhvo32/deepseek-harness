@@ -968,9 +968,15 @@ describe('clear evidence policy', () => {
     }, root.agent)
     expect(text(thin)).toContain('a clear of module "src/db" cites sites in 2 of its files; cite the sites you inspected in at least 3 different files of the module')
     const batch = await execute(ctx, 'hard_mark_module', {
-      module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/a.ts:1'] }],
+      module: 'src/db', cells: [
+        { bug_class: 'cmdi', verdict: 'cleared', declared_sinks: ['src/db/a.ts:1'] },
+        { bug_class: 'sqli', verdict: 'cleared', declared_sinks: ['src/db/a.ts:1', 'src/db/b.ts:1-400'] },
+      ],
     }, root.agent)
-    expect(text(batch)).toContain('cmdi: a clear of module "src/db" cites sites in 1 of its files')
+    // Every shortfall of every entry is named in one refusal.
+    expect(text(batch)).toContain('sqli: src/db/b.ts:1-400 cites 400 lines; a clear cites the function or the lines you read, at most 300 lines per site; '
+      + 'cmdi: a clear of module "src/db" cites sites in 1 of its files; cite the sites you inspected in at least 3 different files of the module; '
+      + 'sqli: a clear of module "src/db" cites sites in 2 of its files')
     expect(resultJson(await execute(ctx, 'hard_mark_coverage', {
       module: 'src/db', bug_class: 'sqli', verdict: 'cleared',
       declared_sinks: ['src/db/a.ts:1 prepared', 'src/db/b.ts:2 prepared', 'src/db/c.ts:3 prepared'],

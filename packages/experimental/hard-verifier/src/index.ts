@@ -204,19 +204,22 @@ function cellGrep(target: PinnedTarget, pattern: string, module: string, bugClas
 }
 
 /**
- * The non-empty lines of one pinned grep's output, with the `<commit>:` prefix
+ * The match lines of one pinned grep's output, with the `<commit>:` prefix
  * `git grep` puts on every match removed so the paths compare with
- * target-relative citations.
- * @param stdout - the grep's stdout.
+ * target-relative citations. When the shell bounded the output it kept only
+ * the tail, whose first line is a match cut mid-line, so that line is dropped;
+ * any other line without a `path:line:` location is dropped too.
+ * @param stdout - the grep's stdout, with whether the shell truncated it.
  * @param commit - the pinned commit the grep read.
  * @returns the trimmed `path:line:text` match lines.
  */
-function grepLines(stdout: string, commit: string): string[] {
+function grepLines(stdout: { readonly text: string; readonly truncated: boolean }, commit: string): string[] {
   const prefix = `${commit}:`
-  return stdout.split('\n')
+  const lines = stdout.text.split('\n')
+  return (stdout.truncated ? lines.slice(1) : lines)
     .map(line => line.trim())
-    .filter(line => line.length > 0)
     .map(line => line.startsWith(prefix) ? line.slice(prefix.length) : line)
+    .filter(line => /^[^\s:][^:]*:\d+:/u.test(line))
 }
 
 /** Undeclared matches one reopening lists; any further ones are counted in a closing note. */
@@ -498,7 +501,7 @@ export class HardVerifier extends Service {
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = grepLines(result.stdout.text, matrix.commit)
+    const missed = grepLines(result.stdout, matrix.commit)
       .filter(line => !cell.declaredSinks.some(sink => declarationCoversLine(sink, line)))
       .map(boundedEvidence)
     if (missed.length === 0) return undefined
@@ -537,7 +540,7 @@ export class HardVerifier extends Service {
     const execution = await this.ctx.shell.execute(spec)
     const result = await execution.result()
     assertGrepSettled(result, `audit: grep over ${cell.module}`, 'HARD_VERIFIER_AUDIT_FAILED')
-    const missed = [...new Set(grepLines(result.stdout.text, matrix.commit).flatMap(line => surfaceOperands(line)))]
+    const missed = [...new Set(grepLines(result.stdout, matrix.commit).flatMap(line => surfaceOperands(line)))]
       // An operation named by its location (`path:line`) is also covered by a line or range citation of that line.
       .filter(operand => !cell.declaredSinks.some(declaration => declaration.includes(operand)
         || (/:\d+$/u.test(operand) && declarationCoversLine(declaration, `${operand}:`))))
@@ -832,7 +835,7 @@ export class HardVerifier extends Service {
       const execution = await this.ctx.shell.execute(spec)
       const result = await execution.result()
       assertGrepSettled(result, `screen: grep over ${modules.join(', ')}`, 'HARD_VERIFIER_SCREEN_FAILED')
-      evidence.push(...grepLines(result.stdout.text, matrix.commit).map(boundedEvidence))
+      evidence.push(...grepLines(result.stdout, matrix.commit).map(boundedEvidence))
     }
     return { clean: evidence.length === 0, evidence: evidence.slice(0, 8) }
   }

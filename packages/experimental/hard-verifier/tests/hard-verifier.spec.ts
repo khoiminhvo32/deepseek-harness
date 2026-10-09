@@ -65,6 +65,8 @@ interface ScriptedRun {
   readonly stdoutText: string
   readonly stderrText?: string
   readonly timedOut?: boolean
+  /** Whether the shell kept only the tail of a bounded stdout. */
+  readonly stdoutTruncated?: boolean
 }
 
 /** Foreground result shape the scripted shell settles with. */
@@ -75,7 +77,7 @@ interface ScriptedExecution {
     timedOut: boolean
     aborted: false
     timeoutMs: number
-    stdout: { text: string; truncated: false }
+    stdout: { text: string; truncated: boolean }
     stderr: { text: string; truncated: false }
   }>
 }
@@ -115,7 +117,7 @@ class ScriptedShell extends Service {
         timedOut: scripted.timedOut ?? false,
         aborted: false,
         timeoutMs: spec.timeoutMs === undefined ? 0 : spec.timeoutMs,
-        stdout: { text: scripted.stdoutText, truncated: false },
+        stdout: { text: scripted.stdoutText, truncated: scripted.stdoutTruncated ?? false },
         stderr: { text: scripted.stderrText ?? '', truncated: false },
       }),
     }
@@ -456,6 +458,20 @@ describe('hard verifier coverage cross-check', () => {
     })
     expect(shell.runs[0]?.command).toMatch(new RegExp(`^git grep -I -n -E -e '.*' '${pinnedSha}' -- 'src/auth'$`, 'u'))
     expect(shell.runs[0]?.workdir).toBe('/tmp/hard-target')
+  })
+
+  it('ignores the cut fragment a bounded grep output starts with, for surface and sink classes alike', async () => {
+    // A bounded output keeps only its tail, so the first line is a minified match cut mid-line.
+    const fragment = `${'x'.repeat(5000)}:12:module.exports = { leaked }`
+    const tail = `${fragment}\n${pinnedSha}:src/auth/api.js:3:module.exports = { login }\n`
+    const { ctx } = await harness([
+      { exitCode: 0, stdoutText: tail, stdoutTruncated: true },
+      { exitCode: 0, stdoutText: `${'y'.repeat(4000)}exec(\n${pinnedSha}:src/auth/run.js:2:exec(cmd)\n` },
+    ], { coverageSpotCheckPercent: 100 })
+    const root = armMatrix(ctx, '/tmp/hard-target')
+    expect((await ctx.hardVerifier.auditCoverage(root, { module: 'src/auth', bugClass: 'authz', verdict: 'cleared', declaredSinks: ['src/auth/x.js:1'] }))?.declaredSinks)
+      .toEqual(['login'])
+    expect((await ctx.hardVerifier.auditCoverage(root, clearedCell))?.declaredSinks).toEqual(['src/auth/run.js:2:exec(cmd)'])
   })
 
   it('drops the commit prefix of pinned grep output and counts the undeclared matches it does not list', async () => {

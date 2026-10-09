@@ -199,7 +199,10 @@ const OPERAND_PATTERNS: readonly { readonly regex: RegExp; readonly operand: (ma
 /**
  * Name the exported operations one matched surface line declares, so the
  * cross-check can compare them with the operations the model declared. A line
- * whose shape no extractor recognizes falls back to the whole trimmed line.
+ * whose shape no extractor recognizes falls back to its `path:line` location,
+ * which a citation of that line covers — never the content, because a minified
+ * bundle line can run to tens of thousands of characters; a line without a
+ * location falls back to its trimmed text.
  * @param line - one `grep` match line, typically `path:line:content`.
  * @returns the operation names to check against the model's declarations.
  */
@@ -211,5 +214,6 @@ export function surfaceOperands(line: string): readonly string[] {
       if (named.length > 0) return named
     }
   }
-  return [line.trim()]
+  const location = /^(.+?:\d+):/u.exec(line)?.[1]
+  return [location ?? line.trim()]
 }

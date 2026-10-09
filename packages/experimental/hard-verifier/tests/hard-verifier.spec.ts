@@ -404,10 +404,12 @@ describe('hard verifier coverage cross-check', () => {
     expect(surfaceOperands('src/app.ts:12:app.get(\'/view/:id\', handler)')).toEqual(['/view/:id'])
     expect(surfaceOperands('src/api.ts:4:@Get(\'/account\')')).toEqual(['/account'])
     expect(surfaceOperands('src/api.ts:5:@Get')).toEqual(['Get'])
-    // A line no extractor recognizes falls back to the whole matched line.
-    expect(surfaceOperands('src/odd.js:1:some unmatched line')).toEqual(['src/odd.js:1:some unmatched line'])
-    // An extractor that names nothing falls through to the next one, then to the whole line.
-    expect(surfaceOperands('src/empty.js:1:module.exports = {}')).toEqual(['src/empty.js:1:module.exports = {}'])
+    // A line no extractor recognizes falls back to its location.
+    expect(surfaceOperands('src/odd.js:1:some unmatched line')).toEqual(['src/odd.js:1'])
+    // An extractor that names nothing falls through to the next one, then to the line's location.
+    expect(surfaceOperands('src/empty.js:1:module.exports = {}')).toEqual(['src/empty.js:1'])
+    expect(surfaceOperands(`wp-admin/js/iris.min.js:5:!function(a,b){${'x'.repeat(30000)}}`)).toEqual(['wp-admin/js/iris.min.js:5'])
+    expect(surfaceOperands('module.exports = {}')).toEqual(['module.exports = {}'])
     // WordPress: literal hooks, shortcodes, and routes name themselves; built or multi-line ones are named by location.
     expect(surfaceOperands("wp-admin/admin-ajax.php:171:add_action( 'wp_ajax_nopriv_heartbeat', 'wp_ajax_nopriv_heartbeat', 1 );")).toEqual(['wp_ajax_nopriv_heartbeat'])
     expect(surfaceOperands("wp-admin/admin-post.php:9:add_action( 'admin_post_export', 'export' );")).toEqual(['admin_post_export'])

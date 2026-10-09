@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for hard-harness.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/user/guide/hard-harness.md
+/run-a-hard-security-audit:
+  en: 2f8c0f17abbcdea6
+  zh: 473aabbc8b0e2e7a
+/run-a-hard-security-audit/summary:
+  en: 97560759a5208cf6
+  zh: a03468faa01a033c
+/run-a-hard-security-audit/table-of-contents:
+  en: 8fe9ec7fb6117cb1
+  zh: 66dbb227767a808f
+/run-a-hard-security-audit/before-you-start:
+  en: e87cee4ba72875eb
+  zh: 5c32e7d596fe1b6d
+/run-a-hard-security-audit/create-the-hard-web-profile:
+  en: a3953deaf8907142
+  zh: 8dfa6ffc2bfb47d3
+/run-a-hard-security-audit/start-an-audit:
+  en: 1d8046b4999189e5
+  zh: 4cfa20dc752cc9a0
+/run-a-hard-security-audit/follow-the-audit:
+  en: 097c0c85987e88e7
+  zh: c7aba021ee77b2d6
+/run-a-hard-security-audit/keep-the-audit-running:
+  en: 5088f87614511955
+  zh: 315f1d2466c8887c
+/run-a-hard-security-audit/add-blind-audits:
+  en: 9f84305bb21d7187
+  zh: 7239f68f0650dc42
+/run-a-hard-security-audit/troubleshooting:
+  en: 7ea718ec35c75655
+  zh: b627699471b1aae2
+/run-a-hard-security-audit/further-exploration:
+  en: a09f57bdd0a80f81
+  zh: 431248cc2bb43c96

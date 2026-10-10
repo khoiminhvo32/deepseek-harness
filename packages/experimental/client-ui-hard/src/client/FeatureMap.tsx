@@ -122,7 +122,8 @@ function flowNodes(nodes: readonly LayoutNode[], fresh: ReadonlySet<string>, sel
     id: node.id,
     position: { x: node.x, y: node.y },
     className: [css.node, css[`kind-${node.kind}`], node.role === undefined ? undefined : css[`role-${node.role}`],
-      fresh.has(node.id) ? css.fresh : undefined, node.id === selected ? css.selected : undefined].filter(Boolean).join(' '),
+      node.mapped === false ? css.entryUnmapped : undefined, fresh.has(node.id) ? css.fresh : undefined,
+      node.id === selected ? css.selected : undefined].filter(Boolean).join(' '),
     data: {
       label: (
         <div className={css.nodeBody} title={node.detail}>

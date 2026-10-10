@@ -1,7 +1,7 @@
 /**
- * Pure layouts of the feature map panel. Positions depend only on record
- * order, so a feature or entry point that appears later lands after the ones
- * already drawn and nothing already on screen moves.
+ * Pure layouts of the feature map panel. Entry points keep their index order
+ * and features their record order, so a feature that appears later lands
+ * after the ones already drawn and nothing already on screen moves.
  */
 import type { HardLedgerClientView } from '@deepseek-ai/dsh-experimental-hard-ledger/client'
 import type { HardEdgeSource, HardFeatureGraphNode, HardFeatureGraphView } from '@deepseek-ai/dsh-experimental-hard-featuremap/client'
@@ -21,6 +21,8 @@ export interface LayoutNode {
   readonly label: string
   readonly detail: string
   readonly role?: HardFeatureGraphNode['role']
+  /** For an overview entry point: whether a recorded feature covers it. */
+  readonly mapped?: boolean
   readonly x: number
   readonly y: number
 }
@@ -48,19 +50,30 @@ export function overviewId(kind: 'entry' | 'feature', key: string): string {
 }
 
 /**
- * Entry points with a feature in the first column, features in record order in the second.
+ * Every indexed entry point in one column per entry kind, in index order, with
+ * the features in record order in the column after the last kind.
  * @param map - the indexed feature map.
  * @returns the overview nodes and edges.
  */
 export function overviewLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
-  const entryOrder: string[] = []
-  for (const feature of map.features) {
-    for (const key of feature.entryPoints) if (!entryOrder.includes(key)) entryOrder.push(key)
-  }
-  const handler = new Map(map.entryPoints.map(entry => [entry.key, entry.handler]))
+  const kinds: string[] = []
+  const rows = new Map<string, number>()
+  const entries = map.entryPoints.map((entry) => {
+    const kind = entry.key.slice(0, Math.max(0, entry.key.indexOf(':')))
+    if (!kinds.includes(kind)) kinds.push(kind)
+    const row = rows.get(kind) ?? 0
+    rows.set(kind, row + 1)
+    return {
+      id: overviewId('entry', entry.key), kind: 'entry' as const, label: entry.key, detail: entry.handler ?? '', mapped: entry.mapped,
+      x: kinds.indexOf(kind) * COLUMN, y: row * ROW,
+    }
+  })
   const nodes: LayoutNode[] = [
-    ...entryOrder.map((key, row) => ({ id: overviewId('entry', key), kind: 'entry' as const, label: key, detail: handler.get(key) ?? '', x: 0, y: row * ROW })),
-    ...map.features.map((feature, row) => ({ id: overviewId('feature', feature.id), kind: 'feature' as const, label: `${feature.id} ${feature.name}`, detail: feature.summary, x: COLUMN, y: row * ROW })),
+    ...entries,
+    ...map.features.map((feature, row) => ({
+      id: overviewId('feature', feature.id), kind: 'feature' as const, label: `${feature.id} ${feature.name}`, detail: feature.summary,
+      x: (kinds.length + 0.5) * COLUMN, y: row * ROW,
+    })),
   ]
   const edges: LayoutEdge[] = [
     ...map.features.flatMap(feature => feature.entryPoints.map(key => ({

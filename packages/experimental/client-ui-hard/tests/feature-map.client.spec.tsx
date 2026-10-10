@@ -93,21 +93,25 @@ describe('feature map layouts', () => {
     const before = overviewLayout(MAP)
     const after = overviewLayout({
       ...MAP,
+      entryPoints: MAP.entryPoints.map(entry => ({ ...entry, mapped: true })),
       features: [FEATURE, { ...FEATURE, id: 'FE-2', name: 'Trash', entryPoints: ['script:x.php', 'ajax:save'] }],
       links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'n' }],
     })
-    expect(after.nodes.slice(0, 1)).toEqual(before.nodes.slice(0, 1))
-    expect(after.nodes.map(node => [node.id, node.x, node.y, node.detail])).toEqual([
-      ['entry:ajax:save', 0, 0, 'wp_ajax_save'], ['entry:script:x.php', 0, 64, ''],
-      ['feature:FE-1', 300, 0, 'An editor saves a post.'], ['feature:FE-2', 300, 64, 'An editor saves a post.'],
+    expect(after.nodes.slice(0, 3).map(node => [node.id, node.x, node.y])).toEqual(before.nodes.map(node => [node.id, node.x, node.y]))
+    // One column per entry kind in index order, unmapped entry points included; features after the last kind.
+    expect(before.nodes.map(node => [node.id, node.x, node.y, node.detail, node.mapped])).toEqual([
+      ['entry:ajax:save', 0, 0, 'wp_ajax_save', true], ['entry:script:x.php', 300, 0, '', false],
+      ['feature:FE-1', 750, 0, 'An editor saves a post.', undefined],
     ])
+    expect(after.nodes.at(-1)).toMatchObject({ id: 'feature:FE-2', x: 750, y: 64 })
     expect(after.edges.map(edge => [edge.from, edge.to, edge.kind, edge.label])).toEqual([
       ['entry:ajax:save', 'feature:FE-1', 'member', undefined],
       ['entry:script:x.php', 'feature:FE-2', 'member', undefined],
       ['entry:ajax:save', 'feature:FE-2', 'member', undefined],
       ['feature:FE-1', 'feature:FE-2', 'link', 'shares-state'],
     ])
-    expect(overviewLayout({ ...MAP, entryPoints: [] }).nodes[0]?.detail).toBe('')
+    const sameKind = overviewLayout({ ...MAP, entryPoints: [{ key: 'nokind', handler: null, mapped: false }, { key: 'other', handler: null, mapped: false }] })
+    expect(sameKind.nodes.slice(0, 2).map(node => [node.x, node.y])).toEqual([[0, 0], [0, 64]])
   })
 
   it('layer a feature graph by call distance and park excluded and unreached symbols last', () => {
@@ -132,6 +136,7 @@ describe('FeatureMap', () => {
     expect(screen.getByText('未映射的入口点（1）')).toBeTruthy()
     expect(container.querySelector('.react-flow__node[data-id="feature:FE-1"]')?.textContent).toContain('FE-1 Save a post')
     expect(container.querySelector('.react-flow__node[data-id="entry:ajax:save"]')).not.toBeNull()
+    expect(container.querySelector('.react-flow__node[data-id="entry:script:x.php"]')?.className).toContain('entryUnmapped')
   })
 
   it('opens a feature\'s symbol graph and a symbol\'s detail from the Host routes', async () => {

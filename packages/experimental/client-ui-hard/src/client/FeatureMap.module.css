@@ -99,6 +99,18 @@
 }
 
 .canvas {
+  --xy-background-pattern-color: var(--dsw-alias-border-l2);
+  --xy-controls-button-background-color: var(--dsw-alias-bg-layer-2);
+  --xy-controls-button-background-color-hover: var(--dsw-alias-bg-layer-2);
+  --xy-controls-button-color: var(--dsw-alias-label-primary);
+  --xy-controls-button-color-hover: var(--dsw-alias-label-primary);
+  --xy-controls-button-border-color: var(--dsw-alias-border-l2);
+  --xy-edge-label-background-color: var(--dsw-alias-bg-layer-2);
+  --xy-edge-label-color: var(--dsw-alias-label-secondary);
+  --xy-node-background-color: var(--dsw-alias-bg-layer-2);
+  --xy-node-color: var(--dsw-alias-label-primary);
+  --xy-node-border: 1px solid var(--dsw-alias-border-l2);
+
   flex: 1 0 320px;
   min-height: 320px;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -128,7 +140,8 @@
   border-color: var(--dsw-alias-state-warn-primary);
 }
 
-.role-excluded {
+.role-excluded,
+.entryUnmapped {
   opacity: 0.45;
 }
 

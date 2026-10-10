@@ -1,16 +1,24 @@
-/** With a real Joern installation (`JOERN_HOME`), the packaged query exports resolved calls and callback arrays
- * from a pinned PHP commit and leaves excluded paths out. Skips without `JOERN_HOME`. */
+/** With a real Joern installation (`JOERN_HOME`), the packaged query runs through dsh's real sandboxed Bash
+ * executor, exports resolved calls and callback arrays from a pinned PHP commit, and leaves excluded paths out.
+ * The session workspace and the snapshot store are separate directories under the home directory (the
+ * workspace-write profile grants the temp directories wholesale), so the build succeeds only through the
+ * per-call policy that confines writes to the snapshot store. Skips without `JOERN_HOME`. */
 
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { SandboxBashExecutor } from '@deepseek-ai/dsh-bash-sandbox'
+import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
+import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import type { ShellExecSpec, ShellRunResult } from '@deepseek-ai/dsh-shell'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { HardCpg, readHardCpgFacts } from '@deepseek-ai/dsh-experimental-hard-cpg'
 import type { HardCpgFact } from '@deepseek-ai/dsh-experimental-hard-cpg'
@@ -19,42 +27,21 @@ import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 const joernHome = process.env['JOERN_HOME'] ?? ''
 const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
 
-/** A shell on the `shell` key that runs each command with `/bin/sh` in its workdir. */
-class LocalShell extends Service {
-  constructor(ctx: Context) {
-    super(ctx, 'shell')
-  }
-
-  resolve(request: { command: string; workdir: string }) {
-    return request
-  }
-
-  execute(spec: { command: string; workdir: string }) {
-    let exitCode = 0
-    let stderr = ''
-    try {
-      execFileSync('/bin/sh', ['-c', spec.command], { cwd: spec.workdir, env: GIT_ENV, stdio: ['ignore', 'ignore', 'pipe'], maxBuffer: 64 * 1024 * 1024 })
-    } catch (error: unknown) {
-      const failure = error as { status?: number | null; stderr?: Buffer }
-      exitCode = failure.status ?? 1
-      stderr = failure.stderr?.toString() ?? ''
-    }
-    const result = { exitCode, timedOut: false, aborted: false, stdout: { text: '', truncated: false }, stderr: { text: stderr, truncated: false } }
-    return Promise.resolve({ result: () => Promise.resolve(result) })
-  }
-}
-
-describe.skipIf(joernHome === '')('hard-cpg with Joern', () => {
+describe.skipIf(joernHome === '')('hard-cpg with Joern through the sandboxed shell', () => {
   const roots: string[] = []
+  let ctx: Context | undefined
   afterAll(async () => {
+    await ctx?.fiber.dispose()
     await Promise.all(roots.map(root => rm(root, { recursive: true, force: true })))
   })
 
   it('exports resolved calls and callback arrays from the pinned commit', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'hard-cpg-e2e-'))
+    const root = await mkdtemp(join(homedir(), '.hard-cpg-e2e-'))
     roots.push(root)
     const repo = join(root, 'target')
+    const workspace = join(root, 'workspace')
     await mkdir(join(repo, 'poc'), { recursive: true })
+    await mkdir(workspace)
     await writeFile(join(repo, 'post.php'), [
       '<?php',
       'function can_edit($id) { return $id > 0; }',
@@ -72,14 +59,30 @@ describe.skipIf(joernHome === '')('hard-cpg with Joern', () => {
     const gitDir = join(root, 'snapshots', 'target.git')
     execFileSync('git', ['clone', '--quiet', '--bare', repo, gitDir], { env: GIT_ENV })
 
-    const ctx = new Context()
+    ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(LocalSandboxProvider, {})
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: workspace })
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(SandboxBashExecutor, { cwd: workspace, timeoutMs: 60_000 })
+    const shell = ctx.shell
+    const results: ShellRunResult[] = []
+    const execute = shell.execute.bind(shell)
+    shell.execute = async (spec: ShellExecSpec) => {
+      const execution = await execute(spec)
+      const result = execution.result.bind(execution)
+      execution.result = async () => {
+        const settled = await result()
+        results.push(settled)
+        return settled
+      }
+      return execution
+    }
     await ctx.plugin(HardLedger, {})
-    new LocalShell(ctx)
     await ctx.plugin(HardCpg, { enabled: true, joernHome, excludePaths: ['poc'], heapMb: 2048, buildOnArm: false })
-    const session = ctx.sessions.create(SessionId(`e2e-${Math.random()}`), { meta: { cwd: repo } })
+    const session = ctx.sessions.create(SessionId(`e2e-${Math.random()}`), { meta: { cwd: workspace } })
     const agent: Agent = {
       id: session.id, options: {}, session, inbox: createInboxStub(), status: 'running', ctx,
       send: () => {}, followup: () => {}, steer: () => ({ outcome: Promise.resolve({ status: 'rejected' as const }) }),
@@ -91,6 +94,12 @@ describe.skipIf(joernHome === '')('hard-cpg with Joern', () => {
     })
 
     const facts = await ctx.hardCpg.facts(agent)
+    expect(results.map(result => result.sandbox)).toEqual([
+      { mode: 'workspace-write', denied: false, enforcement: 'full' },
+      { mode: 'workspace-write', denied: false, enforcement: 'full' },
+      { mode: 'workspace-write', denied: false, enforcement: 'full' },
+    ])
+    expect(facts.path.startsWith(join(root, 'snapshots', 'cpg', commit))).toBe(true)
     const rows: HardCpgFact[] = []
     for await (const fact of readHardCpgFacts(facts.path)) rows.push(fact)
     expect(rows.filter(row => row.k === 'file').map(row => row.path)).toEqual(['post.php'])

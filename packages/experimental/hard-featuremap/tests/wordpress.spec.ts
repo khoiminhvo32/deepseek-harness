@@ -37,6 +37,8 @@ describe('resolveCallback', async () => {
     ['an array with a computed method', { arr: ['$this', '$method'] }, undefined],
     ['an array with a computed class', { arr: ['$class', '"handle"'] }, undefined],
     ['an array of the wrong length', { arr: ['"Controller"'] }, undefined],
+    ['a closure reference', { ref: 'save_widget' }, 'save_widget'],
+    ['a reference to an unknown method', { ref: 'gone' }, undefined],
     ['a closure or expression', { code: 'function () {}' }, undefined],
     ['a missing argument', undefined, undefined],
   ] satisfies [string, HardCpgArg | undefined, string | undefined][])('resolves %s', (_name, arg, expected) => {
@@ -79,8 +81,11 @@ describe('hooks', () => {
   })
 
   it('records the source text of an array callback', async () => {
-    const model = await modelOf([call('x', 'add_action', { args: [{ lit: '"init"' }, { arr: ['$this', '"boot"'] }] })])
-    expect(wordpressHooks(model)[0]?.callbackText).toBe('array($this, "boot")')
+    const model = await modelOf([
+      call('x', 'add_action', { args: [{ lit: '"init"' }, { arr: ['$this', '"boot"'] }] }),
+      call('x', 'add_action', { args: [{ lit: '"init"' }, { ref: 'x.<lambda>0' }] }),
+    ])
+    expect(wordpressHooks(model).map(hook => hook.callbackText)).toEqual(['array($this, "boot")', 'x.<lambda>0'])
   })
 })
 

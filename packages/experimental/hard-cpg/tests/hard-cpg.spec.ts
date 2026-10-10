@@ -45,9 +45,9 @@ const gitDir = join(suiteRoot, 'snapshots', 'target.git')
 execFileSync('git', ['clone', '--quiet', '--bare', targetRepo, gitDir], { env: GIT_ENV })
 
 const FACTS = [
-  { k: 'header', format: 2 },
+  { k: 'header', format: 3 },
   { k: 'file', path: 'index.php' },
-  { k: 'method', id: 'main', name: 'main', file: 'index.php', owner: null, line: 1, end: 1 },
+  { k: 'method', id: 'main', name: 'main', file: 'index.php', owner: null, fileLevel: false, annotations: [], line: 1, end: 1 },
   { k: 'call', caller: 'main', name: 'helper', target: 'helper', resolved: [], file: 'index.php', line: 1, dispatch: 'static', args: [] },
   { k: 'end' },
 ].map(row => JSON.stringify(row)).join('\n') + '\n'
@@ -58,6 +58,7 @@ const FACTS = [
  */
 const joernHome = join(suiteRoot, 'joern-cli')
 await mkdir(join(joernHome, 'frontends', 'php2cpg', 'bin'), { recursive: true })
+await mkdir(join(joernHome, 'frontends', 'pysrc2cpg', 'bin'), { recursive: true })
 await mkdir(join(joernHome, 'bin'), { recursive: true })
 await writeFile(join(joernHome, 'facts.jsonl'), FACTS)
 await writeFile(join(joernHome, 'mode'), 'ok')
@@ -83,6 +84,8 @@ await writeFile(join(joernHome, 'bin', 'repl-bridge'), [
   '',
 ].join('\n'))
 await chmod(join(joernHome, 'frontends', 'php2cpg', 'bin', 'php2cpg'), 0o755)
+await writeFile(join(joernHome, 'frontends', 'pysrc2cpg', 'bin', 'pysrc2cpg'), readFileSync(join(joernHome, 'frontends', 'php2cpg', 'bin', 'php2cpg'), 'utf8').replace('php2cpg %s', 'pysrc2cpg %s'))
+await chmod(join(joernHome, 'frontends', 'pysrc2cpg', 'bin', 'pysrc2cpg'), 0o755)
 await chmod(join(joernHome, 'bin', 'repl-bridge'), 0o755)
 
 async function setMode(mode: 'ok' | 'frontend-fail' | 'truncated'): Promise<void> {
@@ -267,6 +270,17 @@ describe('hardCpg.facts', () => {
     const [first, second] = await Promise.all([ctx.hardCpg.facts(root), ctx.hardCpg.facts(root)])
     expect(second).toEqual(first)
     expect(shell.specs).toHaveLength(3)
+  })
+
+  it('runs the frontend of the configured language and keys the cache by it', async () => {
+    await setMode('ok')
+    const php = await harness()
+    const python = await harness({ language: 'python' })
+    const a = await php.ctx.hardCpg.facts(php.root)
+    const b = await python.ctx.hardCpg.facts(python.root)
+    expect(python.shell.specs[1]?.command).toContain("/frontends/pysrc2cpg/bin/pysrc2cpg' -J-Xmx")
+    expect(calls().map(line => line.split(' ')[0])).toEqual(['php2cpg', 'query', 'pysrc2cpg', 'query'])
+    expect(a.path.split('/').at(-2)).not.toBe(b.path.split('/').at(-2))
   })
 
   it('keys the cache by the exclusions', async () => {

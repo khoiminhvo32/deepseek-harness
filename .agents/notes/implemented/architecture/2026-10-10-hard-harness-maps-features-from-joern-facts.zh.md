@@ -15,12 +15,13 @@ Joern 从源码构建代码属性图（语法树、控制流、调用图、数�
 Joern 提供事实；模型为功能命名并分组；harness 根据事实检查模型的功能主张。
 
 - **Joern 事实是证据，绝不是判决。** 每条调用边都带有来源（`joern`、harness 修复、`grep`，或 harness 在固定提交上解析过的模型引用）。缺少 Joern 边本身绝不拒绝模型主张；图之外的主张必须改为引用调用点。
-- **事实来自固定提交。** `hard-cpg` 用 `git archive` 导出固定快照，通过 shell seam 运行 PHP 前端与一个随包提供的查询脚本，并把 JSON Lines 输出按提交与查询摘要缓存在快照存储旁，因此事实与引用描述同一份内容。
+- **事实来自固定提交。** `hard-cpg` 用 `git archive` 导出固定快照，通过 shell seam 运行所配置语言的前端与一个随包提供的查询脚本，并把 JSON Lines 输出按提交与查询摘要缓存在快照存储旁，因此事实与引用描述同一份内容。
 - **只运行随包提供的查询。** Joern 的解释器执行任意 Scala，其服务器模式不是安全边界，因此模型和任何工具参数都不会到达 Joern；harness 用 harness 构造的参数运行随包脚本。
 - **导出与框架无关。** 脚本输出文件、内部方法与调用点，附带已解析目标与有界的参数摘要，包括被脱糖的数组字面量的值。WordPress hook、REST 路由与权限检查等框架知识属于之后基于这些事实的配置档，而不属于 Scala 查询。
 - **排除是显式的。** `excludePaths` 默认为空，与任务以整个提交为分母一致；快照中含有 PoC 桩的部署按路径排除它们。
 - **由部署方安装 Joern。** bundle 以关闭状态挂载 `hard-cpg`；启用时必须提供 `joernHome`，构建脚本不会下载 1.7 GB 的发行包。
-- **先做 PHP。** 首个导出面向 PHP 前端，因为测量的任务是 WordPress；其他前端在有各自测量后再加入。
+- **一个查询，服务所有前端。** Joern 的各前端产生同样的图，因此随包查询服务 `hard-cpg` 提供的每种语言（PHP、Python、Java、Kotlin、C#、JavaScript 与 TypeScript、Go、Ruby、C 与 C++）；`language` 选择前端。注解、特性与 Python 装饰器也是事实，因为 Spring、ASP.NET Core、Flask 与 FastAPI 用它们声明路由与守卫。
+- **框架知识放在配置档中。** 入口点与路由层守卫来自基于事实的各框架配置档（WordPress、Laravel、Spring、ASP.NET Core、Flask、FastAPI、Express）；没有配置档的目标仍然得到调用边，其入口点由模型带引用提供。
 - **修复是基于事实的规则，并且各自带标记。** `hard-featuremap` 只在事实恰好指明一个目标时，才为 Joern 未解析的调用加边，并标记为 `repair`（类型继承链、相对调用、issue 3050 的类限定自由函数）、`unique-name`（只有一个方法使用该方法名的动态调用）或 `hook`（字面 hook 触发到其注册的回调）。在 WordPress 7.1.3 上，这把 grep 找到的全部 24 个 `wp_insert_post` 调用点都链接上了。
 - **功能地图数据库是派生数据。** 一个 SQLite 文件保存所有项目与快照，按目标根目录、提交与派生摘要作为键；因为事实随时可以再次导入，带有其他 schema 版本标记的文件会被删除并重建，而不是迁移。
 

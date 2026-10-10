@@ -1,15 +1,21 @@
 /** Fact builders shared by the feature map specs. */
 
-import type { HardCpgArg, HardCpgFact } from '@deepseek-ai/dsh-experimental-hard-cpg'
+import type { HardCpgAnnotation, HardCpgArg, HardCpgFact } from '@deepseek-ai/dsh-experimental-hard-cpg'
 import { buildModel } from '@deepseek-ai/dsh-experimental-hard-featuremap'
 import type { FactModel } from '@deepseek-ai/dsh-experimental-hard-featuremap'
 
-export function type(id: string, inherits: string[] = [], file = 'types.php'): HardCpgFact {
-  return { k: 'type', id, name: id, file, line: 1, inherits }
+export function type(id: string, inherits: string[] = [], file = 'types.php', annotations: HardCpgAnnotation[] = []): HardCpgFact {
+  return { k: 'type', id, name: id.split('.').at(-1)!, file, line: 1, inherits, annotations }
 }
 
-export function method(id: string, owner: string | null = null, file = 'code.php'): HardCpgFact {
-  return { k: 'method', id, name: id.includes(':<global>') ? '<global>' : id.split('.').at(-1)!, file, owner, line: 1, end: 2 }
+/** A method fact; an id ending in `:<global>` is file-level code. */
+export function method(id: string, owner: string | null = null, file = 'code.php', annotations: HardCpgAnnotation[] = []): HardCpgFact {
+  const fileLevel = id.endsWith(':<global>')
+  return { k: 'method', id, name: fileLevel ? '<global>' : id.split(/[.:]/).at(-1)!, file, owner, fileLevel, annotations, line: 1, end: 2 }
+}
+
+export function annotation(name: string, args: string[] = [], code = `@${name}`): HardCpgAnnotation {
+  return { name, args, code }
 }
 
 interface CallOptions {

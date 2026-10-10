@@ -3,7 +3,8 @@
  * that validates it. A fact file is one `header` row, then `file`, `method`,
  * and `call` rows in any order, then one `end` row; a file without the end row
  * is a truncated export and fails to read. Format 2 added `type` rows and the
- * method `owner`.
+ * method `owner`; format 3 added annotations on types and methods, the method
+ * `fileLevel` flag, and `ref` arguments.
  * @module @deepseek-ai/dsh-experimental-hard-cpg/facts
  */
 
@@ -13,27 +14,49 @@ import { z } from 'zod'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 /** The fact format version the packaged query writes and the reader accepts. */
-export const HARD_CPG_FACTS_FORMAT = 2
+export const HARD_CPG_FACTS_FORMAT = 3
 
 const lineNumber = z.number().int().nonnegative().nullable()
 
-/** One argument summary: a literal's source text, a desugared array literal's element texts, or other source text. */
+/**
+ * One argument summary: a literal's source text, a desugared array literal's
+ * element texts, the full name of a referenced method (a closure or function
+ * reference), or other source text.
+ */
 const argSchema = z.union([
   z.strictObject({ lit: z.string() }),
   z.strictObject({ arr: z.array(z.string()) }),
+  z.strictObject({ ref: z.string() }),
   z.strictObject({ code: z.string() }),
 ])
+
+/**
+ * One annotation, attribute, or decorator: its name, the source texts of its
+ * literal or named arguments where the frontend separates them, and its whole
+ * source text (bounded).
+ */
+const annotationSchema = z.strictObject({ name: z.string(), args: z.array(z.string()), code: z.string() })
 
 const rowSchema = z.discriminatedUnion('k', [
   z.strictObject({ k: z.literal('header'), format: z.literal(HARD_CPG_FACTS_FORMAT) }),
   z.strictObject({ k: z.literal('file'), path: z.string() }),
-  z.strictObject({ k: z.literal('type'), id: z.string(), name: z.string(), file: z.string(), line: lineNumber, inherits: z.array(z.string()) }),
+  z.strictObject({
+    k: z.literal('type'),
+    id: z.string(),
+    name: z.string(),
+    file: z.string(),
+    line: lineNumber,
+    inherits: z.array(z.string()),
+    annotations: z.array(annotationSchema),
+  }),
   z.strictObject({
     k: z.literal('method'),
     id: z.string(),
     name: z.string(),
     file: z.string(),
     owner: z.string().nullable(),
+    fileLevel: z.boolean(),
+    annotations: z.array(annotationSchema),
     line: lineNumber,
     end: lineNumber,
   }),
@@ -56,11 +79,14 @@ type Row = z.infer<typeof rowSchema>
 /** One argument summary of a call site. */
 export type HardCpgArg = z.infer<typeof argSchema>
 
+/** One annotation, attribute, or decorator of a type or method. */
+export type HardCpgAnnotation = z.infer<typeof annotationSchema>
+
 /**
  * One fact: a target file (repository-relative path), a declared type with
  * the full names it inherits from, an internal method (`id` is Joern's full
  * name; `owner` is its declared type, null for free functions and file-level
- * code), or a call site whose `resolved` lists the internal methods the graph
+ * code; `fileLevel` marks a file's top-level code), or a call site whose `resolved` lists the internal methods the graph
  * links it to (empty when unresolved).
  */
 export type HardCpgFact = Exclude<Row, { k: 'header' } | { k: 'end' }>

@@ -32,11 +32,11 @@ const factsDir = join(root, 'cpg', COMMIT, '0123456789abcdef')
 const factsPath = join(factsDir, 'facts.jsonl')
 await (await import('node:fs/promises')).mkdir(factsDir, { recursive: true })
 await writeFile(factsPath, [
-  { k: 'header', format: 2 },
+  { k: 'header', format: 3 },
   { k: 'file', path: 'wp-admin/admin-ajax.php' },
-  { k: 'method', id: 'wp-admin/admin-ajax.php:<global>', name: '<global>', file: 'wp-admin/admin-ajax.php', owner: null, line: 1, end: 9 },
-  { k: 'method', id: 'wp_ajax_save', name: 'wp_ajax_save', file: 'ajax.php', owner: null, line: 3, end: 8 },
-  { k: 'method', id: 'save_post', name: 'save_post', file: 'post.php', owner: null, line: 1, end: 2 },
+  { k: 'method', id: 'wp-admin/admin-ajax.php:<global>', name: '<global>', file: 'wp-admin/admin-ajax.php', owner: null, fileLevel: true, annotations: [], line: 1, end: 9 },
+  { k: 'method', id: 'wp_ajax_save', name: 'wp_ajax_save', file: 'ajax.php', owner: null, fileLevel: false, annotations: [], line: 3, end: 8 },
+  { k: 'method', id: 'save_post', name: 'save_post', file: 'post.php', owner: null, fileLevel: false, annotations: [], line: 1, end: 2 },
   { k: 'call', caller: 'wp_ajax_save', name: 'save_post', target: 'save_post', resolved: ['save_post'], file: 'ajax.php', line: 5, dispatch: 'static', args: [] },
   { k: 'call', caller: 'wp-admin/admin-ajax.php:<global>', name: 'add_action', target: 'add_action', resolved: [], file: 'wp-admin/admin-ajax.php', line: 4, dispatch: 'static', args: [{ lit: '"wp_ajax_save"' }, { lit: '"wp_ajax_save"' }] },
   { k: 'end' },
@@ -78,7 +78,7 @@ async function harness(config: hardFeatureMap.Config = {}, arm = true) {
   await ctx.plugin(HardLedger, {})
   const cpg = new FakeCpg(ctx)
   dbSeq += 1
-  const fiber = await ctx.plugin(HardFeatureMap, Object.assign({ enabled: true, dbPath: join(root, `map-${dbSeq}.db`), framework: 'wordpress', indexOnArm: false }, config))
+  const fiber = await ctx.plugin(HardFeatureMap, Object.assign({ enabled: true, dbPath: join(root, `map-${dbSeq}.db`), frameworks: ['wordpress'], indexOnArm: false }, config))
   const agent = stubAgent(ctx, `mission-${Math.random()}`)
   await ctx.agents.register(agent)
   if (arm) ctx.hardLedger.recordMissionArmed(agent, ARMED)
@@ -111,6 +111,12 @@ describe('hard-featuremap config', () => {
     expect((await ctx.hardFeatureMap.entryPoints(snapshot.id)).map(entry => entry.kind)).toEqual(['ajax'])
   })
 
+  it('reads the configured frameworks in profile order, once each', async () => {
+    const { ctx, agent } = await harness({ frameworks: ['express', 'wordpress', 'express'] })
+    const snapshot = await ctx.hardFeatureMap.index(agent)
+    expect(snapshot.stats.entryPoints).toBe(2)
+  })
+
   it('declares its service dependencies and the WordPress script directories', () => {
     expect(HardFeatureMap.inject).toEqual(['agents', 'hardLedger', 'hardCpg'])
     expect(WORDPRESS_SCRIPT_DIRS).toEqual(['.', 'wp-admin', 'wp-admin/network', 'wp-admin/user'])
@@ -141,7 +147,7 @@ describe('hardFeatureMap.index', () => {
   })
 
   it('imports call edges only without a framework profile, as a separate derivation', async () => {
-    const { ctx, agent } = await harness({ framework: 'none', dbPath: join(root, 'shared.db') })
+    const { ctx, agent } = await harness({ frameworks: [], dbPath: join(root, 'shared.db') })
     const plain = await ctx.hardFeatureMap.index(agent)
     expect(plain.stats).toMatchObject({ hooks: 0, entryPoints: 0, callSites: 2 })
     const wordpress = await harness({ dbPath: join(root, 'shared.db') })

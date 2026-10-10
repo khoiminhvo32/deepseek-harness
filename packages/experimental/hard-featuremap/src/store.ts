@@ -14,7 +14,7 @@ import type { FactModel } from './model.ts'
 import type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
 
 /** The physical layout version, stored in `PRAGMA user_version`. */
-export const HARD_FEATUREMAP_SCHEMA_VERSION = 1
+export const HARD_FEATUREMAP_SCHEMA_VERSION = 2
 
 const SCHEMA = `
 CREATE TABLE project (
@@ -27,7 +27,7 @@ CREATE TABLE snapshot (
   project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
   commit_sha TEXT NOT NULL,
   derivation TEXT NOT NULL,
-  framework TEXT NOT NULL,
+  frameworks TEXT NOT NULL,
   facts_path TEXT NOT NULL,
   imported_at TEXT NOT NULL,
   UNIQUE (project_id, commit_sha, derivation)
@@ -99,7 +99,8 @@ CREATE TABLE entry_point (
   handler TEXT,
   file TEXT NOT NULL,
   line INTEGER,
-  auth TEXT NOT NULL
+  auth TEXT NOT NULL,
+  guards TEXT NOT NULL
 );
 CREATE INDEX entry_point_snapshot ON entry_point (snapshot_id, kind);
 `
@@ -111,7 +112,8 @@ export interface HardSnapshotImport {
   readonly commit: string
   /** Digest of everything the rows derive from besides the commit. */
   readonly derivation: string
-  readonly framework: string
+  /** The framework profiles the rows were read with. */
+  readonly frameworks: readonly string[]
   readonly factsPath: string
   readonly model: FactModel
   readonly edges: readonly HardCallEdge[]
@@ -202,9 +204,11 @@ export class HardFeatureMapStore {
     try {
       db.prepare('INSERT INTO project (root, name) VALUES (?, ?) ON CONFLICT (root) DO NOTHING').run(input.projectRoot, basename(input.projectRoot))
       const { id: projectId } = db.prepare('SELECT id FROM project WHERE root = ?').get(input.projectRoot) as { id: number }
+      const frameworks = JSON.stringify(input.frameworks)
+      const importedAt = new Date().toISOString()
       const snapshot = Number(db.prepare(`
-        INSERT INTO snapshot (project_id, commit_sha, derivation, framework, facts_path, imported_at) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(projectId, input.commit, input.derivation, input.framework, input.factsPath, new Date().toISOString()).lastInsertRowid)
+        INSERT INTO snapshot (project_id, commit_sha, derivation, frameworks, facts_path, imported_at) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(projectId, input.commit, input.derivation, frameworks, input.factsPath, importedAt).lastInsertRowid)
       const model = input.model
       const file = db.prepare('INSERT INTO file (snapshot_id, path) VALUES (?, ?)')
       for (const path of new Set(model.files)) file.run(snapshot, path)
@@ -223,8 +227,9 @@ export class HardFeatureMapStore {
       for (const e of input.edges) edge.run(snapshot, e.site, e.caller, e.callee, e.file, e.line, e.source)
       const hook = db.prepare('INSERT INTO hook (snapshot_id, site, op, name, callback, callback_text, caller, file, line) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       for (const h of input.hooks) hook.run(snapshot, h.site, h.op, h.name, h.callback, h.callbackText, h.caller, h.file, h.line)
-      const entry = db.prepare('INSERT INTO entry_point (snapshot_id, kind, key, handler, file, line, auth) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      for (const p of input.entryPoints) entry.run(snapshot, p.kind, p.key, p.handler, p.file, p.line, p.auth)
+      const entry = db.prepare(
+        'INSERT INTO entry_point (snapshot_id, kind, key, handler, file, line, auth, guards) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      for (const p of input.entryPoints) entry.run(snapshot, p.kind, p.key, p.handler, p.file, p.line, p.auth, JSON.stringify(p.guards))
       db.exec('COMMIT')
       return snapshot
     } catch (error: unknown) {
@@ -287,14 +292,16 @@ export class HardFeatureMapStore {
    * @returns entry points ordered by kind and key.
    */
   entryPoints(snapshot: number): HardEntryPoint[] {
-    const rows = this.db.prepare('SELECT kind, key, handler, file, line, auth FROM entry_point WHERE snapshot_id = ? ORDER BY kind, key').all(snapshot) as {
+    const sql = 'SELECT kind, key, handler, file, line, auth, guards FROM entry_point WHERE snapshot_id = ? ORDER BY kind, key'
+    const rows = this.db.prepare(sql).all(snapshot) as {
       kind: HardEntryKind
       key: string
       handler: string | null
       file: string
       line: number | null
       auth: HardEntryAuth
+      guards: string
     }[]
-    return rows.map(row => ({ ...row }))
+    return rows.map(row => ({ ...row, guards: JSON.parse(row.guards) as string[] }))
   }
 }

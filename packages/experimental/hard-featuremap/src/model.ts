@@ -24,11 +24,10 @@ export interface FactModel {
   readonly methodsByName: ReadonlyMap<string, readonly string[]>
   /** Ids of free functions (no owning type, not file-level code). */
   readonly functions: ReadonlySet<string>
+  /** The file-level code of each file, by repository-relative path. */
+  readonly fileLevel: ReadonlyMap<string, string>
   readonly calls: readonly CallFact[]
 }
-
-/** The suffix Joern gives a file's top-level code. */
-export const FILE_LEVEL_SUFFIX = ':<global>'
 
 /**
  * Index facts read from one file.
@@ -41,6 +40,7 @@ export async function buildModel(facts: AsyncIterable<HardCpgFact>): Promise<Fac
   const methods = new Map<string, MethodFact>()
   const methodsByName = new Map<string, string[]>()
   const functions = new Set<string>()
+  const fileLevel = new Map<string, string>()
   const calls: CallFact[] = []
   for await (const fact of facts) {
     switch (fact.k) {
@@ -55,7 +55,8 @@ export async function buildModel(facts: AsyncIterable<HardCpgFact>): Promise<Fac
         const named = methodsByName.get(fact.name)
         if (named === undefined) methodsByName.set(fact.name, [fact.id])
         else named.push(fact.id)
-        if (fact.owner === null && !fact.id.endsWith(FILE_LEVEL_SUFFIX)) functions.add(fact.id)
+        if (fact.fileLevel) fileLevel.set(fact.file, fact.id)
+        else if (fact.owner === null) functions.add(fact.id)
         break
       }
       case 'call':
@@ -63,7 +64,7 @@ export async function buildModel(facts: AsyncIterable<HardCpgFact>): Promise<Fac
         break
     }
   }
-  return { files, types, methods, methodsByName, functions, calls }
+  return { files, types, methods, methodsByName, functions, fileLevel, calls }
 }
 
 /**

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-featuremap` provides the `hardFeatureMap` service, which imports the Joern facts `hard-cpg` builds for a mission's pinned commit into one SQLite database shared by every project and session. It stores symbols, call sites, and call edges tagged with the rule that made each edge, and, under the WordPress profile, hook registrations, firings, and entry points. Repairs fill the call edges Joern's PHP frontend leaves unresolved. The database holds only derived data, so it is rebuilt rather than migrated. The plugin ships switched off.
+`dsh-experimental-hard-featuremap` provides the `hardFeatureMap` service, which imports the Joern facts `hard-cpg` builds for a mission's pinned commit into one SQLite database shared by every project and session. It stores symbols, call sites, call edges tagged with the rule that made each edge, and the entry points and routing guards the configured framework profiles read: WordPress, Laravel, Spring, ASP.NET Core, Flask, FastAPI, and Express. Repairs fill call edges Joern leaves unresolved. The database holds only derived data, so it is rebuilt rather than migrated. The plugin ships switched off.
 
 ## Table of Contents
 
@@ -30,10 +30,10 @@ Enable the row the hard bundle already mounts, together with `hard-cpg`:
 - id: hard-featuremap
   config:
     enabled: true
-    framework: wordpress
+    frameworks: [wordpress]
 ```
 
-The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` directory. `framework: wordpress` adds hooks and entry points; `none` keeps call edges only. `scriptDirs` lists the directories whose top-level PHP files are requested directly; empty selects the WordPress install's root, `wp-admin`, `wp-admin/network`, and `wp-admin/user`. With `indexOnArm` (default on), arming a mission imports in the background and logs the edge counts. Consumers call `ctx.hardFeatureMap.index(agent)` for a snapshot id, then `callers`, `callees`, and `entryPoints`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-featuremap) lists every field.
+The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` directory. `frameworks` lists the profiles to read, any of `wordpress`, `laravel`, `spring`, `aspnet`, `flask`, `fastapi`, and `express`; empty keeps call edges only. Set `hard-cpg`'s `language` to match. `scriptDirs` lists the directories whose top-level PHP files are requested directly; empty selects the WordPress install's root, `wp-admin`, `wp-admin/network`, and `wp-admin/user` when the WordPress profile is on. With `indexOnArm` (default on), arming a mission imports in the background and logs the edge counts. Consumers call `ctx.hardFeatureMap.index(agent)` for a snapshot id, then `callers`, `callees`, and `entryPoints`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-featuremap) lists every field.
 
 -----
 
@@ -45,10 +45,11 @@ The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` dire
 
 ### Design
 
-- **Every edge names its source.** `joern` is the graph's own resolution. `repair` covers a type-qualified or `parent`/`self`/`static` call resolved through the type lineage, and a class-qualified call PHP routes to the global function (Joern issue 3050). `unique-name` links a dynamic call on an unknown receiver only when one method carries the name. `hook` links a firing with a literal name to each callback registered under it. A consumer weighs a `unique-name` edge below the others.
+- **Every edge names its source.** `joern` is the graph's own resolution. `repair` covers a type-qualified, `parent`/`self`/`static`, or receiverless call (Ruby) resolved through the type lineage, and a class-qualified call PHP routes to the global function (Joern issue 3050). `unique-name` links a dynamic call on an unknown receiver only when one method carries the name. `hook` links a firing with a literal name to each callback registered under it. A consumer weighs a `unique-name` edge below the others.
 - **Facts name the target or nothing is linked.** A repair adds an edge only when the facts name exactly one target; a computed hook name, a closure callback, or a variable call stays unlinked.
 - **WordPress entry points.** Admin-ajax and admin-post actions come from hook registrations, with `nopriv` actions public; admin-ajax handlers also come from the core naming convention `wp_ajax_<action>`, because core registers most actions in a loop with computed names. REST handlers are the `get_items`, `get_item`, `create_item`, `update_item`, and `delete_item` methods of `WP_REST_Controller` descendants. Shortcodes and directly requested scripts complete the list.
-- **One snapshot per derivation.** A snapshot is keyed by target root, commit, and a digest of the facts cache key, the framework, the script directories, and the import version. A different derivation imports beside the old one; the same one is reused, and concurrent requests share one import.
+- **HTTP route profiles.** Each route is an entry point of kind `http` keyed `VERB path` with its routing guards. Spring joins the class `@RequestMapping` prefix and reads `@PreAuthorize`, `@Secured`, and `@RolesAllowed`; ASP.NET Core expands `[controller]` and `[action]` in `[Route]` and reads `[Authorize]`, with `[AllowAnonymous]` making a route public; Flask and FastAPI read route decorators with a path and treat access-named decorators such as `login_required` as guards; Express reads `get`, `post`, and similar routing calls, takes the last argument as the handler (a referenced closure or a same-file function) and the others as middleware; Laravel reads `Route::` calls with controller arrays, `Controller@method` strings, or closures, and chained `middleware`. A route with guards is `authenticated`, an explicitly open one `public`, and the rest `unknown`, because global middleware is not read.
+- **One snapshot per derivation.** A snapshot is keyed by target root, commit, and a digest of the facts cache key, the frameworks, the script directories, and the import version. A different derivation imports beside the old one; the same one is reused, and concurrent requests share one import.
 - **Derived, so rebuilt.** A database stamped with another schema version is dropped and recreated, because the facts can always be imported again.
 
 ### Source map
@@ -58,7 +59,8 @@ The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` dire
 | [`src/index.ts`](src/index.ts) | Config, the `hardFeatureMap` service, and the arming trigger |
 | [`src/model.ts`](src/model.ts) | In-memory fact index and type lineage |
 | [`src/repair.ts`](src/repair.ts) | Call edges and repairs |
-| [`src/wordpress.ts`](src/wordpress.ts) | Hooks, hook edges, and entry points |
+| [`src/wordpress.ts`](src/wordpress.ts) | WordPress hooks, hook edges, and entry points |
+| [`src/http.ts`](src/http.ts) | HTTP route profiles |
 | [`src/store.ts`](src/store.ts) | SQLite schema, import, and queries |
 
 </details>
@@ -80,7 +82,8 @@ None; the plugin adds no request content of its own.
 
 - **REST routes registered outside controllers** — `register_rest_route` callbacks in nested arrays are not read; plugin routes outside `WP_REST_Controller` descendants are missing.
 - **Cron and XML-RPC entry points** — scheduled hooks and the XML-RPC method table are not entry points yet; `xmlrpc.php` appears as a script.
-- **WordPress only** — other frameworks need their own profile; `none` keeps call edges for any language Joern exports.
+- **Route prefixes outside the declaration** — Express routers mounted with `app.use('/prefix', router)`, Laravel route groups and `Route::resource`, and ASP.NET conventional routes are not read; Django has no profile.
+- **Global middleware** — app-wide authentication is invisible to the profiles, so a route without its own guard is `unknown`, not `public`.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -88,6 +91,6 @@ None; the plugin adds no request content of its own.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-Measured on WordPress 7.1.3 facts with PoC stubs excluded: 183,100 call sites gave 53,338 `joern`, 20,780 `repair`, 3,927 `unique-name`, and 1,692 `hook` edges; every call site of `wp_insert_post` (24, matching grep), `wp_delete_post`, `update_user_meta`, `wp_set_current_user`, and `check_ajax_referer` is linked; 1,336 of 1,435 hook registrations resolve their callback; 370 entry points (114 admin-ajax actions, 99 REST handlers, 8 shortcodes, 149 scripts). Deriving took about 0.6 seconds and the import about 1 second, for a 52 MB snapshot.
+Measured on WordPress 7.1.3 facts with PoC stubs excluded: 183,100 call sites gave 53,338 `joern`, 20,780 `repair`, 3,927 `unique-name`, and 1,692 `hook` edges; every call site of `wp_insert_post` (24, matching grep), `wp_delete_post`, `update_user_meta`, `wp_set_current_user`, and `check_ajax_referer` is linked; 1,348 of 1,435 hook registrations resolve their callback; 370 entry points (114 admin-ajax actions, 99 REST handlers, 8 shortcodes, 149 scripts). Deriving took about 0.6 seconds and the import about 1 second, for a 52 MB snapshot.
 
 </details>

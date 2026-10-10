@@ -3,8 +3,10 @@
  * facts `hardCpg` builds for a mission's pinned commit into one SQLite
  * database shared across projects and sessions: symbols, call sites, call
  * edges tagged with the rule that made them (Joern, a repair, a unique name,
- * or a hook), and, under the WordPress profile, hook registrations and entry
- * points. The database is derived data and can always be rebuilt.
+ * or a hook), and the entry points the configured framework profiles read:
+ * WordPress hooks and routes, and the HTTP routes of Laravel, Spring, ASP.NET
+ * Core, Flask, FastAPI, and Express. The database is derived data and can
+ * always be rebuilt.
  * @module @deepseek-ai/dsh-experimental-hard-featuremap
  */
 
@@ -23,6 +25,8 @@ import { buildModel } from './model.ts'
 import { callEdges } from './repair.ts'
 import { HardFeatureMapStore } from './store.ts'
 import type { HardEdgeRow, HardSnapshotStats } from './store.ts'
+import { httpEntryPoints } from './http.ts'
+import type { HardHttpFramework } from './http.ts'
 import { hookEdges, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
 import type { HardEntryPoint } from './wordpress.ts'
 
@@ -34,18 +38,20 @@ export { HARD_FEATUREMAP_SCHEMA_VERSION, HardFeatureMapStore } from './store.ts'
 export type { HardEdgeRow, HardSnapshotImport, HardSnapshotStats } from './store.ts'
 export { hookEdges, phpString, resolveCallback, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
 export type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
+export { httpEntryPoints } from './http.ts'
+export type { HardHttpFramework } from './http.ts'
 
-/**
- * The framework profile that reads hooks and entry points: `wordpress`, or
- * `none` for call edges only.
- */
-export type HardFramework = 'none' | 'wordpress'
+/** A framework profile that reads entry points: WordPress, or one of the HTTP route profiles. */
+export type HardFramework = 'wordpress' | HardHttpFramework
+
+/** Every framework profile, in the order an import reads them. */
+export const HARD_FRAMEWORKS: readonly HardFramework[] = ['wordpress', 'laravel', 'spring', 'aspnet', 'flask', 'fastapi', 'express']
 
 /** The directories whose top-level PHP files a WordPress install serves directly. */
 export const WORDPRESS_SCRIPT_DIRS: readonly string[] = ['.', 'wp-admin', 'wp-admin/network', 'wp-admin/user']
 
 /** Bumped when the rows an import derives from the same facts change. */
-const IMPORT_VERSION = 1
+const IMPORT_VERSION = 2
 
 /** Feature map plugin config. */
 export interface Config {
@@ -53,12 +59,12 @@ export interface Config {
   enabled?: boolean
   /** Absolute path of the shared database file. Required when enabled. */
   dbPath?: string
-  /** The framework profile. */
-  framework?: HardFramework
+  /** The framework profiles to read; empty keeps call edges only. */
+  frameworks?: HardFramework[]
   /**
    * Repository-relative directories (`.` for the root) whose top-level PHP
-   * files are requested directly. Empty selects the profile's directories:
-   * {@link WORDPRESS_SCRIPT_DIRS} under the WordPress profile, none otherwise.
+   * files are requested directly. Empty selects {@link WORDPRESS_SCRIPT_DIRS}
+   * when the WordPress profile is on, none otherwise.
    */
   scriptDirs?: string[]
   /** Import in the background when a mission arms. */
@@ -69,7 +75,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(false),
   dbPath: z.string(),
-  framework: z.union(['none', 'wordpress']).default('none'),
+  frameworks: z.array(z.union([...HARD_FRAMEWORKS])).default([]),
   scriptDirs: z.array(z.string()).default([]),
   indexOnArm: z.boolean().default(true),
 })
@@ -78,7 +84,7 @@ export const Config: z<Config> = z.object({
 interface ResolvedConfig {
   readonly enabled: boolean
   readonly dbPath: string
-  readonly framework: HardFramework
+  readonly frameworks: readonly HardFramework[]
   readonly scriptDirs: readonly string[]
   readonly indexOnArm: boolean
 }
@@ -88,16 +94,16 @@ function resolveConfig(config: Config): ResolvedConfig {
   const enabled = config.enabled ?? false
   const dbPath = config.dbPath ?? ''
   if (enabled && !isAbsolute(dbPath)) throw new TypeError('dbPath must be an absolute path when hard-featuremap is enabled')
-  const framework = config.framework ?? 'none'
+  const frameworks = HARD_FRAMEWORKS.filter(framework => (config.frameworks ?? []).includes(framework))
   const configured = config.scriptDirs ?? []
-  const scriptDirs = configured.length > 0 ? configured : framework === 'wordpress' ? [...WORDPRESS_SCRIPT_DIRS] : []
+  const scriptDirs = configured.length > 0 ? configured : frameworks.includes('wordpress') ? [...WORDPRESS_SCRIPT_DIRS] : []
   for (const dir of scriptDirs) {
     const clean = normalize(dir)
     if (dir.length === 0 || isAbsolute(dir) || clean === '..' || clean.startsWith('../')) {
       throw new TypeError(`scriptDirs entries must be repository-relative directories inside the target: ${JSON.stringify(dir)}`)
     }
   }
-  return { enabled, dbPath, framework, scriptDirs: scriptDirs.map(dir => normalize(dir)), indexOnArm: config.indexOnArm ?? true }
+  return { enabled, dbPath, frameworks, scriptDirs: scriptDirs.map(dir => normalize(dir)), indexOnArm: config.indexOnArm ?? true }
 }
 
 /** One imported snapshot. */
@@ -173,9 +179,9 @@ export class HardFeatureMap extends Service {
     const matrix = this.ctx.hardLedger.coverageMatrix(agent)
     if (matrix === undefined) throw new HarnessError('hard-featuremap needs an armed mission to know the target', 'HARD_FEATUREMAP_NOT_ARMED')
     const facts = await this.ctx.hardCpg.facts(agent)
-    const { framework, scriptDirs } = this.resolved
+    const { frameworks, scriptDirs } = this.resolved
     const derivation = createHash('sha256')
-      .update([String(IMPORT_VERSION), basename(dirname(facts.path)), framework, ...scriptDirs].join('\0'))
+      .update([String(IMPORT_VERSION), basename(dirname(facts.path)), frameworks.join(','), ...scriptDirs].join('\0'))
       .digest('hex').slice(0, 16)
     const key = [matrix.targetRepo, facts.commit, derivation].join('\0')
     const pending = this.importing.get(key)
@@ -185,13 +191,15 @@ export class HardFeatureMap extends Service {
       const existing = store.findSnapshot(matrix.targetRepo, facts.commit, derivation)
       if (existing !== undefined) return { id: existing, commit: facts.commit, stats: store.stats(existing), reused: true }
       const model = await buildModel(readHardCpgFacts(facts.path))
-      const hooks = framework === 'wordpress' ? wordpressHooks(model) : []
-      const entryPoints = framework === 'wordpress' ? wordpressEntryPoints(model, hooks, scriptDirs) : []
+      const wordpress = frameworks.includes('wordpress')
+      const hooks = wordpress ? wordpressHooks(model) : []
+      const http = frameworks.filter((framework): framework is HardHttpFramework => framework !== 'wordpress')
+      const entryPoints = [...wordpress ? wordpressEntryPoints(model, hooks, scriptDirs) : [], ...httpEntryPoints(model, http)]
       const id = store.importSnapshot({
         projectRoot: matrix.targetRepo,
         commit: facts.commit,
         derivation,
-        framework,
+        frameworks,
         factsPath: facts.path,
         model,
         edges: [...callEdges(model), ...hookEdges(hooks)],

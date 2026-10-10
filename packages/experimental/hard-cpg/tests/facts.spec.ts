@@ -13,10 +13,10 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const HEADER = { k: 'header', format: 2 }
-const TYPE = { k: 'type', id: 'WP_REST_Posts_Controller', name: 'WP_REST_Posts_Controller', file: 'wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php', line: 17, inherits: ['WP_REST_Controller'] }
+const HEADER = { k: 'header', format: 3 }
+const TYPE = { k: 'type', id: 'WP_REST_Posts_Controller', name: 'WP_REST_Posts_Controller', file: 'wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php', line: 17, inherits: ['WP_REST_Controller'], annotations: [] }
 const FILE = { k: 'file', path: 'wp-admin/admin-ajax.php' }
-const METHOD = { k: 'method', id: 'wp_ajax_inline_save', name: 'wp_ajax_inline_save', file: 'wp-admin/includes/ajax-actions.php', owner: null, line: 2001, end: 2120 }
+const METHOD = { k: 'method', id: 'wp_ajax_inline_save', name: 'wp_ajax_inline_save', file: 'wp-admin/includes/ajax-actions.php', owner: null, fileLevel: false, annotations: [], line: 2001, end: 2120 }
 const CALL = {
   k: 'call',
   caller: 'wp-admin/admin-ajax.php:<global>',
@@ -26,7 +26,7 @@ const CALL = {
   file: 'wp-admin/admin-ajax.php',
   line: 174,
   dispatch: 'static',
-  args: [{ lit: '"wp_ajax_check_plugin_dependencies"' }, { arr: ['"WP_Plugin_Dependencies"', '"check_plugin_dependencies_during_ajax"'] }, { code: '$priority' }],
+  args: [{ lit: '"wp_ajax_check_plugin_dependencies"' }, { arr: ['"WP_Plugin_Dependencies"', '"check_plugin_dependencies_during_ajax"'] }, { code: '$priority' }, { ref: 'main.<lambda>0' }],
 }
 const END = { k: 'end' }
 
@@ -46,7 +46,14 @@ async function readAll(path: string): Promise<HardCpgFact[]> {
 
 describe('readHardCpgFacts', () => {
   it('yields every fact between the header and the end row', async () => {
-    const owned = { ...METHOD, id: 'WP_REST_Posts_Controller.update_item', owner: 'WP_REST_Posts_Controller', line: null, end: null }
+    const owned = {
+      ...METHOD,
+      id: 'WP_REST_Posts_Controller.update_item',
+      owner: 'WP_REST_Posts_Controller',
+      annotations: [{ name: 'GetMapping', args: ['/{id}'], code: '@GetMapping("/{id}")' }],
+      line: null,
+      end: null,
+    }
     const path = await factFile([HEADER, FILE, TYPE, METHOD, CALL, owned, END])
     const facts = await readAll(path)
     expect(facts).toEqual([FILE, TYPE, METHOD, CALL, owned])
@@ -60,7 +67,7 @@ describe('readHardCpgFacts', () => {
     ['a row after the end', [HEADER, END, FILE], 'row 3: a row follows the end row'],
     ['a missing end row', [HEADER, FILE], 'row 2: the end row is missing, so the export was cut short'],
     ['a row that is not JSON', [HEADER, '{"k":"file",', END], 'row 2: not JSON'],
-    ['an earlier fact format', [{ k: 'header', format: 1 }, END], 'row 1:'],
+    ['an earlier fact format', [{ k: 'header', format: 2 }, END], 'row 1:'],
     ['an unknown row kind', [HEADER, { k: 'type', name: 'x' }, END], 'row 2:'],
     ['an unexpected field', [HEADER, { ...FILE, extra: true }, END], 'row 2:'],
     ['an invalid dispatch', [HEADER, { ...CALL, dispatch: 'virtual' }, END], 'row 2:'],

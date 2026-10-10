@@ -37,7 +37,7 @@ function snapshotImport(overrides: Partial<HardSnapshotImport> = {}): HardSnapsh
     projectRoot: '/targets/wordpress',
     commit: 'a'.repeat(40),
     derivation: 'd1',
-    framework: 'wordpress',
+    frameworks: ['wordpress'],
     factsPath: '/cache/facts.jsonl',
     model,
     edges: [...callEdges(model), ...hookEdges(hooks)],
@@ -71,8 +71,8 @@ describe('HardFeatureMapStore', () => {
     ])
     expect(store.callees(id, 'save_post')).toEqual([{ caller: 'save_post', callee: 'Hooks.on_save', file: 'code.php', line: 30, source: 'hook' }])
     expect(store.entryPoints(id)).toEqual([
-      { kind: 'ajax', key: 'save', handler: 'wp_ajax_save', file: 'wp-admin/admin-ajax.php', line: 5, auth: 'authenticated' },
-      { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', file: 'wp-admin/admin-ajax.php', line: null, auth: 'unknown' },
+      { kind: 'ajax', key: 'save', handler: 'wp_ajax_save', file: 'wp-admin/admin-ajax.php', line: 5, auth: 'authenticated', guards: [] },
+      { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', file: 'wp-admin/admin-ajax.php', line: null, auth: 'unknown', guards: [] },
     ])
     const second = store.importSnapshot(snapshotImport({ derivation: 'd2' }))
     expect(second).not.toBe(id)

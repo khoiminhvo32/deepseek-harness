@@ -30,8 +30,10 @@ const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYS
 describe.skipIf(joernHome === '')('hard-cpg with Joern through the sandboxed shell', () => {
   const roots: string[] = []
   let ctx: Context | undefined
+  const contexts: Context[] = []
   afterAll(async () => {
     await ctx?.fiber.dispose()
+    await Promise.all(contexts.map(each => each.fiber.dispose()))
     await Promise.all(roots.map(root => rm(root, { recursive: true, force: true })))
   })
 
@@ -103,10 +105,67 @@ describe.skipIf(joernHome === '')('hard-cpg with Joern through the sandboxed she
     const rows: HardCpgFact[] = []
     for await (const fact of readHardCpgFacts(facts.path)) rows.push(fact)
     expect(rows.filter(row => row.k === 'file').map(row => row.path)).toEqual(['post.php'])
-    expect(rows).toContainEqual({ k: 'type', id: 'Hooks', name: 'Hooks', file: 'post.php', line: 5, inherits: [] })
+    expect(rows).toContainEqual({ k: 'type', id: 'Hooks', name: 'Hooks', file: 'post.php', line: 5, inherits: [], annotations: [] })
     expect(rows).toContainEqual(expect.objectContaining({ k: 'method', id: 'Hooks.on_save', owner: 'Hooks' }))
     expect(rows).toContainEqual(expect.objectContaining({ k: 'method', id: 'can_edit', owner: null }))
     expect(rows).toContainEqual(expect.objectContaining({ k: 'call', name: 'can_edit', resolved: ['can_edit'], file: 'post.php', line: 3 }))
     expect(rows).toContainEqual(expect.objectContaining({ k: 'call', name: 'add_action', args: [{ lit: '"save"' }, { arr: ['$this', '"on_save"'] }] }))
+  }, 300_000)
+
+  it('builds Python facts with decorators through the configured frontend', async () => {
+    const root = await mkdtemp(join(homedir(), '.hard-cpg-e2e-py-'))
+    roots.push(root)
+    const repo = join(root, 'target')
+    await mkdir(repo)
+    await writeFile(join(repo, 'app.py'), [
+      'from flask import Flask',
+      'app = Flask(__name__)',
+      'def login_required(f): return f',
+      'def remove_post(pid): pass',
+      '@app.route("/posts/<pid>/delete")',
+      '@login_required',
+      'def delete(pid):',
+      '    remove_post(pid)',
+      '',
+    ].join('\n'))
+    const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', env: GIT_ENV })
+    git('init', '--quiet')
+    git('add', '-A')
+    git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
+    const commit = git('rev-parse', 'HEAD').trim()
+    const gitDir = join(root, 'snapshots', 'target.git')
+    execFileSync('git', ['clone', '--quiet', '--bare', repo, gitDir], { env: GIT_ENV })
+    const python = new Context()
+    contexts.push(python)
+    await python.plugin(SessionStore)
+    await python.plugin(SessionProjectionRegistry)
+    await python.plugin(AgentRegistry)
+    await python.plugin(LocalSandboxProvider, {})
+    await python.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: repo })
+    await python.plugin(LocalSubprocessRuntime)
+    await python.plugin(SandboxBashExecutor, { cwd: repo, timeoutMs: 60_000 })
+    await python.plugin(HardLedger, {})
+    await python.plugin(HardCpg, { enabled: true, joernHome, language: 'python', heapMb: 2048, buildOnArm: false })
+    const session = python.sessions.create(SessionId(`e2e-py-${Math.random()}`), { meta: { cwd: repo } })
+    const agent: Agent = {
+      id: session.id, options: {}, session, inbox: createInboxStub(), status: 'running', ctx: python,
+      send: () => {}, followup: () => {}, steer: () => ({ outcome: Promise.resolve({ status: 'rejected' as const }) }),
+      inject() {}, cancel() {}, runMaintenance: task => task(new AbortController().signal), whenIdle: () => Promise.resolve(),
+    }
+    await python.agents.register(agent)
+    python.hardLedger.recordMissionArmed(agent, {
+      objective: 'audit', targetRepo: repo, commit, modules: ['.'], bugClasses: ['logic'], snapshot: { gitDir, kind: 'git' },
+    })
+    const facts = await python.hardCpg.facts(agent)
+    const rows: HardCpgFact[] = []
+    for await (const fact of readHardCpgFacts(facts.path)) rows.push(fact)
+    expect(rows).toContainEqual(expect.objectContaining({ k: 'method', id: 'app.py:<module>', fileLevel: true }))
+    expect(rows).toContainEqual(expect.objectContaining({
+      k: 'method',
+      id: 'app.py:<module>.delete',
+      fileLevel: false,
+      annotations: [expect.objectContaining({ name: 'route', args: ['"/posts/<pid>/delete"'] }), expect.objectContaining({ name: 'login_required' })],
+    }))
+    expect(rows).toContainEqual(expect.objectContaining({ k: 'call', caller: 'app.py:<module>.delete', name: 'remove_post', resolved: ['app.py:<module>.remove_post'] }))
   }, 300_000)
 })

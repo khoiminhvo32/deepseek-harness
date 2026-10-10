@@ -594,8 +594,8 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | `ctx.hardLedger` | `seam` | `hard-ledger` | - | `hard-tools`, `hard-verifier`, `hard-stopgate` | - | Validates and appends hard/* session events and serves the hardLedger session projection; ids are assigned from projected counts. |
 | `ctx.hardVerifier` | `seam` | `hard-verifier` | - | `hard-tools` | - | Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger. |
-| `ctx.hardCpg` | `seam` | `hard-cpg` | - | `hard-featuremap` | - | Exports the pinned commit, runs the Joern PHP frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest. |
-| `ctx.hardFeatureMap` | `seam` | `hard-featuremap` | - | - | - | Imports hard-cpg facts into one derived database: symbols, call sites, source-tagged call edges with repairs, and WordPress hooks and entry points. |
+| `ctx.hardCpg` | `seam` | `hard-cpg` | - | `hard-featuremap` | - | Exports the pinned commit, runs the configured language's Joern frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest. |
+| `ctx.hardFeatureMap` | `seam` | `hard-featuremap` | - | - | - | Imports hard-cpg facts into one derived database: symbols, call sites, source-tagged call edges with repairs, and the entry points and guards of the configured framework profiles. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 负责模块和精确配置监听；应用修改共用其队列，自动重载等待应用文件锁。 |
 | `ctx.pluginRegistryProbe` | `core` | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | 在 Host 上并发比较公共安装源响应；初始安装源推荐由 Client 负责。 |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | 与 CLI 共享 profile 包操作，并向 Web 和 Agent 调用方分别报告持久状态与运行状态。 |

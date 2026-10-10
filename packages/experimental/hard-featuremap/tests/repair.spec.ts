@@ -71,6 +71,13 @@ describe('callEdges', () => {
     expect(await edgesFor(call('Child.run', 'missing', { target: 'Child.missing' }))).toEqual([])
   })
 
+  it('resolves a call Joern could not name through the caller type, as Ruby receiverless calls', async () => {
+    expect(await edgesFor(
+      call('Child.run', 'save', { target: '<unknownFullName>', dynamic: true }),
+      call('wp_insert_post', 'save', { target: '<unknownFullName>', dynamic: true }),
+    )).toEqual([{ callee: 'Parent.save', source: 'repair' }, { callee: 'Parent.save', source: 'unique-name' }])
+  })
+
   it('links a dynamic call on an unknown receiver only when one method carries the name', async () => {
     expect(await edgesFor(
       call('Child.run', 'get_error_code', { target: 'null.get_error_code', dynamic: true }),

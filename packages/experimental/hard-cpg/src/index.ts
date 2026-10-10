@@ -1,6 +1,6 @@
 /**
  * Joern facts for the hard harness. The `hardCpg` service exports the pinned
- * snapshot commit, builds a PHP code property graph with the deployment's
+ * snapshot commit, builds a code property graph for the configured language with the deployment's
  * Joern installation, runs the packaged query, and caches the resulting
  * JSON Lines facts beside the snapshot store, keyed by commit and query
  * digest. Only the packaged query ever reaches Joern: its interpreter runs
@@ -26,8 +26,28 @@ import type { HardCpgFactCounts } from './facts.ts'
 import { HARD_CPG_FACTS_QUERY } from './query.ts'
 
 export { countHardCpgFacts, HARD_CPG_FACTS_FORMAT, readHardCpgFacts } from './facts.ts'
-export type { HardCpgArg, HardCpgFact, HardCpgFactCounts } from './facts.ts'
+export type { HardCpgAnnotation, HardCpgArg, HardCpgFact, HardCpgFactCounts } from './facts.ts'
 export { HARD_CPG_FACTS_QUERY } from './query.ts'
+
+/**
+ * The target languages and the Joern frontend each runs. `javascript` covers
+ * TypeScript and `c` covers C++. Each frontend's name is its directory and
+ * launcher under the distribution's `frontends`.
+ */
+export const HARD_CPG_FRONTENDS = {
+  php: 'php2cpg',
+  python: 'pysrc2cpg',
+  java: 'javasrc2cpg',
+  kotlin: 'kotlin2cpg',
+  csharp: 'csharpsrc2cpg',
+  javascript: 'jssrc2cpg',
+  go: 'gosrc2cpg',
+  ruby: 'rubysrc2cpg',
+  c: 'c2cpg',
+} as const
+
+/** A target language `hard-cpg` can build facts for. */
+export type HardCpgLanguage = keyof typeof HARD_CPG_FRONTENDS
 
 /** Default JVM heap for the frontend and the query, in MiB. */
 export const DEFAULT_HEAP_MB = 8192
@@ -40,6 +60,8 @@ export interface Config {
   enabled?: boolean
   /** Absolute path of the Joern distribution (the `joern-cli` directory). Required when enabled. */
   joernHome?: string
+  /** The target's language, which selects the Joern frontend. */
+  language?: HardCpgLanguage
   /**
    * Repository-relative paths the frontend skips, such as PoC stubs inside
    * the snapshot that redefine target functions. Empty by default: the facts
@@ -58,6 +80,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(false),
   joernHome: z.string(),
+  language: z.union(Object.keys(HARD_CPG_FRONTENDS) as HardCpgLanguage[]).default('php'),
   excludePaths: z.array(z.string()).default([]),
   heapMb: z.number().step(1).min(512).default(DEFAULT_HEAP_MB),
   stepTimeoutMinutes: z.number().step(1).min(1).default(DEFAULT_STEP_TIMEOUT_MINUTES),
@@ -68,6 +91,7 @@ export const Config: z<Config> = z.object({
 interface ResolvedConfig {
   readonly enabled: boolean
   readonly joernHome: string
+  readonly language: HardCpgLanguage
   readonly excludePaths: readonly string[]
   readonly heapMb: number
   readonly stepTimeoutMs: number
@@ -90,7 +114,7 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(heapMb) || heapMb < 512) throw new TypeError('heapMb must be a safe integer of at least 512')
   const minutes = config.stepTimeoutMinutes ?? DEFAULT_STEP_TIMEOUT_MINUTES
   if (!Number.isSafeInteger(minutes) || minutes < 1) throw new TypeError('stepTimeoutMinutes must be a positive safe integer')
-  return { enabled, joernHome, excludePaths, heapMb, stepTimeoutMs: minutes * 60_000, buildOnArm: config.buildOnArm ?? true }
+  return { enabled, joernHome, language: config.language ?? 'php', excludePaths, heapMb, stepTimeoutMs: minutes * 60_000, buildOnArm: config.buildOnArm ?? true }
 }
 
 /** The facts of one pinned commit. */
@@ -193,9 +217,10 @@ export class HardCpg extends Service {
     }
   }
 
-  /** The cache key: fact format, query text, Joern installation, and exclusions. */
+  /** The cache key: fact format, query text, Joern installation, language, and exclusions. */
   private cacheKey(): string {
-    const parts = [String(HARD_CPG_FACTS_FORMAT), HARD_CPG_FACTS_QUERY, this.resolved.joernHome, ...this.resolved.excludePaths]
+    const { joernHome, language, excludePaths } = this.resolved
+    const parts = [String(HARD_CPG_FACTS_FORMAT), HARD_CPG_FACTS_QUERY, joernHome, language, ...excludePaths]
     return createHash('sha256').update(parts.join('\0')).digest('hex').slice(0, 16)
   }
 
@@ -213,11 +238,12 @@ export class HardCpg extends Service {
       await writeFile(query, HARD_CPG_FACTS_QUERY)
       const policy: SandboxExecutionPolicy = { mode: 'workspace-write', workspaceRoot: dirname(gitDir) }
       const { joernHome, heapMb } = this.resolved
+      const frontend = HARD_CPG_FRONTENDS[this.resolved.language]
       await this.step('export', work, policy,
         `mkdir ${shellQuote(tree)} && ${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} archive --format=tar ${shellQuote(commit)} | tar -x -C ${shellQuote(tree)}`)
       const excludes = this.resolved.excludePaths.map(path => ` --exclude ${shellQuote(path)}`).join('')
       await this.step('frontend', work, policy,
-        `${shellQuote(join(joernHome, 'frontends', 'php2cpg', 'bin', 'php2cpg'))} -J-Xmx${heapMb}m ${shellQuote(tree)} -o ${shellQuote(graph)}${excludes}`)
+        `${shellQuote(join(joernHome, 'frontends', frontend, 'bin', frontend))} -J-Xmx${heapMb}m ${shellQuote(tree)} -o ${shellQuote(graph)}${excludes}`)
       await this.step('query', work, policy, [
         shellQuote(join(joernHome, 'bin', 'repl-bridge')),
         `-J-Xmx${heapMb}m`,

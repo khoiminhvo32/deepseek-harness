@@ -5741,11 +5741,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardEntryKind',
-    declaration: 'export type HardEntryKind = \'ajax\' | \'admin-post\' | \'rest\' | \'shortcode\' | \'script\';',
+    declaration: 'export type HardEntryKind = \'ajax\' | \'admin-post\' | \'rest\' | \'shortcode\' | \'script\' | \'http\';',
   },
   {
     name: 'HardEntryPoint',
-    declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n}',
+    declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n    readonly guards: readonly string[];\n}',
   },
   {
     name: 'HardFeatureMapSnapshot',

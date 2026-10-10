@@ -10,8 +10,8 @@ import type { FactModel } from './model.ts'
 
 /**
  * Which rule made a call edge: `joern` (the graph's own resolution),
- * `repair` (a type-qualified or relative call resolved through the type
- * lineage, or a free function a class-qualified call meant), `unique-name`
+ * `repair` (a type-qualified, relative, or receiverless call resolved through
+ * the type lineage, or a free function a class-qualified call meant), `unique-name`
  * (a method call on an unknown receiver whose name only one method carries),
  * or `hook` (a fired hook reaching a registered callback).
  */
@@ -26,6 +26,9 @@ export interface HardCallEdge {
   readonly line: number | null
   readonly source: HardEdgeSource
 }
+
+/** The target Joern gives a call it could not name. */
+const UNKNOWN_TARGET = '<unknownFullName>'
 
 /**
  * The call edges of every call site in the model.
@@ -55,16 +58,18 @@ export function callEdges(model: FactModel): HardCallEdge[] {
 
 /**
  * The single target a call Joern left unresolved means, when the facts name one.
- * A `parent`, `self`, or `static` prefix is relative to the caller's type; a
+ * A call Joern could not name at all (Ruby's receiverless calls) and a
+ * `parent`, `self`, or `static` prefix are relative to the caller's type; a
  * known type prefix resolves through that type's lineage and, failing that, to
  * the free function of the same name, because PHP resolves an unqualified call
  * inside a class to the global function (Joern issue 3050).
  */
 function repairTarget(model: FactModel, caller: string, target: string, name: string): string | undefined {
+  const owner = model.methods.get(caller)?.owner ?? null
+  if (target === UNKNOWN_TARGET) return owner === null ? undefined : findMethod(model, owner, name)
   const dot = target.lastIndexOf('.')
   if (dot <= 0) return model.functions.has(name) ? name : undefined
   const prefix = target.slice(0, dot)
-  const owner = model.methods.get(caller)?.owner ?? null
   if (prefix === 'parent') {
     for (const parent of owner === null ? [] : model.types.get(owner)?.inherits ?? []) {
       const found = findMethod(model, parent, name)

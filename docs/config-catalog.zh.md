@@ -1072,7 +1072,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-cpg`
 
 - `inject`: `agents` · `shell` · `hardLedger`
-- `source`: [`packages/experimental/hard-cpg/src/index.ts:38`](../packages/experimental/hard-cpg/src/index.ts)
+- `source`: [`packages/experimental/hard-cpg/src/index.ts:58`](../packages/experimental/hard-cpg/src/index.ts)
 
 ```ts config-catalog
 /** Joern facts plugin config. */
@@ -1081,6 +1081,8 @@ export interface Config {
   enabled?: boolean
   /** Absolute path of the Joern distribution (the `joern-cli` directory). Required when enabled. */
   joernHome?: string
+  /** The target's language, which selects the Joern frontend. */
+  language?: HardCpgLanguage
   /**
    * Repository-relative paths the frontend skips, such as PoC stubs inside
    * the snapshot that redefine target functions. Empty by default: the facts
@@ -1094,6 +1096,9 @@ export interface Config {
   /** Start building facts in the background when a mission arms. */
   buildOnArm?: boolean
 }
+
+/** A target language `hard-cpg` can build facts for. */
+export type HardCpgLanguage = keyof typeof HARD_CPG_FRONTENDS
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-cpg -->
 
@@ -1123,7 +1128,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-featuremap`
 
 - `inject`: `agents` · `hardLedger` · `hardCpg`
-- `source`: [`packages/experimental/hard-featuremap/src/index.ts:51`](../packages/experimental/hard-featuremap/src/index.ts)
+- `source`: [`packages/experimental/hard-featuremap/src/index.ts:57`](../packages/experimental/hard-featuremap/src/index.ts)
 
 ```ts config-catalog
 /** Feature map plugin config. */
@@ -1132,23 +1137,23 @@ export interface Config {
   enabled?: boolean
   /** Absolute path of the shared database file. Required when enabled. */
   dbPath?: string
-  /** The framework profile. */
-  framework?: HardFramework
+  /** The framework profiles to read; empty keeps call edges only. */
+  frameworks?: HardFramework[]
   /**
    * Repository-relative directories (`.` for the root) whose top-level PHP
-   * files are requested directly. Empty selects the profile's directories:
-   * {@link WORDPRESS_SCRIPT_DIRS} under the WordPress profile, none otherwise.
+   * files are requested directly. Empty selects {@link WORDPRESS_SCRIPT_DIRS}
+   * when the WordPress profile is on, none otherwise.
    */
   scriptDirs?: string[]
   /** Import in the background when a mission arms. */
   indexOnArm?: boolean
 }
 
-/**
- * The framework profile that reads hooks and entry points: `wordpress`, or
- * `none` for call edges only.
- */
-export type HardFramework = 'none' | 'wordpress'
+/** A framework profile that reads entry points: WordPress, or one of the HTTP route profiles. */
+export type HardFramework = 'wordpress' | HardHttpFramework
+
+/** A framework whose HTTP routes have a profile. */
+export type HardHttpFramework = 'laravel' | 'spring' | 'aspnet' | 'flask' | 'fastapi' | 'express'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-featuremap -->
 

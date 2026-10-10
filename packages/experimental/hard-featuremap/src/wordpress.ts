@@ -8,7 +8,7 @@
 
 import { dirname } from 'node:path'
 import type { HardCpgArg } from '@deepseek-ai/dsh-experimental-hard-cpg'
-import { FILE_LEVEL_SUFFIX, findMethod, lineage } from './model.ts'
+import { findMethod, lineage } from './model.ts'
 import type { FactModel } from './model.ts'
 import type { HardCallEdge } from './repair.ts'
 
@@ -47,14 +47,18 @@ export interface HardHook {
 
 /**
  * How a request reaches an entry point: an admin-ajax action, an admin-post
- * action, a REST controller handler, a shortcode, or a directly requested
- * script's top-level code.
+ * action, a WordPress REST controller handler, a shortcode, a directly
+ * requested script's top-level code, or a framework HTTP route.
  */
-export type HardEntryKind = 'ajax' | 'admin-post' | 'rest' | 'shortcode' | 'script'
+export type HardEntryKind = 'ajax' | 'admin-post' | 'rest' | 'shortcode' | 'script' | 'http'
 /** Who the routing itself admits; `unknown` leaves the decision to the handler. */
 export type HardEntryAuth = 'public' | 'authenticated' | 'unknown'
 
-/** One entry point; `handler` is null when the facts do not resolve the callback. */
+/**
+ * One entry point; `handler` is null when the facts do not resolve the
+ * callback, and `guards` lists the routing-level checks in front of it
+ * (annotations, decorators, or middleware), in source order.
+ */
 export interface HardEntryPoint {
   readonly kind: HardEntryKind
   readonly key: string
@@ -62,6 +66,7 @@ export interface HardEntryPoint {
   readonly file: string
   readonly line: number | null
   readonly auth: HardEntryAuth
+  readonly guards: readonly string[]
 }
 
 /**
@@ -78,8 +83,9 @@ export function phpString(code: string): string | undefined {
 }
 
 /**
- * The method a callback argument names: a function name, a `Class::method`
- * string, or an array of a class name or `$this` and a method name.
+ * The method a callback argument names: a closure or function reference, a
+ * function name, a `Class::method` string, or an array of a class name or
+ * `$this` and a method name.
  * @param model - the indexed facts.
  * @param arg - the callback argument summary.
  * @param caller - the method holding the registration, whose type `$this` means.
@@ -87,6 +93,7 @@ export function phpString(code: string): string | undefined {
  */
 export function resolveCallback(model: FactModel, arg: HardCpgArg | undefined, caller: string): string | undefined {
   if (arg === undefined) return undefined
+  if ('ref' in arg) return model.methods.has(arg.ref) ? arg.ref : undefined
   if ('lit' in arg) {
     const text = phpString(arg.lit)
     if (text === undefined) return undefined
@@ -167,7 +174,7 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     const route = HOOK_ENTRY_PREFIXES.find(entry => name.startsWith(entry.prefix))
     if (route === undefined) continue
     const key = name.slice(route.prefix.length)
-    entries.push({ kind: route.kind, key, handler: hook.callback, file: hook.file, line: hook.line, auth: route.auth })
+    entries.push({ kind: route.kind, key, handler: hook.callback, file: hook.file, line: hook.line, auth: route.auth, guards: [] })
   }
   // Core registers most admin-ajax actions in a loop with a computed hook name
   // and the handler `wp_ajax_` plus the action, so a free function named by
@@ -177,7 +184,8 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     if (!model.functions.has(method.id) || handled.has(method.id)) continue
     const route = HOOK_ENTRY_PREFIXES.find(entry => entry.kind === 'ajax' && method.id.startsWith(entry.prefix))
     if (route === undefined) continue
-    entries.push({ kind: 'ajax', key: method.id.slice(route.prefix.length), handler: method.id, file: method.file, line: method.line, auth: route.auth })
+    const key = method.id.slice(route.prefix.length)
+    entries.push({ kind: 'ajax', key, handler: method.id, file: method.file, line: method.line, auth: route.auth, guards: [] })
   }
   model.calls.forEach((call) => {
     if (call.name !== 'add_shortcode') return
@@ -185,18 +193,17 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     const tag = first !== undefined && 'lit' in first ? phpString(first.lit) : undefined
     if (tag === undefined) return
     const handler = resolveCallback(model, call.args[1], call.caller) ?? null
-    entries.push({ kind: 'shortcode', key: tag, handler, file: call.file, line: call.line, auth: 'public' })
+    entries.push({ kind: 'shortcode', key: tag, handler, file: call.file, line: call.line, auth: 'public', guards: [] })
   })
   for (const method of model.methods.values()) {
     if (method.owner === null || !REST_HANDLERS.has(method.name)) continue
     if (!lineage(model, method.owner).slice(1).includes(REST_CONTROLLER)) continue
-    entries.push({ kind: 'rest', key: method.id, handler: method.id, file: method.file, line: method.line, auth: 'unknown' })
+    entries.push({ kind: 'rest', key: method.id, handler: method.id, file: method.file, line: method.line, auth: 'unknown', guards: [] })
   }
   const dirs = new Set(scriptDirs)
   for (const path of new Set(model.files)) {
     if (!path.endsWith('.php') || !dirs.has(dirname(path))) continue
-    const handler = `${path}${FILE_LEVEL_SUFFIX}`
-    entries.push({ kind: 'script', key: path, handler: model.methods.has(handler) ? handler : null, file: path, line: null, auth: 'unknown' })
+    entries.push({ kind: 'script', key: path, handler: model.fileLevel.get(path) ?? null, file: path, line: null, auth: 'unknown', guards: [] })
   }
   return entries
 }
@@ -204,5 +211,6 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
 function argText(arg: HardCpgArg): string {
   if ('lit' in arg) return arg.lit
   if ('arr' in arg) return `array(${arg.arr.join(', ')})`
+  if ('ref' in arg) return arg.ref
   return arg.code
 }

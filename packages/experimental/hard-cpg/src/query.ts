@@ -1,5 +1,5 @@
 /**
- * The packaged Joern query. It writes fact format 2 (see `facts.ts`) for one
+ * The packaged Joern query. It writes fact format 3 (see `facts.ts`) for one
  * code property graph and takes two parameters, `cpgFile` and `outFile`. The
  * service writes this text into each build directory and passes only that
  * file and harness-built paths to Joern.
@@ -8,12 +8,12 @@
 
 /** The Scala source of the packaged query; its digest keys the fact cache. */
 export const HARD_CPG_FACTS_QUERY = String.raw`// Exports the facts hard-cpg reads from one code property graph as JSON Lines,
-// in fact format 2: a header, then files, internal type declarations with
-// their parents, internal methods with their owning type, and call sites with
-// resolved internal targets and bounded argument summaries, then an end
-// marker. Usage: --param cpgFile=<cpg> --param outFile=<jsonl>.
+// in fact format 3: a header, then files, internal type declarations with
+// their parents, internal methods with their owning type, file-level flag, and
+// annotations or decorators, and call sites with resolved internal targets and
+// bounded argument summaries, then an end marker. Usage: --param cpgFile=<cpg> --param outFile=<jsonl>.
 import io.shiftleft.semanticcpg.language._
-import io.shiftleft.codepropertygraph.generated.nodes.{Block, Expression, Literal}
+import io.shiftleft.codepropertygraph.generated.nodes.{AstNode, Block, Call, Expression, Literal, Method, MethodRef}
 import java.io.{BufferedWriter, FileOutputStream, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
 
@@ -31,9 +31,41 @@ import java.nio.charset.StandardCharsets
     case l: Literal => ujson.Obj("lit" -> bounded(l.code, 200))
     case b: Block if b.astChildren.isCall.nameExact("<operator>.assignment").argument(2).isCall.nameExact("array").nonEmpty =>
       ujson.Obj("arr" -> ujson.Arr.from(arrayItems(b).map(ujson.Str(_))))
+    case r: MethodRef => ujson.Obj("ref" -> r.methodFullName)
     case other => ujson.Obj("code" -> bounded(other.code, 120))
   }
-  emit(ujson.Obj("k" -> "header", "format" -> 2))
+  // The names frontends give a file's top-level code: PHP, Python, JavaScript, Ruby.
+  val fileLevelNames = Set("<global>", "<module>", ":program", "<main>")
+  def annotation(name: String, args: List[String], code: String): ujson.Value =
+    ujson.Obj("name" -> name, "args" -> ujson.Arr.from(args.map(a => ujson.Str(bounded(a, 200)))), "code" -> bounded(code, 200))
+  def literalArgs(c: Call): List[String] = c.argument.filter(_.argumentIndex > 0).sortBy(_.argumentIndex).isLiteral.code.l
+  // Frontends without annotation nodes (Python) desugar "@d(...) def f" into
+  // "f = d(...)(f)": the decorators are the calls wrapping a reference to the
+  // method, read only when the chain ends in an assignment back to its name.
+  def decorators(m: Method): List[ujson.Value] = cpg.methodRef.methodFullNameExact(m.fullName).l.flatMap { ref =>
+    val chain = scala.collection.mutable.ListBuffer.empty[Call]
+    var node: AstNode = ref
+    var parent = node.astParent
+    while (parent.isInstanceOf[Call] && !parent.asInstanceOf[Call].name.startsWith("<operator")) {
+      chain += parent.asInstanceOf[Call]
+      node = parent
+      parent = node.astParent
+    }
+    val assigned = parent match {
+      case c: Call if c.name == "<operator>.assignment" => c.argument.argumentIndex(1).code.headOption.contains(m.name)
+      case _ => false
+    }
+    if (!assigned) Nil
+    else chain.toList.reverse.map { c =>
+      c.receiver.isCall.headOption match {
+        case Some(factory) => annotation(factory.name, literalArgs(factory), factory.code)
+        case None => annotation(c.name, Nil, c.name)
+      }
+    }
+  }
+  def annotations(m: Method): List[ujson.Value] =
+    m.annotation.l.map(a => annotation(a.name, a.parameterAssign.value.code.l, a.code)) ++ decorators(m)
+  emit(ujson.Obj("k" -> "header", "format" -> 3))
   cpg.file.name.filterNot(_.startsWith("<")).foreach(f => emit(ujson.Obj("k" -> "file", "path" -> f)))
   // A file's top-level code, closures, and every method also sit in synthetic
   // type declarations; only declared classes, interfaces, and traits are types here.
@@ -42,12 +74,15 @@ import java.nio.charset.StandardCharsets
     !fullName.endsWith("<global>") && !fullName.contains("<lambda>") && !methodNames.contains(fullName)
   cpg.typeDecl.isExternal(false).filter(t => declared(t.fullName)).foreach { t =>
     emit(ujson.Obj("k" -> "type", "id" -> t.fullName, "name" -> t.name, "file" -> t.filename,
-      "line" -> line(t.lineNumber), "inherits" -> ujson.Arr.from(t.inheritsFromTypeFullName.l.map(ujson.Str(_)))))
+      "line" -> line(t.lineNumber), "inherits" -> ujson.Arr.from(t.inheritsFromTypeFullName.l.map(ujson.Str(_))),
+      "annotations" -> ujson.Arr.from(t.annotation.l.map(a => annotation(a.name, a.parameterAssign.value.code.l, a.code)))))
   }
   cpg.method.isExternal(false).foreach { m =>
     val owner = m.definingTypeDecl.fullName.filter(declared).headOption
     emit(ujson.Obj("k" -> "method", "id" -> m.fullName, "name" -> m.name, "file" -> m.filename,
       "owner" -> owner.map(ujson.Str(_)).getOrElse(ujson.Null),
+      "fileLevel" -> fileLevelNames.contains(m.name),
+      "annotations" -> ujson.Arr.from(annotations(m)),
       "line" -> line(m.lineNumber), "end" -> line(m.lineNumberEnd)))
   }
   cpg.call.filterNot(_.name.startsWith("<operator")).foreach { c =>

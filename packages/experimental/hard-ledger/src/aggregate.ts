@@ -417,6 +417,12 @@ export function openWorkFromState(
   thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent'>,
 ): string[] {
   const work: string[] = []
+  // The mapping summary leads: round context shows only the first items, and
+  // features are recorded while the code is read, not after the sweep.
+  const { owed, total } = owedEntryPoints(state, thresholds.minEntryMappedPercent)
+  if (owed.length > 0) {
+    work.push(`${owed.length} of ${total} entry points are in no recorded feature; features must cover ${thresholds.minEntryMappedPercent}%: map them with hard_record_feature`)
+  }
   for (const record of state.findings) {
     if (record.verdict === undefined) work.push(`finding ${record.proposed.id} awaits verification`)
     if (record.verdict?.verdict === 'flaky') {
@@ -446,11 +452,7 @@ export function openWorkFromState(
   for (const id of unchainedMaterialFromState(state)) {
     work.push(`${id} is in no chain hypothesis: link it with another weakness or finding, or propose that chain and refute it with the reason`)
   }
-  const { owed, total } = owedEntryPoints(state, thresholds.minEntryMappedPercent)
-  if (owed.length > 0) {
-    work.push(`${owed.length} of ${total} entry points are in no recorded feature; features must cover ${thresholds.minEntryMappedPercent}%: map them with hard_record_feature`)
-    for (const key of owed.slice(0, 5)) work.push(`entry point ${key} is in no feature`)
-  }
+  for (const key of owed.slice(0, 5)) work.push(`entry point ${key} is in no feature`)
   return work
 }
 

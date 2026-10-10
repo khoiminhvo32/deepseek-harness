@@ -581,6 +581,16 @@ describe('hard ledger feature map', () => {
     expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual([entries[4]])
   })
 
+  it('leads the open work with the mapping summary so round context shows it', async () => {
+    const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
+    ctx.hardLedger.recordMissionArmed(root.agent, { objective: 'audit', targetRepo: '/t', commit: 'c'.repeat(40), modules: ['src'], bugClasses: ['sqli'] })
+    ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)
+    const work = ctx.hardLedger.openWork(root.agent)
+    expect(work[0]).toBe('5 of 5 entry points are in no recorded feature; features must cover 80%: map them with hard_record_feature')
+    expect(work.slice(1, 3)).toEqual(['1 coverage cell(s) have no verdict yet', 'cell src × sqli has no verdict'])
+    expect(work.at(-1)).toBe(`entry point ${entries[4]} is in no feature`)
+  })
+
   it('drops the coverage condition at 0 percent and refuses an out-of-range percent', async () => {
     const { ctx, root } = await harness({ minEntryMappedPercent: 0 })
     ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)

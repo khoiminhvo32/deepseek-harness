@@ -136,6 +136,18 @@ const MARK_MODULE_DESCRIPTION = 'Record several bug classes for one module after
   + 'the whole call naming it. Each recorded class may then be re-grepped and reopened exactly as hard_mark_coverage '
   + 'would. Prefer it to one hard_mark_coverage call per class whenever you swept a module for more than one class.'
 
+/**
+ * The mapping order a module sweep returns while entry points lack a feature,
+ * so features are recorded while the code is fresh rather than after the sweep.
+ * @param unmapped - indexed entry points no recorded feature covers.
+ * @param total - all indexed entry points.
+ * @returns the model-facing order.
+ */
+export function markModuleMapping(unmapped: number, total: number): string {
+  return `${unmapped} of ${total} entry points are in no recorded feature. Before the next module, record with hard_record_feature `
+    + 'every feature whose entry points you read in this module: map as you read, not after the sweep.'
+}
+
 /** The most classes one hard_mark_module call records. */
 const MARK_MODULE_CELL_LIMIT = 32
 
@@ -713,6 +725,7 @@ export function apply(ctx: Context, config: Config): void {  const ledger = ctx.
               },
             },
           },
+          mapping: { type: 'string', description: 'While indexed entry points lack a feature: how many, and the order to map them now.' },
         },
       } as const,
       render: renderJson,
@@ -757,7 +770,13 @@ export function apply(ctx: Context, config: Config): void {  const ledger = ctx.
           recorded.push({ bugClass: cell.bugClass, verdict: 'suspicious', reopenedSinks: [], crossCheckFailed: error.message })
         }
       }
-      return { module: args.module, cells: recorded }
+      const total = ledger.featureMap(agent)?.entryPoints.length ?? 0
+      const unmapped = ledger.unmappedEntryPoints(agent).length
+      return {
+        module: args.module,
+        cells: recorded,
+        ...unmapped === 0 ? {} : { mapping: markModuleMapping(unmapped, total) },
+      }
     },
     presentCall: args => present(`Coverage ${args.module}: ${args.cells.length} classes`, args.module),
   }))

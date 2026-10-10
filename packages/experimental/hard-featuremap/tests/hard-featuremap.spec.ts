@@ -212,27 +212,49 @@ describe('hardFeatureMap.index', () => {
 })
 
 describe('indexing on arming', () => {
-  async function armed(failure?: Error) {
-    const { ctx, cpg } = await harness({ indexOnArm: true }, false)
+  async function armed(failure?: Error, config: hardFeatureMap.Config = {}) {
+    const { ctx, cpg } = await harness(Object.assign({ indexOnArm: true }, config), false)
     cpg.failure = failure
     const info = vi.spyOn(ctx.logger, 'info').mockImplementation(() => {})
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     const stranger = ctx.sessions.create(SessionId(`no-agent-${Math.random()}`))
     ctx.hardLedger.recordMissionArmed({ session: stranger } as Agent, ARMED)
     const agent = stubAgent(ctx, `armed-${Math.random()}`)
+    const inject = vi.spyOn(agent, 'inject')
     await ctx.agents.register(agent)
     agent.session.append('compaction/start', { compactionId: CompactionId('k1'), turn: 1 })
     ctx.hardLedger.recordMissionArmed(agent, ARMED)
     await vi.waitFor(() => {
       expect(info.mock.calls.length + warn.mock.calls.length).toBe(1)
     })
-    return { info, warn }
+    return { info, warn, inject }
   }
 
-  it('imports in the background and logs the edge counts', async () => {
-    const { info } = await armed()
+  it('imports in the background, logs the edge counts, and tells the model to map while sweeping', async () => {
+    const { info, inject } = await armed()
     const ready = /^hard-featuremap: snapshot \d+ for b{40} ready: 1 joern, 0 repair, 0 unique-name, 0 hook edges, 2 entry points$/
     expect(info).toHaveBeenCalledWith(expect.stringMatching(ready))
+    await vi.waitFor(() => {
+      expect(inject).toHaveBeenCalledTimes(1)
+    })
+    expect(inject.mock.calls[0]?.[0]).toMatchObject({
+      source: { kind: 'hard-featuremap' },
+      content: [{ type: 'text', text: hardFeatureMap.featureMapReady(['ajax:save', 'script:wp-admin/admin-ajax.php']) }],
+    })
+  })
+
+  it('injects no notice when the map holds no entry points', async () => {
+    const { inject } = await armed(undefined, { frameworks: [] })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(inject).not.toHaveBeenCalled()
+  })
+
+  it('counts entry points per kind in the ready notice', () => {
+    expect(hardFeatureMap.featureMapReady(['ajax:a', 'rest:b', 'ajax:c'])).toBe(
+      '<hard_feature_map> The feature map of the pinned commit is ready: 3 entry points (2 ajax, 1 rest). '
+      + 'Map features while you sweep, not after: whenever you have read the code behind an entry point, record its feature with '
+      + 'hard_record_feature before moving on; hard_query_map view entry-points with unmapped_only true lists what is left.',
+    )
   })
 
   it('logs a failed background import instead of raising', async () => {

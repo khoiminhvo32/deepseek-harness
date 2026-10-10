@@ -87,7 +87,7 @@ When the plugin is enabled, the `hard:feature-map` section teaches the mapping t
 ##### Feature map section
 
 ```markdown
-Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, the symbols behind them, and the guards and state writes they reach. Map every feature: list entry points with hard_query_map (view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), and the state it reads or writes. The harness refuses a feature that leaves a required symbol unaccounted for, excludes a guard or a state write as utility, or names a symbol outside the reach without citing the call that reaches it (via). Link related features with hard_link_feature. Two features that write the same state behind different guards are where feature abuse hides: link them with kind shares-state and test the weaker path.
+Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, the symbols behind them, and the guards and state writes they reach. Map every feature, and map while you sweep: record each feature as soon as you have read the code behind its entry points instead of leaving the map for the end. See what is mapped with hard_query_map view features. List entry points with hard_query_map (view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), and the state it reads or writes. The harness refuses a feature that leaves a required symbol unaccounted for, excludes a guard or a state write as utility, or names a symbol outside the reach without citing the call that reaches it (via). Link related features with hard_link_feature. Two features that write the same state behind different guards are where feature abuse hides: link them with kind shares-state and test the weaker path.
 ```
 
 #### Token effect
@@ -98,11 +98,31 @@ Small fixed input cost on every request while the plugin is enabled.
 
 Prefix-stable while the plugin is enabled; enabling or disabling it changes the prompt prefix.
 
+### Injected notice
+
+#### What the model sees
+
+When indexing on arming finishes and the map holds entry points, the plugin injects one notice into the running conversation with the entry point count per kind and the order to map features while sweeping. On WordPress 7.1.3 it reads:
+
+##### Ready notice
+
+```markdown
+<hard_feature_map> The feature map of the pinned commit is ready: 370 entry points (114 ajax, 99 rest, 8 shortcode, 149 script). Map features while you sweep, not after: whenever you have read the code behind an entry point, record its feature with hard_record_feature before moving on; hard_query_map view entry-points with unmapped_only true lists what is left.
+```
+
+#### Token effect
+
+One short message per armed session.
+
+#### KV Cache effect
+
+Appends after the reusable prefix; earlier entries stay cached.
+
 ### Tool schemas and results
 
 #### What the model sees
 
-The generated [`hard_query_map`, `hard_record_feature`, and `hard_link_feature` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-featuremap). Results are compact JSON: a page of entry points with their routing guards and whether a feature covers them, matching symbols, a page of call edges with the rule that made each, the required set of given entry points with each symbol's reasons, the recorded feature id with the reach and required-set sizes and the count of entry points still unmapped, or the recorded link. A refused feature returns every shortfall at once.
+The generated [`hard_query_map`, `hard_record_feature`, and `hard_link_feature` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-featuremap). Results are compact JSON: the recorded features with their entry points, member and exclusion counts, and state, the links, and how many entry points features cover; a page of entry points with their routing guards and whether a feature covers them, matching symbols, a page of call edges with the rule that made each, the required set of given entry points with each symbol's reasons, the recorded feature id with the reach and required-set sizes and the count of entry points still unmapped, or the recorded link. A refused feature returns every shortfall at once.
 
 #### Token effect
 

@@ -18,7 +18,8 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 // Loads the declaration-merged `Context` keys this plugin injects.
 import type {} from '@deepseek-ai/dsh-agent'
-import { HarnessError } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -39,6 +40,37 @@ import { httpEntryPoints } from './http.ts'
 import type { HardHttpFramework } from './http.ts'
 import { hookEdges, WORDPRESS_GUARDS, WORDPRESS_MUTATIONS, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
 import type { HardEntryPoint } from './wordpress.ts'
+
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /**
+     * Marks the notice the feature map injects when indexing on arming
+     * finishes. The message persists for replay and audit; no reader needs
+     * the producer, and readers preserve the message without this attribution.
+     * @persistenceAttribution
+     */
+    'hard-featuremap': { kind: 'hard-featuremap' } & ContextFormed
+  }
+}
+
+/**
+ * The notice injected when the map of the pinned commit is ready: the entry
+ * point count per kind and the order to map features while sweeping.
+ * @param keys - every indexed entry point as kind:key.
+ * @returns the model-facing notice.
+ */
+export function featureMapReady(keys: readonly string[]): string {
+  const kinds = new Map<string, number>()
+  for (const key of keys) {
+    const kind = key.slice(0, key.indexOf(':'))
+    kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
+  }
+  const counts = [...kinds].map(([kind, count]) => `${count} ${kind}`).join(', ')
+  return `<hard_feature_map> The feature map of the pinned commit is ready: ${keys.length} entry points (${counts}). `
+    + 'Map features while you sweep, not after: whenever you have read the code behind an entry point, record its feature with '
+    + 'hard_record_feature before moving on; hard_query_map view entry-points with unmapped_only true lists what is left.'
+}
 
 export { buildModel, findMethod, lineage } from './model.ts'
 export type { FactModel } from './model.ts'
@@ -258,10 +290,14 @@ export class HardFeatureMap extends Service {
         if (event.type !== 'hard/mission/armed') return
         const agent = ctx.agents.get(session.id)
         if (agent === undefined) return
-        this.index(agent).then((snapshot) => {
+        this.index(agent).then(async (snapshot) => {
           const { edges, entryPoints } = snapshot.stats
           ctx.logger.info(`hard-featuremap: snapshot ${snapshot.id} for ${snapshot.commit} ready: ${edges.joern} joern, ${edges.repair} repair, ${edges['unique-name']} unique-name, ${edges.hook} hook edges, ${entryPoints} entry points`)
-        }, (error: unknown) => {
+          const keys = (await this.entryPoints(snapshot.id)).map(entry => `${entry.kind}:${entry.key}`)
+          if (keys.length > 0) {
+            agent.inject(createUserMessage({ content: [{ type: 'text', text: featureMapReady(keys) }], source: { kind: 'hard-featuremap' } }))
+          }
+        }).catch((error: unknown) => {
           ctx.logger.warn(`hard-featuremap: indexing on arming failed: ${String(error)}`)
         })
       })

@@ -1992,7 +1992,7 @@ Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/exper
 
 ### `hard_query_map`
 
-Read the feature map of the pinned commit. view entry-points lists entry points (kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry points must account for.
+Read the feature map of the pinned commit. view features lists the recorded features with their entry points, member counts, and state, the recorded links, and how many entry points features cover; view entry-points lists entry points (kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry points must account for.
 
 ```json
 {
@@ -2002,6 +2002,7 @@ Read the feature map of the pinned commit. view entry-points lists entry points 
       "type": "string",
       "description": "What to read.",
       "enum": [
+        "features",
         "entry-points",
         "symbol",
         "callers",

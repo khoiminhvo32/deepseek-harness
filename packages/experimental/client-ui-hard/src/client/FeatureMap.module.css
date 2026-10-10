@@ -111,8 +111,8 @@
   --xy-node-color: var(--dsw-alias-label-primary);
   --xy-node-border: 1px solid var(--dsw-alias-border-l2);
 
-  flex: 1 0 320px;
-  min-height: 320px;
+  flex: none;
+  height: 520px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
 }
@@ -126,6 +126,11 @@
   color: var(--dsw-alias-label-primary);
   font-size: 11px;
   text-align: left;
+}
+
+.kind-unmapped {
+  border-style: dashed;
+  cursor: pointer;
 }
 
 .kind-feature {

@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { HardFeatureGraphView, HardSymbolDetail } from '@deepseek-ai/dsh-experimental-hard-featuremap/client'
 import {
-  FEATURE_GRAPH_ROUTE, SYMBOL_DETAIL_ROUTE, featureLayout, overviewId, overviewLayout,
+  FEATURE_GRAPH_ROUTE, SYMBOL_DETAIL_ROUTE, UNMAPPED_NODE, featureLayout, overviewId, overviewLayout,
   type LayoutEdge, type LayoutNode,
 } from './feature-layout.ts'
 import { NS, type HardKey } from './locales.ts'
@@ -127,7 +127,7 @@ function flowNodes(nodes: readonly LayoutNode[], fresh: ReadonlySet<string>, sel
     data: {
       label: (
         <div className={css.nodeBody} title={node.detail}>
-          <span className={css.nodeLabel}>{node.label}</span>
+          <span className={css.nodeLabel}>{node.count === undefined ? node.label : t('map.unmapped', { count: node.count })}</span>
           {node.role === undefined ? null : <span className={css.nodeRole}>{t(ROLE_LABEL[node.role])}</span>}
           {fresh.has(node.id) ? <span className={css.freshMark}>{t('map.fresh')}</span> : null}
         </div>
@@ -158,6 +158,7 @@ export function FeatureMap({ sessionId, useSessions, t }: FeatureMapProps): Reac
   const map = view?.featureMap
   const [feature, setFeature] = useState<string | undefined>(undefined)
   const [symbol, setSymbol] = useState<string | undefined>(undefined)
+  const [unmappedOpen, setUnmappedOpen] = useState(false)
   const record = map?.features.find(entry => entry.id === feature)
   // A revised record changes this key, so the graph refetches.
   const recordKey = record === undefined ? undefined : JSON.stringify(record)
@@ -235,6 +236,7 @@ export function FeatureMap({ sessionId, useSessions, t }: FeatureMapProps): Reac
           onNodeClick={(_event, node) => {
             if (record !== undefined) setSymbol(node.id)
             else if (node.id.startsWith('feature:')) open(node.id.slice('feature:'.length))
+            else if (node.id === UNMAPPED_NODE) setUnmappedOpen(true)
           }}
         >
           <Background />
@@ -243,7 +245,13 @@ export function FeatureMap({ sessionId, useSessions, t }: FeatureMapProps): Reac
       </div>
       {detail === undefined ? null : <SymbolPanel detail={detail} t={t} onSelect={setSymbol} />}
       {unmapped.length === 0 ? null : (
-        <details className={css.unmapped}>
+        <details
+          className={css.unmapped}
+          open={unmappedOpen}
+          onToggle={(event) => {
+            setUnmappedOpen(event.currentTarget.open)
+          }}
+        >
           <summary>{t('map.unmapped', { count: unmapped.length })}</summary>
           <ul>{unmapped.map(entry => <li key={entry.key}><code>{entry.key}</code> {entry.handler ?? ''}</li>)}</ul>
         </details>

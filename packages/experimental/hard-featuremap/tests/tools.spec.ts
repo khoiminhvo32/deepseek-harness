@@ -257,6 +257,23 @@ describe('hard_record_feature', () => {
   })
 })
 
+describe('hard_query_map view features', () => {
+  it('lists the recorded features, links, and entry point coverage the panel draws', async () => {
+    const { ctx, agent } = await harness()
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'features' }))).toEqual({ entryPoints: { mapped: 0, total: 2 }, links: [], total: 0, offset: 0, items: [] })
+    json(await run(ctx, agent, 'hard_record_feature', SAVE))
+    json(await run(ctx, agent, 'hard_record_feature', { ...SAVE, name: 'Save again' }))
+    json(await run(ctx, agent, 'hard_link_feature', { from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'postmeta' }))
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'features', limit: 1 }))).toEqual({
+      entryPoints: { mapped: 1, total: 2 },
+      links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'postmeta' }],
+      total: 2,
+      offset: 0,
+      items: [{ id: 'FE-1', name: 'Save a post', summary: SAVE.summary, entryPoints: ['ajax:save'], members: 4, excluded: 0, states: SAVE.states }],
+    })
+  })
+})
+
 describe('hard_link_feature', () => {
   it('links recorded features and passes ledger refusals through', async () => {
     const { ctx, agent } = await harness()

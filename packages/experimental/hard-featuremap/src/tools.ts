@@ -32,7 +32,9 @@ export interface HardFeatureMapAccess {
 
 /** The system-prompt section that teaches the mapping task. */
 export const FEATURE_MAP_SECTION = 'Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, '
-  + 'the symbols behind them, and the guards and state writes they reach. Map every feature: list entry points with hard_query_map '
+  + 'the symbols behind them, and the guards and state writes they reach. Map every feature, and map while you sweep: record each feature '
+  + 'as soon as you have read the code behind its entry points instead of leaving the map for the end. See what is mapped with hard_query_map '
+  + 'view features. List entry points with hard_query_map '
   + '(view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required '
   + 'and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols '
   + 'with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), '
@@ -77,11 +79,13 @@ function liveAgent(agent: Agent | undefined, tool: string): Agent {
 export function featureMapTools(access: HardFeatureMapAccess, ledger: HardLedger): ToolDefinition[] {
   const query = defineTool({
     name: 'hard_query_map',
-    description: 'Read the feature map of the pinned commit. view entry-points lists entry points (kind:key, handler, routing guards, '
-      + 'whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol '
-      + 'with the rule that made each edge; view required computes what a feature with the given entry points must account for.',
+    description: 'Read the feature map of the pinned commit. view features lists the recorded features with their entry points, '
+      + 'member counts, and state, the recorded links, and how many entry points features cover; view entry-points lists entry points '
+      + '(kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees '
+      + 'list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry '
+      + 'points must account for.',
     parameters: {
-      view: { type: 'string', required: true, enum: ['entry-points', 'symbol', 'callers', 'callees', 'required'], description: 'What to read.' },
+      view: { type: 'string', required: true, enum: ['features', 'entry-points', 'symbol', 'callers', 'callees', 'required'], description: 'What to read.' },
       symbol: { type: 'string', description: 'The symbol id for callers and callees; the text to look for in view symbol.' },
       entry_points: { type: 'array', items: { type: 'string' }, description: 'Entry points as kind:key, for view required.' },
       kind: { type: 'string', description: 'Only entry points of this kind (ajax, admin-post, rest, shortcode, script, http).' },
@@ -94,6 +98,20 @@ export function featureMapTools(access: HardFeatureMapAccess, ledger: HardLedger
       const agent = liveAgent(exec.agent, 'hard_query_map')
       const snapshot = (await access.snapshotOf(agent)).id
       switch (args.view) {
+        case 'features': {
+          const features = ledger.features(agent)
+          const covered = new Set(features.flatMap(feature => feature.entryPoints))
+          const indexed = (await access.entryPoints(snapshot)).map(entry => ({ key: `${entry.kind}:${entry.key}` }))
+          const items = features.map(feature => ({
+            id: feature.id, name: feature.name, summary: feature.summary, entryPoints: [...feature.entryPoints],
+            members: feature.symbols.length, excluded: feature.excluded.length, states: feature.states.map(entry => ({ ...entry })),
+          }))
+          return {
+            entryPoints: { mapped: indexed.filter(entry => covered.has(entry.key)).length, total: indexed.length },
+            links: ledger.featureLinks(agent).map(link => ({ ...link })),
+            ...page(items, args.offset, args.limit),
+          }
+        }
         case 'entry-points': {
           const mapped = new Set(ledger.features(agent).flatMap(feature => feature.entryPoints))
           const items = (await access.entryPoints(snapshot))

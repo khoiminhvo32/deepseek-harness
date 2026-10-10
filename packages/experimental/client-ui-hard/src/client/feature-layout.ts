@@ -1,7 +1,8 @@
 /**
- * Pure layouts of the feature map panel. Entry points keep their index order
- * and features their record order, so a feature that appears later lands
- * after the ones already drawn and nothing already on screen moves.
+ * Pure layouts of the feature map panel. Before any feature is recorded the
+ * overview lists the indexed entry points by kind; afterwards it groups them
+ * by feature. Features keep their record order and each cluster has a fixed
+ * size, so a feature that appears later lands after the ones already drawn.
  */
 import type { HardLedgerClientView } from '@deepseek-ai/dsh-experimental-hard-ledger/client'
 import type { HardEdgeSource, HardFeatureGraphNode, HardFeatureGraphView } from '@deepseek-ai/dsh-experimental-hard-featuremap/client'
@@ -17,12 +18,14 @@ export type FeatureMapView = NonNullable<HardLedgerClientView['featureMap']>
 /** One laid-out node. */
 export interface LayoutNode {
   readonly id: string
-  readonly kind: 'entry' | 'feature' | 'symbol'
+  readonly kind: 'entry' | 'feature' | 'symbol' | 'unmapped'
   readonly label: string
   readonly detail: string
   readonly role?: HardFeatureGraphNode['role']
   /** For an overview entry point: whether a recorded feature covers it. */
   readonly mapped?: boolean
+  /** For the unmapped node: how many entry points no feature covers. */
+  readonly count?: number
   readonly x: number
   readonly y: number
 }
@@ -38,6 +41,14 @@ export interface LayoutEdge {
 
 const COLUMN = 300
 const ROW = 64
+const CLUSTER_COLUMNS = 3
+const CLUSTER_X = 340
+const ENTRY_ROW = 36
+const CLUSTER_ENTRIES = 6
+const CLUSTER_Y = ROW + (CLUSTER_ENTRIES + 1) * ENTRY_ROW
+
+/** The node id of the overview node that stands for every unmapped entry point. */
+export const UNMAPPED_NODE = 'unmapped'
 
 /**
  * The node id of an entry point or a feature in the overview.
@@ -45,17 +56,60 @@ const ROW = 64
  * @param key - the entry point key or the feature id.
  * @returns the React Flow node id.
  */
-export function overviewId(kind: 'entry' | 'feature', key: string): string {
+export function overviewId(kind: 'entry' | 'feature' | 'more', key: string): string {
   return `${kind}:${key}`
 }
 
 /**
- * Every indexed entry point in one column per entry kind, in index order, with
- * the features in record order in the column after the last kind.
+ * The overview: entry points by kind until a feature is recorded, then one
+ * cluster per feature.
  * @param map - the indexed feature map.
  * @returns the overview nodes and edges.
  */
 export function overviewLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
+  return map.features.length === 0 ? entryLayout(map) : clusterLayout(map)
+}
+
+/**
+ * One cluster per feature in a grid of {@link CLUSTER_COLUMNS}: the feature with up to
+ * {@link CLUSTER_ENTRIES} of its entry points below it and a count node for the rest, plus
+ * one node beside the grid for the entry points no feature covers.
+ * @param map - the indexed feature map with at least one feature.
+ * @returns the overview nodes and edges.
+ */
+function clusterLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
+  const handler = new Map(map.entryPoints.map(entry => [entry.key, entry.handler]))
+  const nodes: LayoutNode[] = []
+  const edges: LayoutEdge[] = []
+  map.features.forEach((feature, index) => {
+    const x = (index % CLUSTER_COLUMNS) * CLUSTER_X
+    const y = Math.floor(index / CLUSTER_COLUMNS) * CLUSTER_Y
+    const featureNode = overviewId('feature', feature.id)
+    nodes.push({ id: featureNode, kind: 'feature', label: `${feature.id} ${feature.name}`, detail: feature.summary, x, y })
+    feature.entryPoints.slice(0, CLUSTER_ENTRIES).forEach((key, row) => {
+      const id = overviewId('entry', `${feature.id}:${key}`)
+      nodes.push({ id, kind: 'entry', label: key, detail: handler.get(key) ?? '', mapped: true, x: x + 24, y: y + ROW + row * ENTRY_ROW })
+      edges.push({ id: `member:${feature.id}:${key}`, from: featureNode, to: id, kind: 'member' })
+    })
+    const rest = feature.entryPoints.length - CLUSTER_ENTRIES
+    if (rest > 0) {
+      nodes.push({ id: overviewId('more', feature.id), kind: 'entry', label: `+${rest}`, detail: '', x: x + 24, y: y + ROW + CLUSTER_ENTRIES * ENTRY_ROW })
+    }
+  })
+  const unmapped = map.entryPoints.filter(entry => !entry.mapped).length
+  if (unmapped > 0) nodes.push({ id: UNMAPPED_NODE, kind: 'unmapped', label: '', detail: '', count: unmapped, x: CLUSTER_COLUMNS * CLUSTER_X + 40, y: 0 })
+  for (const [index, link] of map.links.entries()) {
+    edges.push({ id: `link:${index}`, from: overviewId('feature', link.from), to: overviewId('feature', link.to), kind: 'link', label: link.kind })
+  }
+  return { nodes, edges }
+}
+
+/**
+ * Every indexed entry point in one column per entry kind, in index order.
+ * @param map - the indexed feature map without features.
+ * @returns the overview nodes.
+ */
+function entryLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
   const kinds: string[] = []
   const rows = new Map<string, number>()
   const entries = map.entryPoints.map((entry) => {
@@ -68,22 +122,7 @@ export function overviewLayout(map: FeatureMapView): { nodes: LayoutNode[]; edge
       x: kinds.indexOf(kind) * COLUMN, y: row * ROW,
     }
   })
-  const nodes: LayoutNode[] = [
-    ...entries,
-    ...map.features.map((feature, row) => ({
-      id: overviewId('feature', feature.id), kind: 'feature' as const, label: `${feature.id} ${feature.name}`, detail: feature.summary,
-      x: (kinds.length + 0.5) * COLUMN, y: row * ROW,
-    })),
-  ]
-  const edges: LayoutEdge[] = [
-    ...map.features.flatMap(feature => feature.entryPoints.map(key => ({
-      id: `member:${key}:${feature.id}`, from: overviewId('entry', key), to: overviewId('feature', feature.id), kind: 'member' as const,
-    }))),
-    ...map.links.map((link, index) => ({
-      id: `link:${index}`, from: overviewId('feature', link.from), to: overviewId('feature', link.to), kind: 'link' as const, label: link.kind,
-    })),
-  ]
-  return { nodes, edges }
+  return { nodes: entries, edges: [] }
 }
 
 /**

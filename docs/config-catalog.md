@@ -1126,7 +1126,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-featuremap`
 
 - `inject`: `agents` · `hardLedger` · `hardCpg` · `shell` · `tools` · `systemPrompt`
-- `source`: [`packages/experimental/hard-featuremap/src/index.ts:96`](../packages/experimental/hard-featuremap/src/index.ts)
+- `source`: [`packages/experimental/hard-featuremap/src/index.ts:128`](../packages/experimental/hard-featuremap/src/index.ts)
 
 ```ts config-catalog
 /** Feature map plugin config. */

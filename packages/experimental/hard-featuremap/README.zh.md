@@ -87,7 +87,7 @@ patch 会替换 bundle 行的整个 `config`，因此需要重新写出 `dbPath`
 ##### Feature map section
 
 ```markdown
-Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, the symbols behind them, and the guards and state writes they reach. Map every feature: list entry points with hard_query_map (view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), and the state it reads or writes. The harness refuses a feature that leaves a required symbol unaccounted for, excludes a guard or a state write as utility, or names a symbol outside the reach without citing the call that reaches it (via). Link related features with hard_link_feature. Two features that write the same state behind different guards are where feature abuse hides: link them with kind shares-state and test the weaker path.
+Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, the symbols behind them, and the guards and state writes they reach. Map every feature, and map while you sweep: record each feature as soon as you have read the code behind its entry points instead of leaving the map for the end. See what is mapped with hard_query_map view features. List entry points with hard_query_map (view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), and the state it reads or writes. The harness refuses a feature that leaves a required symbol unaccounted for, excludes a guard or a state write as utility, or names a symbol outside the reach without citing the call that reaches it (via). Link related features with hard_link_feature. Two features that write the same state behind different guards are where feature abuse hides: link them with kind shares-state and test the weaker path.
 ```
 
 #### Token effect
@@ -98,11 +98,31 @@ Feature map. The harness builds a map of the target from its call graph: entry p
 
 插件启用期间前缀保持稳定；启用或停用会改变提示前缀。
 
+### Injected notice
+
+#### What the model sees
+
+任务武装时的索引完成且地图包含入口点后，插件会向正在进行的对话注入一条通知，列出每类入口点的数量，并要求在扫描时同步绘制功能。在 WordPress 7.1.3 上内容为：
+
+##### Ready notice
+
+```markdown
+<hard_feature_map> The feature map of the pinned commit is ready: 370 entry points (114 ajax, 99 rest, 8 shortcode, 149 script). Map features while you sweep, not after: whenever you have read the code behind an entry point, record its feature with hard_record_feature before moving on; hard_query_map view entry-points with unmapped_only true lists what is left.
+```
+
+#### Token effect
+
+每个已武装会话一条短消息。
+
+#### KV Cache effect
+
+追加在可复用前缀之后；先前条目保持缓存。
+
 ### Tool schemas and results
 
 #### What the model sees
 
-生成的 [`hard_query_map`、`hard_record_feature` 与 `hard_link_feature` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-featuremap)。结果是紧凑 JSON：一页带路由层守卫及是否已被功能覆盖的入口点、匹配的符号、一页标明生成规则的调用边、给定入口点的必需集合及每个符号的原因、已记录功能的 id 连同可达规模、必需集合规模与仍未映射的入口点数，或已记录的链接。被拒绝的功能会一次返回所有不足之处。
+生成的 [`hard_query_map`、`hard_record_feature` 与 `hard_link_feature` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-hard-featuremap)。结果是紧凑 JSON：已记录的功能及其入口点、成员与排除数量和状态、功能关系，以及功能覆盖了多少入口点；一页带路由层守卫及是否已被功能覆盖的入口点、匹配的符号、一页标明生成规则的调用边、给定入口点的必需集合及每个符号的原因、已记录功能的 id 连同可达规模、必需集合规模与仍未映射的入口点数，或已记录的链接。被拒绝的功能会一次返回所有不足之处。
 
 #### Token effect
 

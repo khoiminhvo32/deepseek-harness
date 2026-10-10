@@ -529,6 +529,18 @@ describe('hard_update_hypothesis and methodology tools', () => {
     expect(ctx.hardLedger.coverage(root.agent).map(cell => [cell.bugClass, cell.verdict, cell.source ?? 'model'])).toEqual([
       ['cmdi', 'suspicious', 'harness'], ['xss', 'suspicious', 'model'], ['dependencies', 'uncovered', 'model'],
     ])
+  })
+
+  it('orders the features of the swept module while indexed entry points lack a feature', async () => {
+    const { ctx, root } = await harness({ exitCode: 0, stdoutText: '' }, { runs: 1 }, {})
+    armModules(ctx, root.agent)
+    ctx.hardLedger.recordFeatureMapIndexed(root.agent, {
+      commit: 'c'.repeat(40), derivation: 'd', entryPoints: [{ key: 'ajax:save', handler: 'save' }, { key: 'ajax:trash', handler: 'trash' }],
+    })
+    const value = resultJson(await execute(ctx, 'hard_mark_module', { module: 'src/db', cells: [{ bug_class: 'dependencies', verdict: 'uncovered' }] }, root.agent))
+    expect(value).toMatchObject({ mapping: hardTools.markModuleMapping(2, 2) })
+    expect(hardTools.markModuleMapping(1, 3)).toBe('1 of 3 entry points are in no recorded feature. Before the next module, record with hard_record_feature '
+      + 'every feature whose entry points you read in this module: map as you read, not after the sweep.')
     expect(ctx.tools.get('hard_mark_module')?.presentCall?.({ module: 'src/db', cells: [{ bug_class: 'cmdi', verdict: 'uncovered' }, { bug_class: 'xss', verdict: 'uncovered' }] }))
       .toMatchObject({ title: 'Coverage src/db: 2 classes' })
   })

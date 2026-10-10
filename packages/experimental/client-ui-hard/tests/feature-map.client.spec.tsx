@@ -6,7 +6,7 @@ import type { HardLedgerClientView } from '@deepseek-ai/dsh-experimental-hard-le
 import type { HardFeatureGraphView, HardSymbolDetail } from '@deepseek-ai/dsh-experimental-hard-featuremap/client'
 import { FEATURE_GRAPH_PATH, SYMBOL_DETAIL_PATH } from '../../hard-featuremap/src/routes.ts'
 import { FeatureMap } from '../src/client/FeatureMap.tsx'
-import { FEATURE_GRAPH_ROUTE, SYMBOL_DETAIL_ROUTE, featureLayout, overviewLayout, type FeatureMapView } from '../src/client/feature-layout.ts'
+import { FEATURE_GRAPH_ROUTE, SYMBOL_DETAIL_ROUTE, UNMAPPED_NODE, featureLayout, overviewLayout, type FeatureMapView } from '../src/client/feature-layout.ts'
 // The locale-namespace merge for `hard` lives beside the registrations.
 import type {} from '../src/client/mount.ts'
 import { panelProps, SESSION } from './panel-props.client.ts'
@@ -89,29 +89,41 @@ describe('feature map layouts', () => {
     expect(`/${SYMBOL_DETAIL_ROUTE}`).toBe(SYMBOL_DETAIL_PATH)
   })
 
-  it('keep drawn nodes in place when features and links arrive', () => {
+  it('list the indexed entry points by kind until a feature is recorded', () => {
+    const layout = overviewLayout({ ...MAP, entryPoints: [...MAP.entryPoints, { key: 'ajax:trash', handler: null, mapped: false }], features: [] })
+    expect(layout.nodes.map(node => [node.id, node.x, node.y, node.detail, node.mapped])).toEqual([
+      ['entry:ajax:save', 0, 0, 'wp_ajax_save', true], ['entry:script:x.php', 300, 0, '', false], ['entry:ajax:trash', 0, 64, '', false],
+    ])
+    expect(layout.edges).toEqual([])
+    expect(overviewLayout({ ...MAP, entryPoints: [{ key: 'nokind', handler: null, mapped: false }], features: [] }).nodes[0]).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('group entry points by feature and keep drawn clusters in place when features and links arrive', () => {
     const before = overviewLayout(MAP)
+    expect(before.nodes.map(node => [node.id, node.kind, node.x, node.y, node.detail, node.count])).toEqual([
+      ['feature:FE-1', 'feature', 0, 0, 'An editor saves a post.', undefined],
+      ['entry:FE-1:ajax:save', 'entry', 24, 64, 'wp_ajax_save', undefined],
+      [UNMAPPED_NODE, 'unmapped', 1060, 0, '', 1],
+    ])
+    const many = ['ajax:save', 'script:x.php', 'a:1', 'a:2', 'a:3', 'a:4', 'a:5']
     const after = overviewLayout({
       ...MAP,
       entryPoints: MAP.entryPoints.map(entry => ({ ...entry, mapped: true })),
-      features: [FEATURE, { ...FEATURE, id: 'FE-2', name: 'Trash', entryPoints: ['script:x.php', 'ajax:save'] }],
+      features: [FEATURE, { ...FEATURE, id: 'FE-2', name: 'Trash', entryPoints: many }],
       links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'n' }],
     })
-    expect(after.nodes.slice(0, 3).map(node => [node.id, node.x, node.y])).toEqual(before.nodes.map(node => [node.id, node.x, node.y]))
-    // One column per entry kind in index order, unmapped entry points included; features after the last kind.
-    expect(before.nodes.map(node => [node.id, node.x, node.y, node.detail, node.mapped])).toEqual([
-      ['entry:ajax:save', 0, 0, 'wp_ajax_save', true], ['entry:script:x.php', 300, 0, '', false],
-      ['feature:FE-1', 750, 0, 'An editor saves a post.', undefined],
+    expect(after.nodes.slice(0, 2)).toEqual(before.nodes.slice(0, 2))
+    expect(after.nodes.slice(2).map(node => [node.id, node.x, node.y, node.label])).toEqual([
+      ['feature:FE-2', 340, 0, 'FE-2 Trash'],
+      ...many.slice(0, 6).map((key, row) => [`entry:FE-2:${key}`, 364, 64 + row * 36, key]),
+      ['more:FE-2', 364, 280, '+1'],
     ])
-    expect(after.nodes.at(-1)).toMatchObject({ id: 'feature:FE-2', x: 750, y: 64 })
-    expect(after.edges.map(edge => [edge.from, edge.to, edge.kind, edge.label])).toEqual([
-      ['entry:ajax:save', 'feature:FE-1', 'member', undefined],
-      ['entry:script:x.php', 'feature:FE-2', 'member', undefined],
-      ['entry:ajax:save', 'feature:FE-2', 'member', undefined],
+    expect(after.edges.map(edge => [edge.from, edge.to, edge.kind, edge.label]).filter(edge => edge[2] === 'link')).toEqual([
       ['feature:FE-1', 'feature:FE-2', 'link', 'shares-state'],
     ])
-    const sameKind = overviewLayout({ ...MAP, entryPoints: [{ key: 'nokind', handler: null, mapped: false }, { key: 'other', handler: null, mapped: false }] })
-    expect(sameKind.nodes.slice(0, 2).map(node => [node.x, node.y])).toEqual([[0, 0], [0, 64]])
+    expect(after.edges.filter(edge => edge.kind === 'member')).toHaveLength(7)
+    const fourth = overviewLayout({ ...MAP, features: [1, 2, 3, 4].map(n => ({ ...FEATURE, id: `FE-${n}` })) })
+    expect(fourth.nodes.find(node => node.id === 'feature:FE-4')).toMatchObject({ x: 0, y: 316 })
   })
 
   it('layer a feature graph by call distance and park excluded and unreached symbols last', () => {
@@ -133,10 +145,27 @@ describe('FeatureMap', () => {
   it('shows the totals, the features, the unmapped entry points, and the overview graph', () => {
     const { container } = render(<FeatureMap {...panelProps({ state: 'ready', view: ledger(MAP) }).props} />)
     expect(screen.getByText('1 个功能 · 已映射 1/2 个入口点 · 0 条关系')).toBeTruthy()
-    expect(screen.getByText('未映射的入口点（1）')).toBeTruthy()
+    expect(screen.getByText('未映射的入口点（1）', { selector: 'summary' })).toBeTruthy()
     expect(container.querySelector('.react-flow__node[data-id="feature:FE-1"]')?.textContent).toContain('FE-1 Save a post')
-    expect(container.querySelector('.react-flow__node[data-id="entry:ajax:save"]')).not.toBeNull()
+    expect(container.querySelector('.react-flow__node[data-id="entry:FE-1:ajax:save"]')).not.toBeNull()
+    const unmappedNode = container.querySelector('.react-flow__node[data-id="unmapped"]')
+    expect(unmappedNode?.textContent).toBe('未映射的入口点（1）')
+    expect(container.querySelector('details')?.open).toBe(false)
+    fireEvent.click(unmappedNode ?? document.body)
+    expect(container.querySelector('details')?.open).toBe(true)
+    const details = container.querySelector('details')
+    if (details === null) throw new Error('no unmapped list')
+    details.open = false
+    fireEvent(details, new Event('toggle'))
+    fireEvent.click(unmappedNode ?? document.body)
+    expect(details.open).toBe(true)
+  })
+
+  it('dims the entry points no feature covers before any feature is recorded', () => {
+    const { container } = render(<FeatureMap {...panelProps({ state: 'ready', view: ledger({ ...MAP, features: [] }) }).props} />)
     expect(container.querySelector('.react-flow__node[data-id="entry:script:x.php"]')?.className).toContain('entryUnmapped')
+    fireEvent.click(container.querySelector('.react-flow__node[data-id="entry:script:x.php"]') ?? document.body)
+    expect(container.querySelector('details')?.open).toBe(false)
   })
 
   it('opens a feature\'s symbol graph and a symbol\'s detail from the Host routes', async () => {
@@ -196,7 +225,7 @@ describe('FeatureMap', () => {
     const fetch = stubFetch({ 'api/hard-featuremap.feature:FE-1': { status: 200, body: GRAPH } })
     const { props, publish } = panelProps({ state: 'ready', view: ledger(MAP) })
     const { container } = render(<FeatureMap {...props} />)
-    fireEvent.click(container.querySelector('.react-flow__node[data-id="entry:ajax:save"]') ?? document.body)
+    fireEvent.click(container.querySelector('.react-flow__node[data-id="entry:FE-1:ajax:save"]') ?? document.body)
     expect(fetch).not.toHaveBeenCalled()
     fireEvent.click(container.querySelector('.react-flow__node[data-id="feature:FE-1"]') ?? document.body)
     await waitFor(() => {

@@ -5,8 +5,8 @@ export const NS = 'hard'
 
 /** Simplified Chinese dictionary and key source. */
 export const zh = {
-  'tab.title': 'Hard 覆盖矩阵',
-  'guide.title': 'Hard 覆盖矩阵',
+  'tab.title': 'Meebard 覆盖矩阵',
+  'guide.title': 'Meebard 覆盖矩阵',
   'guide.description': '查看目标覆盖矩阵与完成门状态',
   loading: '正在加载台账…',
   empty: '覆盖矩阵尚未武装；任务启动后这里会显示矩阵。',
@@ -32,8 +32,8 @@ export type HardKey = keyof typeof zh
 
 /** English dictionary checked against the Chinese key set. */
 export const en = {
-  'tab.title': 'Hard coverage matrix',
-  'guide.title': 'Hard coverage matrix',
+  'tab.title': 'Meebard coverage matrix',
+  'guide.title': 'Meebard coverage matrix',
   'guide.description': 'See the target coverage matrix and the completion gate',
   loading: 'Loading ledger…',
   empty: 'The coverage matrix is not armed yet; it appears here once the mission arms.',

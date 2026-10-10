@@ -173,7 +173,7 @@ const homeAndGuide = pairedPages([
   {
     source: 'docs/user/guide/hard-harness.md',
     route: 'guide/hard-harness.md',
-    label: { root: 'hard 安全审计', en: 'Hard security audits' },
+    label: { root: 'Meebard Harness 安全审计', en: 'Meebard Harness security audits' },
     sidebar: { root: 'zh-guide', en: 'en-guide' },
     section: { root: '自动化', en: 'Automation' },
     order: 3,

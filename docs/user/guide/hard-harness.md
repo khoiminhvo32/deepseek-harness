@@ -1,10 +1,10 @@
-# Run a hard security audit
+# Run a Meebard Harness security audit
 
 English | [中文](hard-harness.zh.md)
 
 ## Summary
 
-The hard harness turns a Web UI session into a long-running security audit of one target: a git repository, a plain directory, or a single file. The agent sweeps every module for a fixed list of bug classes, reads modules deeply, records every weakness it finds, chains weaknesses toward higher impact, and proves each finding with a proof of concept (PoC) that the harness runs itself. The session keeps working across turns, provider quota stops, and connection failures until the harness certifies the audit complete. Expect a long run: a mid-size target takes many hours and many model requests.
+Meebard Harness, the hard harness, turns a Web UI session into a long-running security audit of one target: a git repository, a plain directory, or a single file. The agent sweeps every module for a fixed list of bug classes, reads modules deeply, records every weakness it finds, chains weaknesses toward higher impact, and proves each finding with a proof of concept (PoC) that the harness runs itself. The session keeps working across turns, provider quota stops, and connection failures until the harness certifies the audit complete. Expect a long run: a mid-size target takes many hours and many model requests.
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ An installed command is `dsh --profile hard-web`. Add `--port <n>` to choose the
 
 In the Web UI, configure a model under **Settings → Models**, add the target directory as the workspace, and start a session. Each new session in this profile is a separate audit of the configured target. Send a short instruction such as “Start the audit.” The agent then works in rounds without further prompts.
 
-Open the **Hard coverage matrix** tab in the right sidebar to see the module × bug-class grid, the coverage ratio, the pinned commit, and what still blocks completion.
+Open the **Meebard coverage matrix** tab in the right sidebar to see the module × bug-class grid, the coverage ratio, the pinned commit, and what still blocks completion.
 
 <a id="follow-the-audit"></a>
 ## Follow the audit

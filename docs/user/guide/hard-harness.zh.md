@@ -1,10 +1,10 @@
-# 运行 hard 安全审计
+# 运行 Meebard Harness 安全审计
 
 [English](hard-harness.md) | 中文
 
 ## Summary
 
-hard harness 把一个 Web UI 会话变成针对单一目标的长时间安全审计：目标可以是 git 仓库、普通目录或单个文件。代理按固定的缺陷类别清单扫描每个模块，深入阅读模块，记录发现的每个弱点，把弱点串联成更高的影响，并用 harness 亲自运行的概念验证（PoC）证明每个 finding。会话会跨越多个 turn、provider 配额中断和连接故障持续工作，直到 harness 认证审计完成。请预期这是一次长时间运行：中等规模的目标需要许多小时和大量模型请求。
+Meebard Harness（即 hard harness）把一个 Web UI 会话变成针对单一目标的长时间安全审计：目标可以是 git 仓库、普通目录或单个文件。代理按固定的缺陷类别清单扫描每个模块，深入阅读模块，记录发现的每个弱点，把弱点串联成更高的影响，并用 harness 亲自运行的概念验证（PoC）证明每个 finding。会话会跨越多个 turn、provider 配额中断和连接故障持续工作，直到 harness 认证审计完成。请预期这是一次长时间运行：中等规模的目标需要许多小时和大量模型请求。
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ pnpm dsh --profile hard-web
 
 在 Web UI 中，在 **Settings → Models** 配置模型，把目标目录添加为工作区，然后开始一个会话。该 profile 中的每个新会话都是对所配置目标的一次独立审计。发送一条简短指令，例如“Start the audit.”。之后代理会按轮次工作，无需进一步提示。
 
-打开右侧边栏的 **Hard coverage matrix** 标签页，查看模块 × 缺陷类别网格、覆盖率、被钉住的提交，以及仍在阻塞完成的事项。
+打开右侧边栏的 **Meebard coverage matrix** 标签页，查看模块 × 缺陷类别网格、覆盖率、被钉住的提交，以及仍在阻塞完成的事项。
 
 <a id="follow-the-audit"></a>
 ## 跟进审计

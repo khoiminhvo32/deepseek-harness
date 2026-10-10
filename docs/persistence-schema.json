@@ -11534,6 +11534,487 @@
       }
     },
     {
+      "key": "event:hard/feature/linked",
+      "kind": "event",
+      "event": "hard/feature/linked",
+      "surface": false,
+      "digest": "cd4908c1207d6767117f4e09395408db86f453a0cbc398f9ee0593191f876c7a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "from",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "to",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "calls"
+          },
+          {
+            "kind": "literal",
+            "value": "enables"
+          },
+          {
+            "kind": "literal",
+            "value": "gates"
+          },
+          {
+            "kind": "literal",
+            "value": "shares-state"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/linked"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/recorded",
+      "kind": "event",
+      "event": "hard/feature/recorded",
+      "surface": false,
+      "digest": "013a116aceedf81d16bc6c243418a0fde01180a6786d15002f1e34ce6053e92e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 24,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 25,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "check",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryPoints",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "excluded",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "states",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "symbols",
+                "type": 17,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "commit",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "reach",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "required",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "array",
+            "element": 7
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "note",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "reason",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "other-feature"
+          },
+          {
+            "kind": "literal",
+            "value": "unreachable"
+          },
+          {
+            "kind": "literal",
+            "value": "utility"
+          },
+          {
+            "kind": "array",
+            "element": 13
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "access",
+                "type": 14,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              15,
+              16
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "read"
+          },
+          {
+            "kind": "literal",
+            "value": "write"
+          },
+          {
+            "kind": "array",
+            "element": 18
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "role",
+                "type": 19,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "guard"
+          },
+          {
+            "kind": "literal",
+            "value": "helper"
+          },
+          {
+            "kind": "literal",
+            "value": "mutation"
+          },
+          {
+            "kind": "literal",
+            "value": "entry"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/recorded"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/featuremap/indexed",
+      "kind": "event",
+      "event": "hard/featuremap/indexed",
+      "surface": false,
+      "digest": "23081f7f97e4b4c163aac9698255273e730dd41afc0dfb6be87815326252efce",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "commit",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "derivation",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryPoints",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "handler",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              6
+            ]
+          },
+          {
+            "kind": "primitive",
+            "type": "null"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/featuremap/indexed"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:hard/finding/proposed",
       "kind": "event",
       "event": "hard/finding/proposed",
@@ -26079,6 +26560,18 @@
       "sources": []
     },
     {
+      "digest": "013a116aceedf81d16bc6c243418a0fde01180a6786d15002f1e34ce6053e92e",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "013b332406768609927d38a5be0d0be8d541693df74c96bb1d7c10b86cf13455",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:209"
+      ]
+    },
+    {
       "digest": "01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5",
       "names": [],
       "sources": []
@@ -26282,6 +26775,11 @@
       "sources": []
     },
     {
+      "digest": "0ec477445d5789968a473715dc0db278c072e164b10cfd85e08982169cfe0c83",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "0ed8d1108fe7a5e1c3078ef1faea12199a56b6b1216ccaceb0f6103b0c9a7691",
       "names": [],
       "sources": []
@@ -26458,6 +26956,13 @@
       "sources": []
     },
     {
+      "digest": "17a1f3dc1ac8f51475e04850728a1f731a5aec17f8979db05af1ea85b2238408",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:206"
+      ]
+    },
+    {
       "digest": "17aae616ef020b8b9f011ec398ec935450fb06d3e2a0722c456f63aeaf5ff728",
       "names": [],
       "sources": []
@@ -26487,6 +26992,11 @@
       "sources": [
         "packages/schedule/schedule/src/types.ts:230"
       ]
+    },
+    {
+      "digest": "18ecff74ae9ce1a1b76d9eff9339b5c273d3aefbc4db31dca30c43b9cd3c5b0f",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "18ee62b8900a4c3d046700f05d7a4d49d6cab2a660a020c87481d1603dd8bd4f",
@@ -26648,7 +27158,7 @@
       "digest": "1e5545d0505fb302ed9babf0f278726c57150b8f3fc8b78ffe00a9d753af5dd8",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:278"
+        "packages/experimental/hard-ledger/src/types.ts:337"
       ]
     },
     {
@@ -26737,6 +27247,11 @@
       "sources": []
     },
     {
+      "digest": "23081f7f97e4b4c163aac9698255273e730dd41afc0dfb6be87815326252efce",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "234142ee4f996f38cc9fa3b8b3e3de29b03c9aefe5ebf6c224eddd564505aa85",
       "names": [],
       "sources": []
@@ -26821,7 +27336,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingVerdictData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:110"
+        "packages/experimental/hard-ledger/src/types.ts:113"
       ]
     },
     {
@@ -26850,6 +27365,15 @@
       "digest": "297fbd8067d7815adae02b89790ec6ff5fb7c2cb0d0eb026e1746c24ec857761",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "29a6edad2a9bac6a83444e773de0f13f3403f87e8113234db5d56d46faaf7cef",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureLinkKind"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:213"
+      ]
     },
     {
       "digest": "2a1f3aaa145bbe3ab4147928e0d4184eb8d6e3b1b84a78efc5f839b5dd169887",
@@ -27043,7 +27567,7 @@
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:291"
+        "packages/experimental/hard-ledger/src/types.ts:350"
       ]
     },
     {
@@ -27053,6 +27577,11 @@
     },
     {
       "digest": "35203ba7ad5ef6f97d556b85df20ae98f04f09c65748cecdf8eefdb8b6405ffc",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "35e76e915ed0d9acee5ba14eeb353d392b10622bd6071fd49aa1045d033935f7",
       "names": [],
       "sources": []
     },
@@ -27106,6 +27635,11 @@
     },
     {
       "digest": "3abae7324356f155cb42450c00b806d134ec93bd6439d2063b8d724162d58604",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "3afd2e87902024a0130b1f20f8c5fff270be95cc609e255e19f9d8737a1df7c8",
       "names": [],
       "sources": []
     },
@@ -27175,6 +27709,11 @@
       ]
     },
     {
+      "digest": "3d642f8e75a7e25bfb0d8c9312232f6cbc154548cb0e5430143c4c4263e30a83",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "3d7d07060a7be77984feb651ea2bf1925d3e0477911d9d3ed86330d1e8ca6182",
       "names": [
         "packages/feedback/message-feedback/src/types.ts#MessageFeedbackItem"
@@ -27211,7 +27750,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStatus"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:24"
+        "packages/experimental/hard-ledger/src/types.ts:27"
       ]
     },
     {
@@ -27341,6 +27880,11 @@
       ]
     },
     {
+      "digest": "47b710604ca73504dd78dc664e968339f3d90596995daad9c3c3c5a4987ec432",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "47e5d84f1a93450a78c7f3954b43990d0f629af7c034a56313e5deb63e772c1b",
       "names": [],
       "sources": []
@@ -27401,6 +27945,11 @@
       "sources": []
     },
     {
+      "digest": "4ae29d3e3d530ebfe48a4e8de2dcec42aece955019f204d7e276b7e9c3068fcd",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "4aed17ec726b5397c29f6cb4bcd7905dc1a12bb6140f1657f073cd24380f2af8",
       "names": [],
       "sources": []
@@ -27434,7 +27983,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:247"
+        "packages/experimental/hard-ledger/src/types.ts:306"
       ]
     },
     {
@@ -27459,6 +28008,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamId",
         "packages/experimental/agent-team/src/types.ts#TeamMessageId",
         "packages/experimental/agent-team/src/types.ts#TeamTaskId",
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureId",
         "packages/experimental/hard-ledger/src/types.ts#HardFindingId",
         "packages/experimental/hard-ledger/src/types.ts#HardFlawId",
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisId",
@@ -27490,6 +28040,7 @@
         "packages/experimental/hard-ledger/src/types.ts:12",
         "packages/experimental/hard-ledger/src/types.ts:15",
         "packages/experimental/hard-ledger/src/types.ts:18",
+        "packages/experimental/hard-ledger/src/types.ts:21",
         "packages/feedback/message-feedback/src/types.ts:14",
         "packages/goal/goal/src/types.ts:17",
         "packages/interaction/commands/src/brand.ts:31",
@@ -27536,6 +28087,11 @@
       "sources": [
         "packages/subagent/subagent/src/continuation-messages.ts:30"
       ]
+    },
+    {
+      "digest": "4ea0434c678a846b736324e796b3e732ff48688072204abd6e2b81931df53bab",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "4edec1b770e8ec4ce1220bf42edc5ac46713a1b48d4caa778dcfc98bad1f28a3",
@@ -27632,7 +28188,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocSections"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:216"
+        "packages/experimental/hard-ledger/src/types.ts:275"
       ]
     },
     {
@@ -28008,8 +28564,13 @@
         "packages/experimental/hard-ledger/src/types.ts#HardVerdict"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:21"
+        "packages/experimental/hard-ledger/src/types.ts:24"
       ]
+    },
+    {
+      "digest": "6b4169b5598d91c5395e36904bf2c73c80c95e2dba9dc33ff5c14a4d72ad0bfb",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "6bbe793f6a93dc8d50a4d4d3fbb6f8ed15650bcb7e151d28669628f7b7c3fc25",
@@ -28122,7 +28683,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:191"
+        "packages/experimental/hard-ledger/src/types.ts:250"
       ]
     },
     {
@@ -28160,8 +28721,13 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:212"
+        "packages/experimental/hard-ledger/src/types.ts:271"
       ]
+    },
+    {
+      "digest": "72a51f68c1712dcab4e57023a63da327c6b5ef2fd00c8aa781cdd013397176f0",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "72ec79127a9c0d0241b1106a74cc2b24c81ce467170f1c3c93f7b71a9496d227",
@@ -28232,6 +28798,11 @@
       ]
     },
     {
+      "digest": "76cfa46f0e12c92ff3906998ae48dfc02fb732a3a8e04f680461fc3395974d08",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "77f83914f9fe917b255099fd191f39b898cd9231b02612a5a7b1fa2bc04ecf1d",
       "names": [],
       "sources": []
@@ -28249,6 +28820,11 @@
       ]
     },
     {
+      "digest": "799231ac91869a6695666505343003905638e1b4d11349bff953d4dbfe3191ba",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "79ddc907312f97cf9553d4841e8b3fc937097bd8d97900a790efad3c05255e99",
       "names": [],
       "sources": [
@@ -28259,7 +28835,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:213"
+        "packages/experimental/hard-ledger/src/types.ts:272"
       ]
     },
     {
@@ -28279,6 +28855,11 @@
     },
     {
       "digest": "7bdf6fa6739c693b9467a46c74c303e1e231172f435cf493cb1a237cd8625d8f",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "7c380833d2f12d51aac1ee504b3b32c8246ccd7820d5630523fb7dae10fbe7be",
       "names": [],
       "sources": []
     },
@@ -28344,6 +28925,15 @@
       "sources": []
     },
     {
+      "digest": "7f6fb2f8071338cdd6a7c57aabaf544e083780e7f5a054cfbe58056e94a2ecb7",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureEntryRef"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:168"
+      ]
+    },
+    {
       "digest": "7f7fd5a6b0064f597534b29ff62ef26e786dffccf5e14f654a7d4fcea2c35f04",
       "names": [],
       "sources": []
@@ -28379,7 +28969,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlawData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:172"
+        "packages/experimental/hard-ledger/src/types.ts:231"
       ]
     },
     {
@@ -28512,7 +29102,7 @@
       "digest": "84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:342"
+        "packages/experimental/hard-ledger/src/types.ts:401"
       ]
     },
     {
@@ -28574,6 +29164,11 @@
       "sources": []
     },
     {
+      "digest": "880778d6d1edbe43aef4ca98f1c2deb0260adba6a2534edf9a2accbb2907f0f2",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "883e93df3e09e9bced9ebd4b2b89c040643b9b2a5d1ee6e7d207e44873eeaf6a",
       "names": [],
       "sources": []
@@ -28589,7 +29184,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageVerdict"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:27"
+        "packages/experimental/hard-ledger/src/types.ts:30"
       ]
     },
     {
@@ -28606,6 +29201,11 @@
     },
     {
       "digest": "8a6e1ec9e8db346b0e02f027db73c07a94f067a26d40c1aef1abd09c47ce7ba0",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "8a85c6c0f067f99983a05a48b70de9c8c3a08d1c42f19b86021f24d1cd776c38",
       "names": [],
       "sources": []
     },
@@ -28708,6 +29308,11 @@
       ]
     },
     {
+      "digest": "8fef1334966f50c322defab7f7ea17b3d30af01ac00e62fee2d9b041deee256e",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "904bf499d98be4a3a5f836fcac533b6c4899569b018071e6604e1d32657d00fd",
       "names": [],
       "sources": []
@@ -28781,7 +29386,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:297"
+        "packages/experimental/hard-ledger/src/types.ts:356"
       ]
     },
     {
@@ -28846,7 +29451,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMatrixExclusions"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:316"
+        "packages/experimental/hard-ledger/src/types.ts:375"
       ]
     },
     {
@@ -28885,9 +29490,27 @@
       "sources": []
     },
     {
+      "digest": "9b2db4ee2583d49ff64ffbf95ac2e5ef95978bf8fb0c259061768ca0feca90cb",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:198"
+      ]
+    },
+    {
       "digest": "9b4fd974c124c83743efe030ba4e1250e087505f3f74588716a521fb8d453267",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "9ba55f70acec6906e0422c6fba4ac3304042c40b05369b081070f301bcaa8a1e",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureExclusionReason"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:188"
+      ]
     },
     {
       "digest": "9bba1c400d2f30a11f3eeda82c990dd91ce0172480d0d8e36a933abf635abd9c",
@@ -28964,6 +29587,11 @@
     },
     {
       "digest": "9f65c43e340bba31cdc0fc37bd93ccb68d5e9b36f47a68c207e95a8e68620a5d",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "a039dede4d8585e0e2cfc39cee0572086100fb96f23bc3fc7d645c8676bdaa73",
       "names": [],
       "sources": []
     },
@@ -29099,6 +29727,11 @@
       ]
     },
     {
+      "digest": "a717aa8035f5358605a988477ecdf78237e09e6f1c8158af7a2b38546b870a88",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a720757f704a2512e9d2f20da4a093e582472176236a75ab8b8eb7aaff17d85a",
       "names": [],
       "sources": []
@@ -29228,7 +29861,14 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:351"
+        "packages/experimental/hard-ledger/src/types.ts:410"
+      ]
+    },
+    {
+      "digest": "ac8f6c89ca40b17f0b53f9ba557fc731ad7cfc0d60f18f254ff590225adc54d4",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:208"
       ]
     },
     {
@@ -29285,6 +29925,13 @@
       "digest": "aec150797b655c5f15ebb7a501454b0c208fbaccec9ace49d7de2171fc02f47d",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "aecbe4793b1091faa88300dd3d7f5dcb31653861d3d3afae24bf13ccb3df1e2c",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:205"
+      ]
     },
     {
       "digest": "af0750d32d97d47b12b7361a587db41894b17e04c9a805fe212f0114aa2248c7",
@@ -29540,7 +30187,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFindingProposedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:47"
+        "packages/experimental/hard-ledger/src/types.ts:50"
       ]
     },
     {
@@ -29584,6 +30231,15 @@
       "digest": "bd499eac047efe091a4df7382eadd06d25cf0cb31fee3981e8b24d85762841cd",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "be1c4cc34ffa5c0b38370d0af9efddb3ee92a8e8bfe320e516b489c6ba071a5a",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureLinkData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:216"
+      ]
     },
     {
       "digest": "bf16d2e98a7f13894ded2cffe5ce857bf473954a0e3c0ed9bc7739e2e1c7b78a",
@@ -29708,7 +30364,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:232"
+        "packages/experimental/hard-ledger/src/types.ts:291"
       ]
     },
     {
@@ -29773,6 +30429,11 @@
       "sources": []
     },
     {
+      "digest": "cd4908c1207d6767117f4e09395408db86f453a0cbc398f9ee0593191f876c7a",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "cda2345a9be9d139df49ccbd16dcba716f3440178bf20ff8b801fda1f5eb77dc",
       "names": [],
       "sources": []
@@ -29804,7 +30465,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisStateData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:149"
+        "packages/experimental/hard-ledger/src/types.ts:152"
       ]
     },
     {
@@ -29857,12 +30518,17 @@
       "sources": []
     },
     {
+      "digest": "d458c5377024aa7d84190f3113e8afce8f1a5005f070bd8125d7b01f46d33437",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "d47ad4a8dc92359da3b9df16b5bafb57b7f2df030c5f27f4c3d023ababbdf089",
       "names": [
         "packages/experimental/hard-ledger/src/types.ts#HardTargetSnapshot"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:332"
+        "packages/experimental/hard-ledger/src/types.ts:391"
       ]
     },
     {
@@ -30004,6 +30670,15 @@
       "sources": []
     },
     {
+      "digest": "df05d846a12c3a612608e8c9bf1684f698f65ec2df5e6dcafb6a2eb7d3ec76fd",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureRole"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:185"
+      ]
+    },
+    {
       "digest": "df5d9709b7db2a72510dc52052a23f0c38f39730af1504bab8bccabc14fae528",
       "names": [],
       "sources": []
@@ -30034,6 +30709,11 @@
     },
     {
       "digest": "e0a9270a4c677f2f6678b2e5393ac061da56497f45d42cf026b7ae3f6afa2b69",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e1a479b4c91e274ffb20cc3f7a86e123fea982c48777b0a09d860a4b9c85e072",
       "names": [],
       "sources": []
     },
@@ -30110,6 +30790,15 @@
       "digest": "e4cac694f8b6e1d52e48c699464f1c4c26111ef87e558f7931040d00fdc8d486",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "e5acdc7be5812b5c96e03c72fc48d15febd5df0cebfdca4c0ef285e77d0a49a3",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureMapIndexedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:178"
+      ]
     },
     {
       "digest": "e5d3828df1ec3e2a66879de0659e0f4866d9cfffc00825ee731a66f8a0c03d98",
@@ -30224,7 +30913,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:281"
+        "packages/experimental/hard-ledger/src/types.ts:340"
       ]
     },
     {
@@ -30314,7 +31003,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:273"
+        "packages/experimental/hard-ledger/src/types.ts:332"
       ]
     },
     {
@@ -30384,6 +31073,11 @@
       "sources": [
         "packages/llm/llm/src/types.ts:396"
       ]
+    },
+    {
+      "digest": "f35369370732d3517cae1d8ecb6a00cddd1c43788597bdb1358247affc4ba6f6",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "f3dcdc9d865d02413f20aac28f87a7199d95f303a813c71680f705713efae397",
@@ -30584,6 +31278,11 @@
     },
     {
       "digest": "ff0729e5e6956bca1075089bd5d34489448a88a6d8ded5ffaa2e772787fac179",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "ff7bda0c64a36c804164a83d1ae58b1dbddc59d23751b415700ac57447cbd29a",
       "names": [],
       "sources": []
     }

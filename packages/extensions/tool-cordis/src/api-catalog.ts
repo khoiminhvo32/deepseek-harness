@@ -1323,6 +1323,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one record per weakness.',
       },
       {
+        signature: 'recordFeatureMapIndexed(agent: Agent, data: HardFeatureMapIndexedData): boolean',
+        description: 'Record the entry points of the feature map indexed for the pinned commit, unless the session already holds this derivation.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the commit, the import derivation, and the entry points.' }],
+        returns: 'whether a record was appended.',
+      },
+      {
+        signature: 'recordFeature(agent: Agent, request: Omit<HardFeatureData, \'id\'> & { id?: string }): HardFeatureId',
+        description: 'Append one feature the caller already checked against the feature map and return its id; naming an existing id revises that feature.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the feature without an id, or with the existing id it revises.' }],
+        returns: 'the feature id.',
+        throws: ['`HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, or a text error for a blank field.'],
+      },
+      {
+        signature: 'linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData[\'kind\']; note: string }): void',
+        description: 'Append one relation between two recorded features.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the two feature ids, the relation kind, and a note.' }],
+        throws: ['`HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link, or a text error for a blank note.'],
+      },
+      {
+        signature: 'features(agent: Agent): readonly HardFeatureData[]',
+        description: 'The latest record of every feature, in first-record order.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per feature id.',
+      },
+      {
+        signature: 'featureLinks(agent: Agent): readonly HardFeatureLinkData[]',
+        description: 'Feature relations in record order.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per relation.',
+      },
+      {
+        signature: 'featureMap(agent: Agent): HardFeatureMapIndexedData | undefined',
+        description: 'The latest indexed feature map of the session.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the indexed entry points, or undefined before any index.',
+      },
+      {
+        signature: 'unmappedEntryPoints(agent: Agent): readonly string[]',
+        description: 'Indexed entry points no recorded feature names. The math lives in `unmappedEntryPointsFromState`.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'the unmapped `kind:key` entry points.',
+      },
+      {
         signature: 'chainMaterial(agent: Agent): readonly string[]',
         description: 'The ids a chain hypothesis may link: every recorded weakness, then every confirmed finding no weakness already names. The math lives in `chainMaterialFromState`.',
         parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
@@ -5748,8 +5791,40 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n    readonly guards: readonly string[];\n}',
   },
   {
+    name: 'HardFeatureData',
+    declaration: 'export interface HardFeatureData {\n    readonly id: HardFeatureId;\n    readonly name: string;\n    readonly summary: string;\n    readonly entryPoints: readonly string[];\n    readonly symbols: readonly {\n        readonly symbol: string;\n        readonly role: HardFeatureRole;\n    }[];\n    readonly excluded: readonly {\n        readonly symbol: string;\n        readonly reason: HardFeatureExclusionReason;\n        readonly note?: string;\n    }[];\n    readonly states: readonly {\n        readonly kind: string;\n        readonly key: string;\n        readonly access: \'read\' | \'write\';\n    }[];\n    readonly check: {\n        readonly commit: string;\n        readonly reach: number;\n        readonly required: number;\n    };\n}',
+  },
+  {
+    name: 'HardFeatureEntryRef',
+    declaration: 'export interface HardFeatureEntryRef {\n    readonly key: string;\n    readonly handler: string | null;\n}',
+  },
+  {
+    name: 'HardFeatureExclusionReason',
+    declaration: 'export type HardFeatureExclusionReason = \'utility\' | \'other-feature\' | \'unreachable\';',
+  },
+  {
+    name: 'HardFeatureId',
+    declaration: 'export type HardFeatureId = Branded<\'HardFeatureId\'>;',
+  },
+  {
+    name: 'HardFeatureLinkData',
+    declaration: 'export interface HardFeatureLinkData {\n    readonly from: HardFeatureId;\n    readonly to: HardFeatureId;\n    readonly kind: HardFeatureLinkKind;\n    readonly note: string;\n}',
+  },
+  {
+    name: 'HardFeatureLinkKind',
+    declaration: 'export type HardFeatureLinkKind = \'calls\' | \'shares-state\' | \'gates\' | \'enables\';',
+  },
+  {
+    name: 'HardFeatureMapIndexedData',
+    declaration: 'export interface HardFeatureMapIndexedData {\n    readonly commit: string;\n    readonly derivation: string;\n    readonly entryPoints: readonly HardFeatureEntryRef[];\n}',
+  },
+  {
     name: 'HardFeatureMapSnapshot',
     declaration: 'export interface HardFeatureMapSnapshot {\n    readonly id: number;\n    readonly commit: string;\n    readonly stats: HardSnapshotStats;\n    readonly reused: boolean;\n}',
+  },
+  {
+    name: 'HardFeatureRole',
+    declaration: 'export type HardFeatureRole = \'entry\' | \'guard\' | \'mutation\' | \'helper\';',
   },
   {
     name: 'HardFindingCause',
@@ -6457,7 +6532,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'OpenWorkCounts',
-    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n    readonly unchainedMaterial: number;\n};',
+    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n    readonly unchainedMaterial: number;\n    readonly unmappedEntryPoints: number;\n};',
   },
   {
     name: 'OptionalSessionSeq',

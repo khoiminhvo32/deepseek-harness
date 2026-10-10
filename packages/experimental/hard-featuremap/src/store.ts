@@ -132,6 +132,27 @@ export interface HardSnapshotStats {
   readonly entryPoints: number
 }
 
+/** One symbol as a query returns it. */
+export interface HardSymbolRow {
+  readonly id: string
+  readonly name: string
+  readonly kind: 'function' | 'method' | 'script'
+  readonly owner: string | null
+  readonly file: string
+  readonly line: number | null
+  readonly end: number | null
+}
+
+type SymbolRecord = {
+  id: string
+  name: string
+  kind: 'function' | 'method' | 'script'
+  owner: string | null
+  file: string
+  line: number | null
+  end: number | null
+}
+
 /** One edge as a query returns it: the other end, where the call is, and which rule made it. */
 export interface HardEdgeRow {
   readonly caller: string
@@ -278,6 +299,53 @@ export class HardFeatureMapStore {
    */
   callees(snapshot: number, symbol: string): HardEdgeRow[] {
     return this.edges('caller', snapshot, symbol)
+  }
+
+  /**
+   * One symbol of a snapshot.
+   * @param snapshot - snapshot id.
+   * @param id - symbol id.
+   * @returns the symbol, or undefined when the snapshot has none with that id.
+   */
+  symbol(snapshot: number, id: string): HardSymbolRow | undefined {
+    const row = this.db.prepare('SELECT id, name, kind, owner, file, line, end_line AS end FROM symbol WHERE snapshot_id = ? AND id = ?')
+      .get(snapshot, id) as SymbolRecord | undefined
+    return row === undefined ? undefined : { ...row }
+  }
+
+  /**
+   * Symbols whose name or id contains a text, ordered by id.
+   * @param snapshot - snapshot id.
+   * @param text - the text to look for, matched case-insensitively.
+   * @param limit - the most symbols to return.
+   * @returns the matching symbols.
+   */
+  findSymbols(snapshot: number, text: string, limit: number): HardSymbolRow[] {
+    const pattern = `%${text.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+    const rows = this.db.prepare(`SELECT id, name, kind, owner, file, line, end_line AS end FROM symbol
+      WHERE snapshot_id = ? AND (name LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\') ORDER BY id LIMIT ?`).all(snapshot, pattern, pattern, limit) as SymbolRecord[]
+    return rows.map(row => ({ ...row }))
+  }
+
+  /**
+   * The distinct symbols one symbol calls, by any edge source.
+   * @param snapshot - snapshot id.
+   * @param symbol - caller symbol id.
+   * @returns callee ids ordered by id.
+   */
+  calleeIds(snapshot: number, symbol: string): string[] {
+    return (this.db.prepare('SELECT DISTINCT callee FROM call_edge WHERE snapshot_id = ? AND caller = ? ORDER BY callee')
+      .all(snapshot, symbol) as { callee: string }[]).map(row => row.callee)
+  }
+
+  /**
+   * How many distinct symbols call one symbol.
+   * @param snapshot - snapshot id.
+   * @param symbol - callee symbol id.
+   * @returns the distinct caller count.
+   */
+  fanIn(snapshot: number, symbol: string): number {
+    return (this.db.prepare('SELECT COUNT(DISTINCT caller) AS n FROM call_edge WHERE snapshot_id = ? AND callee = ?').get(snapshot, symbol) as { n: number }).n
   }
 
   private edges(end: 'caller' | 'callee', snapshot: number, symbol: string): HardEdgeRow[] {

@@ -16,6 +16,9 @@ export const DEFAULT_SCREEN_SPOT_CHECK_PERCENT = 5
 /** Default number of trailing sweeps the completion assessment requires. */
 export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
 
+/** Default share of indexed entry points recorded features must cover, in percent. */
+export const DEFAULT_MIN_ENTRY_MAPPED_PERCENT = 80
+
 /** Verdicted matrix cells over the matrix cell total, `0/0` without a matrix. */
 export type CoverageProgress = { verdicted: number; total: number }
 
@@ -42,6 +45,8 @@ export interface LedgerThresholds {
   readonly screenSpotCheckPercent: number
   /** Trailing empty-verified sweeps the completion assessment requires. */
   readonly emptySweepsToFinish: number
+  /** Share of indexed entry points recorded features must cover, in percent; `0` drops the condition. */
+  readonly minEntryMappedPercent: number
 }
 
 /** Re-shape one folded cell so the optional source drops its `| undefined`. */
@@ -307,6 +312,32 @@ export type OpenWorkCounts = {
   readonly screenReReads: number
   /** Chain material no chain hypothesis links yet. */
   readonly unchainedMaterial: number
+  /** Indexed entry points no recorded feature covers, while coverage is below the required share; otherwise 0. */
+  readonly unmappedEntryPoints: number
+}
+
+/**
+ * Indexed entry points no recorded feature names, in index order; empty when
+ * no feature map is indexed.
+ * @param state - the folded ledger projection state.
+ * @returns the unmapped `kind:key` entry points.
+ */
+export function unmappedEntryPointsFromState(state: HardLedgerProjectionState): string[] {
+  const mapped = new Set((state.features ?? []).flatMap(feature => feature.entryPoints))
+  return (state.featureMap?.entryPoints ?? []).map(entry => entry.key).filter(key => !mapped.has(key))
+}
+
+/**
+ * The unmapped entry points that are open work: all of them while recorded
+ * features cover less than the required share, none once the share is met.
+ * @param state - the folded ledger projection state.
+ * @param percent - the required share of mapped entry points.
+ * @returns the unmapped entry points that block completion, and the indexed total.
+ */
+function owedEntryPoints(state: HardLedgerProjectionState, percent: number): { owed: string[]; total: number } {
+  const total = state.featureMap?.entryPoints.length ?? 0
+  const unmapped = unmappedEntryPointsFromState(state)
+  return { owed: (total - unmapped.length) * 100 < total * percent ? unmapped : [], total }
 }
 
 /**
@@ -348,7 +379,7 @@ export function unchainedMaterialFromState(state: HardLedgerProjectionState): st
  */
 export function openWorkCountsFromState(
   state: HardLedgerProjectionState,
-  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent'>,
+  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent'>,
 ): OpenWorkCounts {
   return {
     pendingFindings: state.findings.filter(record => record.verdict === undefined).length,
@@ -358,6 +389,7 @@ export function openWorkCountsFromState(
     suspiciousCells: state.coverage.filter(cell => cell.verdict === 'suspicious').length,
     screenReReads: state.coverage.filter(cell => isScreenReRead(cell, thresholds.screenSpotCheckPercent)).length,
     unchainedMaterial: unchainedMaterialFromState(state).length,
+    unmappedEntryPoints: owedEntryPoints(state, thresholds.minEntryMappedPercent).owed.length,
   }
 }
 
@@ -380,7 +412,10 @@ function isScreenReRead(cell: FoldedCoverageCell, percent: number): boolean {
  * @param thresholds - the ledger's screen spot-check percent.
  * @returns bounded human-readable work items, empty when nothing is open.
  */
-export function openWorkFromState(state: HardLedgerProjectionState, thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent'>): string[] {
+export function openWorkFromState(
+  state: HardLedgerProjectionState,
+  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent'>,
+): string[] {
   const work: string[] = []
   for (const record of state.findings) {
     if (record.verdict === undefined) work.push(`finding ${record.proposed.id} awaits verification`)
@@ -410,6 +445,11 @@ export function openWorkFromState(state: HardLedgerProjectionState, thresholds: 
   }
   for (const id of unchainedMaterialFromState(state)) {
     work.push(`${id} is in no chain hypothesis: link it with another weakness or finding, or propose that chain and refute it with the reason`)
+  }
+  const { owed, total } = owedEntryPoints(state, thresholds.minEntryMappedPercent)
+  if (owed.length > 0) {
+    work.push(`${owed.length} of ${total} entry points are in no recorded feature; features must cover ${thresholds.minEntryMappedPercent}%: map them with hard_record_feature`)
+    for (const key of owed.slice(0, 5)) work.push(`entry point ${key} is in no feature`)
   }
   return work
 }

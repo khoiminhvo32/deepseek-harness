@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-experimental-hard-featuremap` provides the `hardFeatureMap` service, which imports the Joern facts `hard-cpg` builds for a mission's pinned commit into one SQLite database shared by every project and session. It stores symbols, call sites, call edges tagged with the rule that made each edge, and the entry points and routing guards the configured framework profiles read: WordPress, Laravel, Spring, ASP.NET Core, Flask, FastAPI, and Express. Repairs fill call edges Joern leaves unresolved. The database holds only derived data, so it is rebuilt rather than migrated. The plugin ships switched off.
+`dsh-experimental-hard-featuremap` provides the `hardFeatureMap` service, which imports the Joern facts `hard-cpg` builds for a mission's pinned commit into one SQLite database shared across projects: symbols, call edges tagged with the rule that made each, and the entry points and routing guards of the configured framework profiles. It gives the model `hard_query_map`, `hard_record_feature`, and `hard_link_feature`, and records a feature only after checking that it accounts for every symbol its entry points require, guards and state writes included. The plugin ships switched off.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ Enable the row the hard bundle already mounts, together with `hard-cpg`:
     frameworks: [wordpress]
 ```
 
-The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` directory. `frameworks` lists the profiles to read, any of `wordpress`, `laravel`, `spring`, `aspnet`, `flask`, `fastapi`, and `express`; empty keeps call edges only. Set `hard-cpg`'s `language` to match. `scriptDirs` lists the directories whose top-level PHP files are requested directly; empty selects the WordPress install's root, `wp-admin`, `wp-admin/network`, and `wp-admin/user` when the WordPress profile is on. With `indexOnArm` (default on), arming a mission imports in the background and logs the edge counts. Consumers call `ctx.hardFeatureMap.index(agent)` for a snapshot id, then `callers`, `callees`, and `entryPoints`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-featuremap) lists every field.
+The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` directory. `frameworks` lists the profiles to read, any of `wordpress`, `laravel`, `spring`, `aspnet`, `flask`, `fastapi`, and `express`; empty keeps call edges only. Set `hard-cpg`'s `language` to match. `scriptDirs` lists the directories whose top-level PHP files are requested directly; empty selects the WordPress install's root, `wp-admin`, `wp-admin/network`, and `wp-admin/user` when the WordPress profile is on. With `indexOnArm` (default on), arming a mission imports in the background and logs the edge counts. Indexing also records the entry points in the session, and the ledger's `minEntryMappedPercent` (default 80) holds the completion gate until recorded features cover that share. The check reads `featureDepth` (default 4) call levels from a feature's handlers, does not expand symbols with more than `libraryFanIn` (default 40) distinct callers, requires the non-library symbols within `requiredDepth` (default 2) plus every reached name in `guards` and `mutations` (empty selects the WordPress lists when that profile is on), and lets a feature exclude at most `maxExcludedPercent` (default 50) of its required symbols. Consumers call `ctx.hardFeatureMap.index(agent)` for a snapshot id, then `callers`, `callees`, and `entryPoints`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-hard-featuremap) lists every field.
 
 -----
 
@@ -50,6 +50,7 @@ The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` dire
 - **WordPress entry points.** Admin-ajax and admin-post actions come from hook registrations, with `nopriv` actions public; admin-ajax handlers also come from the core naming convention `wp_ajax_<action>`, because core registers most actions in a loop with computed names. REST handlers are the `get_items`, `get_item`, `create_item`, `update_item`, and `delete_item` methods of `WP_REST_Controller` descendants. Shortcodes and directly requested scripts complete the list.
 - **HTTP route profiles.** Each route is an entry point of kind `http` keyed `VERB path` with its routing guards. Spring joins the class `@RequestMapping` prefix and reads `@PreAuthorize`, `@Secured`, and `@RolesAllowed`; ASP.NET Core expands `[controller]` and `[action]` in `[Route]` and reads `[Authorize]`, with `[AllowAnonymous]` making a route public; Flask and FastAPI read route decorators with a path and treat access-named decorators such as `login_required` as guards; Express reads `get`, `post`, and similar routing calls, takes the last argument as the handler (a referenced closure or a same-file function) and the others as middleware; Laravel reads `Route::` calls with controller arrays, `Controller@method` strings, or closures, and chained `middleware`. A route with guards is `authenticated`, an explicitly open one `public`, and the rest `unknown`, because global middleware is not read.
 - **One snapshot per derivation.** A snapshot is keyed by target root, commit, and a digest of the facts cache key, the frameworks, the script directories, and the import version. A different derivation imports beside the old one; the same one is reused, and concurrent requests share one import.
+- **A feature must account for what it reaches.** From the handlers of a feature's entry points the check walks call edges to `featureDepth`, stops expanding at widely shared library symbols, and computes the required set: the handlers, the near non-library symbols, and every reached guard and state write. A claim must make each required symbol a member or an exclusion with a reason (`utility`, `other-feature`, `unreachable`); a guard or state write cannot be excluded as `utility`; a member outside the reach needs `via`, the reached caller and the line, which the harness reads at the pinned commit and requires to mention the symbol; and a member with role `guard` or `mutation` must be or call one. Every shortfall is reported at once, and only a passing claim reaches the ledger.
 - **Derived, so rebuilt.** A database stamped with another schema version is dropped and recreated, because the facts can always be imported again.
 
 ### Source map
@@ -62,6 +63,8 @@ The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` dire
 | [`src/wordpress.ts`](src/wordpress.ts) | WordPress hooks, hook edges, and entry points |
 | [`src/http.ts`](src/http.ts) | HTTP route profiles |
 | [`src/store.ts`](src/store.ts) | SQLite schema, import, and queries |
+| [`src/check.ts`](src/check.ts) | Reach, required set, and the feature completeness check |
+| [`src/tools.ts`](src/tools.ts) | The three model tools and the prompt section |
 
 </details>
 
@@ -70,11 +73,39 @@ The bundle sets `dbPath` to `featuremap.db` under the harness home's `hard` dire
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as the plugin only writes and queries a database beside the snapshot store; later tools own any model-facing use.
+### System prompt
+
+#### What the model sees
+
+When the plugin is enabled, the `hard:feature-map` section teaches the mapping task: list entry points, find symbol ids, read what a feature must account for, record each feature with its symbols, exclusions, and state, and link features that write the same state behind different guards.
+
+##### Feature map section
+
+```markdown
+Feature map. The harness builds a map of the target from its call graph: entry points a request reaches, the symbols behind them, and the guards and state writes they reach. Map every feature: list entry points with hard_query_map (view entry-points, unmapped_only true), find symbol ids with view symbol, and see what a feature must account for with view required and its entry points. Record each feature with hard_record_feature: a name, what it does and for whom, its entry points, its symbols with roles (entry, guard, mutation, helper), the required symbols it leaves out with a reason (utility, other-feature, unreachable), and the state it reads or writes. The harness refuses a feature that leaves a required symbol unaccounted for, excludes a guard or a state write as utility, or names a symbol outside the reach without citing the call that reaches it (via). Link related features with hard_link_feature. Two features that write the same state behind different guards are where feature abuse hides: link them with kind shares-state and test the weaker path.
+```
+
+#### Token effect
+
+Small fixed input cost on every request while the plugin is enabled.
 
 #### KV Cache effect
 
-None; the plugin adds no request content of its own.
+Prefix-stable while the plugin is enabled; enabling or disabling it changes the prompt prefix.
+
+### Tool schemas and results
+
+#### What the model sees
+
+The generated [`hard_query_map`, `hard_record_feature`, and `hard_link_feature` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-hard-featuremap). Results are compact JSON: a page of entry points with their routing guards and whether a feature covers them, matching symbols, a page of call edges with the rule that made each, the required set of given entry points with each symbol's reasons, the recorded feature id with the reach and required-set sizes and the count of entry points still unmapped, or the recorded link. A refused feature returns every shortfall at once.
+
+#### Token effect
+
+Fixed schema cost while the plugin is enabled, plus one compact result per call; pages hold at most 200 items and a refusal lists at most 20 missing symbols by name.
+
+#### KV Cache effect
+
+Schemas are prefix-stable while the plugin is enabled. Calls and results append after the reusable request prefix without invalidating earlier entries.
 
 ## Known Limitations and Deferred Work
 
@@ -83,6 +114,8 @@ None; the plugin adds no request content of its own.
 - **REST routes registered outside controllers** — `register_rest_route` callbacks in nested arrays are not read; plugin routes outside `WP_REST_Controller` descendants are missing.
 - **Cron and XML-RPC entry points** — scheduled hooks and the XML-RPC method table are not entry points yet; `xmlrpc.php` appears as a script.
 - **Route prefixes outside the declaration** — Express routers mounted with `app.use('/prefix', router)`, Laravel route groups and `Route::resource`, and ASP.NET conventional routes are not read; Django has no profile.
+- **Check cost** — the check queries the database per reached symbol; on WordPress the Quick Edit feature (185 reached symbols) takes about 4 seconds.
+- **Guard and state-write lists** — only the WordPress profile supplies default lists; other frameworks rely on the near-symbol rule unless `guards` and `mutations` are configured.
 - **Global middleware** — app-wide authentication is invisible to the profiles, so a route without its own guard is `unknown`, not `public`.
 
 <a id="dev-note"></a>

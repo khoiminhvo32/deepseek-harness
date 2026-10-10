@@ -74,6 +74,12 @@ describe('HardFeatureMapStore', () => {
       { kind: 'ajax', key: 'save', handler: 'wp_ajax_save', file: 'wp-admin/admin-ajax.php', line: 5, auth: 'authenticated', guards: [] },
       { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', file: 'wp-admin/admin-ajax.php', line: null, auth: 'unknown', guards: [] },
     ])
+    expect(store.symbol(id, 'save_post')).toEqual({ id: 'save_post', name: 'save_post', kind: 'function', owner: null, file: 'code.php', line: 1, end: 2 })
+    expect(store.symbol(id, 'missing')).toBeUndefined()
+    expect(store.findSymbols(id, 'SAVE', 10).map(row => row.id)).toEqual(['Hooks.on_save', 'save_post', 'wp_ajax_save'])
+    expect(store.findSymbols(id, '%', 10)).toEqual([])
+    expect(store.calleeIds(id, 'save_post')).toEqual(['Hooks.on_save'])
+    expect(store.fanIn(id, 'save_post')).toBe(2)
     const second = store.importSnapshot(snapshotImport({ derivation: 'd2' }))
     expect(second).not.toBe(id)
     store.close()

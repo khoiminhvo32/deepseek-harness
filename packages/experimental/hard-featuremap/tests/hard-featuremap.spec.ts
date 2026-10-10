@@ -12,6 +12,8 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardMissionArmedData } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardCpgFacts } from '@deepseek-ai/dsh-experimental-hard-cpg'
@@ -70,11 +72,21 @@ function stubAgent(ctx: Context, id: string): Agent {
 const ARMED: HardMissionArmedData = { objective: 'audit', targetRepo: '/targets/wordpress', commit: COMMIT, modules: ['.'], bugClasses: ['logic'] }
 
 let dbSeq = 0
+/** A shell on the `shell` key; these specs never read cited lines. */
+class UnusedShell extends Service {
+  constructor(ctx: Context) {
+    super(ctx, 'shell')
+  }
+}
+
 async function harness(config: hardFeatureMap.Config = {}, arm = true) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
+  new UnusedShell(ctx)
   await ctx.plugin(HardLedger, {})
   const cpg = new FakeCpg(ctx)
   dbSeq += 1
@@ -89,6 +101,12 @@ describe('hard-featuremap config', () => {
   it('refuses an enabled plugin without an absolute dbPath', () => {
     expect(() => new HardFeatureMap(new Context(), { enabled: true })).toThrow('dbPath must be an absolute path')
     expect(() => new HardFeatureMap(new Context(), { enabled: true, dbPath: 'map.db' })).toThrow('dbPath must be an absolute path')
+  })
+
+  it('refuses check tunables out of range', () => {
+    expect(() => new HardFeatureMap(new Context(), { featureDepth: 0 })).toThrow('featureDepth must be a safe integer from 1 through 8')
+    expect(() => new HardFeatureMap(new Context(), { featureDepth: 2, requiredDepth: 3 })).toThrow('requiredDepth must be a safe integer from 1 through 2')
+    expect(() => new HardFeatureMap(new Context(), { maxExcludedPercent: 101 })).toThrow('maxExcludedPercent must be a safe integer from 0 through 100')
   })
 
   it('refuses script directories outside the target', () => {
@@ -118,7 +136,7 @@ describe('hard-featuremap config', () => {
   })
 
   it('declares its service dependencies and the WordPress script directories', () => {
-    expect(HardFeatureMap.inject).toEqual(['agents', 'hardLedger', 'hardCpg'])
+    expect(HardFeatureMap.inject).toEqual(['agents', 'hardLedger', 'hardCpg', 'shell', 'tools', 'systemPrompt'])
     expect(WORDPRESS_SCRIPT_DIRS).toEqual(['.', 'wp-admin', 'wp-admin/network', 'wp-admin/user'])
   })
 })
@@ -138,6 +156,26 @@ describe('hardFeatureMap.index', () => {
     expect(await ctx.hardFeatureMap.callees(first.id, 'wp_ajax_save')).toHaveLength(1)
     expect((await ctx.hardFeatureMap.entryPoints(first.id)).map(entry => entry.kind)).toEqual(['ajax', 'script'])
     expect(await ctx.hardFeatureMap.index(agent)).toEqual({ ...first, reused: true })
+    const indexed = agent.session.snapshotEvents().filter(event => event.type === 'hard/featuremap/indexed')
+    expect(indexed.map(event => event.data)).toEqual([{
+      commit: COMMIT,
+      derivation: expect.stringMatching(/^[0-9a-f]{16}$/) as string,
+      entryPoints: [{ key: 'ajax:save', handler: 'wp_ajax_save' }, { key: 'script:wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>' }],
+    }])
+    expect(ctx.hardLedger.unmappedEntryPoints(agent)).toEqual(['ajax:save', 'script:wp-admin/admin-ajax.php'])
+  })
+
+  it('registers the feature map tools and section only while enabled, and removes them on disposal', async () => {
+    const names = ['hard_query_map', 'hard_record_feature', 'hard_link_feature']
+    const off = await harness({ enabled: false })
+    expect(names.map(name => off.ctx.tools.get(name))).toEqual([undefined, undefined, undefined])
+    expect((await off.ctx.systemPrompt.assemble()).sections.some(section => section.name === 'hard:feature-map')).toBe(false)
+    const on = await harness()
+    expect(names.map(name => on.ctx.tools.get(name)?.name)).toEqual(names)
+    const section = (await on.ctx.systemPrompt.assemble()).sections.find(item => item.name === 'hard:feature-map')
+    expect(section?.text).toBe(hardFeatureMap.FEATURE_MAP_SECTION)
+    await on.fiber.dispose()
+    expect(names.map(name => on.ctx.tools.get(name))).toEqual([undefined, undefined, undefined])
   })
 
   it('shares one import between concurrent requests', async () => {

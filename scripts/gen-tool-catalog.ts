@@ -68,6 +68,7 @@ import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import HardVerifier from '@deepseek-ai/dsh-experimental-hard-verifier'
 import * as HardTools from '@deepseek-ai/dsh-experimental-hard-tools'
+import HardFeatureMap from '@deepseek-ai/dsh-experimental-hard-featuremap'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
@@ -459,6 +460,31 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-hard-featuremap',
+    dir: 'hard-featuremap',
+    source: 'packages/experimental/hard-featuremap/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.hardLedger', 'ctx.hardCpg facts', 'ctx.shell for cited lines', 'a live Agent with an armed mission'],
+    writes: ['tool/call', 'hard/featuremap/indexed', 'hard/feature/recorded', 'hard/feature/linked', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(HardLedger)
+      await ctx.plugin(class extends Service {
+        constructor(serviceCtx: CordisContext) {
+          super(serviceCtx, 'hardCpg')
+        }
+      })
+      await ctx.plugin(class extends Service {
+        constructor(serviceCtx: CordisContext) {
+          super(serviceCtx, 'shell')
+        }
+      })
+      // Schema harvest never opens the database, so the path is never created.
+      await ctx.plugin(HardFeatureMap, { enabled: true, dbPath: '/nonexistent/featuremap.db', indexOnArm: false })
+    },
+    note:
+      'Mounted only when the deployment enables the feature map; hard_record_feature records a feature only after the completeness check against the pinned commit passes.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-schedule',

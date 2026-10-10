@@ -23,6 +23,22 @@ const HOOK_FIRERS: ReadonlySet<string> = new Set([
 const REST_CONTROLLER = 'WP_REST_Controller'
 /** The route handlers a REST controller implements. */
 const REST_HANDLERS: ReadonlySet<string> = new Set(['get_items', 'get_item', 'create_item', 'update_item', 'delete_item'])
+/** WordPress access checks: every one a feature reaches is required. */
+export const WORDPRESS_GUARDS: readonly string[] = [
+  'current_user_can', 'user_can', 'author_can', 'current_user_can_for_site', 'is_user_logged_in', 'is_super_admin',
+  'check_ajax_referer', 'check_admin_referer', 'wp_verify_nonce',
+]
+/** WordPress state writes: every one a feature reaches is required. */
+export const WORDPRESS_MUTATIONS: readonly string[] = [
+  'wp_insert_post', 'wp_update_post', 'wp_delete_post', 'wp_trash_post', 'wp_untrash_post', 'wp_publish_post',
+  'add_post_meta', 'update_post_meta', 'delete_post_meta', 'add_option', 'update_option', 'delete_option',
+  'add_user_meta', 'update_user_meta', 'delete_user_meta', 'wp_insert_user', 'wp_update_user', 'wp_delete_user', 'wp_set_password',
+  'wp_set_post_terms', 'wp_set_object_terms', 'wp_insert_term', 'wp_update_term', 'wp_delete_term',
+  'wp_insert_comment', 'wp_update_comment', 'wp_delete_comment', 'wp_set_comment_status',
+  'wp_insert_attachment', 'wp_delete_attachment', 'wp_update_attachment_metadata', 'stick_post', 'unstick_post',
+  'set_site_transient', 'set_transient', 'switch_theme', 'activate_plugin', 'deactivate_plugins', 'delete_plugins',
+]
+
 /** Hook-name prefixes that turn a registration into an entry point: kind and who may call it. */
 const HOOK_ENTRY_PREFIXES: readonly { readonly prefix: string; readonly kind: HardEntryKind; readonly auth: HardEntryAuth }[] = [
   { prefix: 'wp_ajax_nopriv_', kind: 'ajax', auth: 'public' },

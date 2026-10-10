@@ -913,6 +913,9 @@ flowchart TD
   pkg_experimental_hard_featuremap --> pkg_experimental_hard_cpg
   pkg_experimental_hard_featuremap --> pkg_experimental_hard_ledger
   pkg_experimental_hard_featuremap --> pkg_llm
+  pkg_experimental_hard_featuremap --> pkg_shell
+  pkg_experimental_hard_featuremap --> pkg_system_prompt
+  pkg_experimental_hard_featuremap --> pkg_tools
   pkg_experimental_hard_handoff --> pkg_agent
   pkg_experimental_hard_handoff --> pkg_compaction
   pkg_experimental_hard_handoff --> pkg_experimental_hard_ledger
@@ -1717,7 +1720,7 @@ flowchart TD
 | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp) | `experimental` | [`agent`](../packages/core/agent), [`browser-use`](../packages/browser-use/browser-use), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | `experimental` | [`agent`](../packages/core/agent), [`browser-use`](../packages/browser-use/browser-use), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | `experimental` | [`computer-use`](../packages/computer-use/computer-use), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
-| [`experimental-hard-featuremap`](../packages/experimental/hard-featuremap) | `experimental` | [`agent`](../packages/core/agent), [`experimental-hard-cpg`](../packages/experimental/hard-cpg), [`experimental-hard-ledger`](../packages/experimental/hard-ledger), [`llm`](../packages/llm/llm) |
+| [`experimental-hard-featuremap`](../packages/experimental/hard-featuremap) | `experimental` | [`agent`](../packages/core/agent), [`experimental-hard-cpg`](../packages/experimental/hard-cpg), [`experimental-hard-ledger`](../packages/experimental/hard-ledger), [`llm`](../packages/llm/llm), [`shell`](../packages/shell/shell), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`experimental-hard-handoff`](../packages/experimental/hard-handoff) | `experimental` | [`agent`](../packages/core/agent), [`compaction`](../packages/compaction/compaction), [`experimental-hard-ledger`](../packages/experimental/hard-ledger), [`goal`](../packages/goal/goal), [`llm`](../packages/llm/llm) |
 | [`experimental-hard-mission`](../packages/experimental/hard-mission) | `experimental` | [`agent`](../packages/core/agent), [`experimental-hard-ledger`](../packages/experimental/hard-ledger), [`experimental-hard-verifier`](../packages/experimental/hard-verifier), [`goal`](../packages/goal/goal), [`home-paths`](../packages/util/home-paths), [`sandbox`](../packages/sandbox/sandbox), [`shell`](../packages/shell/shell), [`system-prompt`](../packages/core/system-prompt) |
 | [`experimental-hard-tools`](../packages/experimental/hard-tools) | `experimental` | [`agent`](../packages/core/agent), [`experimental-hard-ledger`](../packages/experimental/hard-ledger), [`experimental-hard-verifier`](../packages/experimental/hard-verifier), [`goal`](../packages/goal/goal), [`llm`](../packages/llm/llm), [`tools`](../packages/core/tools) |

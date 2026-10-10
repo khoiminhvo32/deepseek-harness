@@ -33,6 +33,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_mark_module`, `hard_record_flaw`, `hard_record_flow`, `hard_status`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/flow/doc`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
+| `@deepseek-ai/dsh-experimental-hard-featuremap` | `hard_link_feature`, `hard_query_map`, `hard_record_feature` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardCpg facts`, `ctx.shell for cited lines`, `a live Agent with an armed mission` | `tool/call`, `hard/featuremap/indexed`, `hard/feature/recorded`, `hard/feature/linked`, `tool/result` | - | Mounted only when the deployment enables the feature map; hard_record_feature records a feature only after the completeness check against the pinned commit passes. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1942,6 +1943,255 @@ Propose a new hypothesis, or move an existing one through its lifecycle: propose
 Source: [`packages/experimental/hard-tools/src/index.ts`](../packages/experimental/hard-tools/src/index.ts)
 
 hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof.
+
+<a id="deepseek-aidsh-experimental-hard-featuremap"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-featuremap`
+
+### `hard_link_feature`
+
+Record how two recorded features relate: calls, shares-state (both read or write the same state), gates (one checks access for the other), or enables (one sets up state the other needs).
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string",
+      "description": "The FE-n feature the relation starts at."
+    },
+    "to": {
+      "type": "string",
+      "description": "The FE-n feature the relation ends at."
+    },
+    "kind": {
+      "type": "string",
+      "description": "The relation.",
+      "enum": [
+        "calls",
+        "shares-state",
+        "gates",
+        "enables"
+      ]
+    },
+    "note": {
+      "type": "string",
+      "description": "What connects them, such as the shared state and each side's guard."
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "kind",
+    "note"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+### `hard_query_map`
+
+Read the feature map of the pinned commit. view entry-points lists entry points (kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry points must account for.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "view": {
+      "type": "string",
+      "description": "What to read.",
+      "enum": [
+        "entry-points",
+        "symbol",
+        "callers",
+        "callees",
+        "required"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "description": "The symbol id for callers and callees; the text to look for in view symbol."
+    },
+    "entry_points": {
+      "type": "array",
+      "description": "Entry points as kind:key, for view required.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kind": {
+      "type": "string",
+      "description": "Only entry points of this kind (ajax, admin-post, rest, shortcode, script, http)."
+    },
+    "unmapped_only": {
+      "type": "boolean",
+      "description": "Only entry points no recorded feature covers."
+    },
+    "offset": {
+      "type": "integer",
+      "description": "Items to skip."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Items to return, at most 200."
+    }
+  },
+  "required": [
+    "view"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+### `hard_record_feature`
+
+Record one feature of the target after the harness checks it against the feature map. Name an existing feature_id to revise it. Every required symbol (view required) must be a member or an exclusion with a reason; guards and state writes cannot be excluded as utility; a member outside the reach of the handlers needs via with the reached caller and the line of the call.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "feature_id": {
+      "type": "string",
+      "description": "An existing FE-n id to revise."
+    },
+    "name": {
+      "type": "string",
+      "description": "One-line feature name."
+    },
+    "summary": {
+      "type": "string",
+      "description": "What the feature does and for whom."
+    },
+    "entry_points": {
+      "type": "array",
+      "description": "Entry points as kind:key from view entry-points.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "symbols": {
+      "type": "array",
+      "description": "Member symbols with their role.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "entry",
+              "guard",
+              "mutation",
+              "helper"
+            ]
+          }
+        },
+        "required": [
+          "symbol",
+          "role"
+        ]
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "description": "Required symbols left out of the feature, with the reason.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "utility",
+              "other-feature",
+              "unreachable"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "reason"
+        ]
+      }
+    },
+    "via": {
+      "type": "array",
+      "description": "For members outside the reach: the reached caller and the line of the call in its file.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "caller": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "caller",
+          "line"
+        ]
+      }
+    },
+    "states": {
+      "type": "array",
+      "description": "State the feature reads or writes.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "table, option, meta, file, cache, session, or similar."
+          },
+          "key": {
+            "type": "string"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "access"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "summary",
+    "entry_points",
+    "symbols"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+Mounted only when the deployment enables the feature map; hard_record_feature records a feature only after the completeness check against the pinned commit passes.
 
 <a id="deepseek-aidsh-tool-schedule"></a>
 

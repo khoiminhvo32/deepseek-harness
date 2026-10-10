@@ -14,6 +14,9 @@
     { "path": "../../core/agent" },
     { "path": "../../llm/llm" },
     { "path": "../hard-ledger" },
-    { "path": "../hard-cpg" }
+    { "path": "../hard-cpg" },
+    { "path": "../../shell/shell" },
+    { "path": "../../core/system-prompt" },
+    { "path": "../../core/tools" }
   ]
 }

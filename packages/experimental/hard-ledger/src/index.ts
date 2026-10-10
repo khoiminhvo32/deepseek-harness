@@ -27,6 +27,8 @@ import {
   unchainedMaterialFromState,
   uncoveredCellsFromState,
   chainMaterialFromState,
+  DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
+  unmappedEntryPointsFromState,
 } from './aggregate.ts'
 import { classScope } from './scope.ts'
 import type {
@@ -46,6 +48,10 @@ import type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFeatureData,
+  HardFeatureId,
+  HardFeatureLinkData,
+  HardFeatureMapIndexedData,
   HardFlawData,
   HardFlawId,
   HardFlowDocData,
@@ -72,6 +78,14 @@ export type {
   HardFindingProposedData,
   HardFindingRequest,
   HardFindingVerdictData,
+  HardFeatureData,
+  HardFeatureEntryRef,
+  HardFeatureExclusionReason,
+  HardFeatureId,
+  HardFeatureLinkData,
+  HardFeatureLinkKind,
+  HardFeatureMapIndexedData,
+  HardFeatureRole,
   HardFlawData,
   HardFlawId,
   HardFlowDocData,
@@ -103,8 +117,9 @@ export {
   refutationBreakdownFromState,
   unchainedMaterialFromState,
   uncoveredCellsFromState,
+  unmappedEntryPointsFromState,
 } from './aggregate.ts'
-export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
+export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_MIN_ENTRY_MAPPED_PERCENT, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
 export type {
   CompletionAssessment,
   CoverageBySource,
@@ -142,18 +157,26 @@ export interface Config {
    * no way for two plugins' separate configs to drift apart.
    */
   emptySweepsToFinish?: number
+  /**
+   * Share of the indexed feature map's entry points recorded features must
+   * cover before the mission can complete, in percent; `0` drops the
+   * condition. Without an indexed feature map there is nothing to cover.
+   */
+  minEntryMappedPercent?: number
 }
 
 /** Schemastery config for the ledger service. */
 export const Config: z<Config> = z.object({
   screenSpotCheckPercent: z.number().step(1).min(0).max(100).default(DEFAULT_SCREEN_SPOT_CHECK_PERCENT),
   emptySweepsToFinish: z.number().step(1).min(0).max(16).default(DEFAULT_EMPTY_SWEEPS_TO_FINISH),
+  minEntryMappedPercent: z.number().step(1).min(0).max(100).default(DEFAULT_MIN_ENTRY_MAPPED_PERCENT),
 })
 
 /** Fully materialized ledger settings. */
 interface ResolvedConfig {
   readonly screenSpotCheckPercent: number
   readonly emptySweepsToFinish: number
+  readonly minEntryMappedPercent: number
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -166,7 +189,11 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(emptySweepsToFinish) || emptySweepsToFinish < 0 || emptySweepsToFinish > 16) {
     throw new TypeError('emptySweepsToFinish must be a safe integer from 0 through 16')
   }
-  return { screenSpotCheckPercent, emptySweepsToFinish }
+  const minEntryMappedPercent = config.minEntryMappedPercent ?? DEFAULT_MIN_ENTRY_MAPPED_PERCENT
+  if (!Number.isSafeInteger(minEntryMappedPercent) || minEntryMappedPercent < 0 || minEntryMappedPercent > 100) {
+    throw new TypeError('minEntryMappedPercent must be a safe integer from 0 through 100')
+  }
+  return { screenSpotCheckPercent, emptySweepsToFinish, minEntryMappedPercent }
 }
 
 /** Maximum characters retained for bounded reason and statement text. */
@@ -509,6 +536,122 @@ export class HardLedger extends Service {
       ...(findingId === undefined ? {} : { findingId: brandString<HardFindingId>(findingId) }),
       ...(hypothesisId === undefined ? {} : { hypothesisId: brandString<HardHypothesisId>(hypothesisId) }),
     }))
+  }
+
+  /**
+   * Record the entry points of the feature map indexed for the pinned
+   * commit, unless the session already holds this derivation.
+   * @param agent - the live agent whose session receives the record.
+   * @param data - the commit, the import derivation, and the entry points.
+   * @returns whether a record was appended.
+   */
+  recordFeatureMapIndexed(agent: Agent, data: HardFeatureMapIndexedData): boolean {
+    if (this.state(agent.session).featureMap?.derivation === data.derivation) return false
+    agent.session.append('hard/featuremap/indexed', {
+      commit: data.commit,
+      derivation: data.derivation,
+      entryPoints: data.entryPoints.map(entry => ({ key: entry.key, handler: entry.handler })),
+    })
+    return true
+  }
+
+  /**
+   * Append one feature the caller already checked against the feature map
+   * and return its id; naming an existing id revises that feature.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the feature without an id, or with the existing id it revises.
+   * @returns the feature id.
+   * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, or a text error for a blank field.
+   */
+  recordFeature(agent: Agent, request: Omit<HardFeatureData, 'id'> & { id?: string }): HardFeatureId {
+    this.assertText('name', request.name)
+    this.assertText('summary', request.summary)
+    const features = this.state(agent.session).features ?? []
+    if (request.id !== undefined && !features.some(feature => feature.id === request.id)) {
+      throw new HarnessError(`unknown feature id ${request.id}`, 'HARD_LEDGER_UNKNOWN_FEATURE')
+    }
+    const id = brandString<HardFeatureId>(request.id ?? `FE-${features.length + 1}`)
+    agent.session.append('hard/feature/recorded', {
+      id,
+      name: request.name,
+      summary: request.summary,
+      entryPoints: [...request.entryPoints],
+      symbols: request.symbols.map(entry => ({ symbol: entry.symbol, role: entry.role })),
+      excluded: request.excluded.map(entry => ({
+        symbol: entry.symbol,
+        reason: entry.reason,
+        ...entry.note === undefined ? {} : { note: entry.note },
+      })),
+      states: request.states.map(entry => ({ kind: entry.kind, key: entry.key, access: entry.access })),
+      check: { ...request.check },
+    })
+    return id
+  }
+
+  /**
+   * Append one relation between two recorded features.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the two feature ids, the relation kind, and a note.
+   * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link,
+   *   or a text error for a blank note.
+   */
+  linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string }): void {
+    this.assertText('note', request.note)
+    const known = new Set((this.state(agent.session).features ?? []).map(feature => feature.id))
+    const unknown = [request.from, request.to].filter(id => !known.has(id))
+    if (unknown.length > 0) throw new HarnessError(`unknown feature id ${unknown.join(', ')}`, 'HARD_LEDGER_UNKNOWN_FEATURE')
+    if (request.from === request.to) throw new HarnessError('a feature cannot link to itself', 'HARD_LEDGER_INVALID_FEATURE_LINK')
+    agent.session.append('hard/feature/linked', {
+      from: brandString<HardFeatureId>(request.from),
+      to: brandString<HardFeatureId>(request.to),
+      kind: request.kind,
+      note: request.note,
+    })
+  }
+
+  /**
+   * The latest record of every feature, in first-record order.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per feature id.
+   */
+  features(agent: Agent): readonly HardFeatureData[] {
+    return (this.state(agent.session).features ?? []).map(({ id, excluded, ...rest }) => ({
+      ...rest,
+      id: brandString<HardFeatureId>(id),
+      excluded: excluded.map(({ note, ...entry }) => ({ ...entry, ...note === undefined ? {} : { note } })),
+    }))
+  }
+
+  /**
+   * Feature relations in record order.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per relation.
+   */
+  featureLinks(agent: Agent): readonly HardFeatureLinkData[] {
+    return (this.state(agent.session).featureLinks ?? []).map(link => ({
+      ...link,
+      from: brandString<HardFeatureId>(link.from),
+      to: brandString<HardFeatureId>(link.to),
+    }))
+  }
+
+  /**
+   * The latest indexed feature map of the session.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the indexed entry points, or undefined before any index.
+   */
+  featureMap(agent: Agent): HardFeatureMapIndexedData | undefined {
+    return this.state(agent.session).featureMap
+  }
+
+  /**
+   * Indexed entry points no recorded feature names. The math lives in
+   * `unmappedEntryPointsFromState`.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns the unmapped `kind:key` entry points.
+   */
+  unmappedEntryPoints(agent: Agent): readonly string[] {
+    return unmappedEntryPointsFromState(this.state(agent.session))
   }
 
   /**

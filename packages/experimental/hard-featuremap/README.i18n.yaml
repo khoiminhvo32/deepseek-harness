@@ -9,32 +9,56 @@
   en: e8cae2449b6ce595
   zh: c414bf76b9446162
 /deepseek-ai-dsh-experimental-hard-featuremap/summary:
-  en: 1679445ee38705b6
-  zh: c65f54be2fed8381
+  en: 84519bd7d471005d
+  zh: f1cea49a88eff08e
 /deepseek-ai-dsh-experimental-hard-featuremap/table-of-contents:
   en: 76368b6b1da79c80
   zh: 49b8d2c4457703e6
 /deepseek-ai-dsh-experimental-hard-featuremap/use-this-package:
-  en: 6a83d41e6e2a7ef2
-  zh: 6b87f07b50b2006f
+  en: f1f70be209d2702e
+  zh: 45b58b231eee7aa3
 /deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: 42b15ac6321706aa
 /deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation/design:
-  en: 862f3efc04453caa
-  zh: 1f0de270c23199f0
+  en: 1a06abdabf5a75b3
+  zh: 451d63071665914b
 /deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation/source-map:
-  en: 13e8678c18dbaba6
-  zh: 94badf0bad2a3db5
+  en: 7c93ffff30e25293
+  zh: f53e4e659144163f
 /deepseek-ai-dsh-experimental-hard-featuremap/model-experience:
-  en: d011c035d41bb8d9
-  zh: d011c035d41bb8d9
-/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/kv-cache-effect:
-  en: 5d65c2e0579db6a2
-  zh: 5d65c2e0579db6a2
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: cf78b9dd5596495f
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/system-prompt/what-the-model-sees:
+  en: 9c7768c6ee8130f3
+  zh: 33d3e681facadb1b
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/system-prompt/what-the-model-sees/feature-map-section:
+  en: 148f4a503614b086
+  zh: 148f4a503614b086
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/system-prompt/token-effect:
+  en: 0393f96ae5c0a4ec
+  zh: aed5337640247825
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/system-prompt/kv-cache-effect:
+  en: e8912b56ec165706
+  zh: 7a167b4002a498b6
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/tool-schemas-and-results:
+  en: cadc497841430a21
+  zh: cadc497841430a21
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/tool-schemas-and-results/what-the-model-sees:
+  en: 9848a7c01fd5cc9c
+  zh: 06f2ccf39528c8e4
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/tool-schemas-and-results/token-effect:
+  en: a9cbf4096f2aa42e
+  zh: b25e9cacfb717fcd
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/tool-schemas-and-results/kv-cache-effect:
+  en: 9311a006933088de
+  zh: 1bf3d51604c9a280
 /deepseek-ai-dsh-experimental-hard-featuremap/known-limitations-and-deferred-work:
-  en: 0a996f971cb3396b
-  zh: ef267b64dda077d4
+  en: e7b985ecb4228a0d
+  zh: 4ea550c1c57e90a9
 /deepseek-ai-dsh-experimental-hard-featuremap/known-limitations-and-deferred-work/dev-note:
   en: 9c29aaf39914cf76
   zh: 0a510de4e68299f6

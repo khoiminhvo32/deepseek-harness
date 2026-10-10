@@ -1125,8 +1125,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-experimental-hard-featuremap`
 
-- `inject`: `agents` · `hardLedger` · `hardCpg`
-- `source`: [`packages/experimental/hard-featuremap/src/index.ts:57`](../packages/experimental/hard-featuremap/src/index.ts)
+- `inject`: `agents` · `hardLedger` · `hardCpg` · `shell` · `tools` · `systemPrompt`
+- `source`: [`packages/experimental/hard-featuremap/src/index.ts:89`](../packages/experimental/hard-featuremap/src/index.ts)
 
 ```ts config-catalog
 /** Feature map plugin config. */
@@ -1145,6 +1145,18 @@ export interface Config {
   scriptDirs?: string[]
   /** Import in the background when a mission arms. */
   indexOnArm?: boolean
+  /** Call levels the feature check follows from a feature's handlers. */
+  featureDepth?: number
+  /** Call levels whose non-library symbols a feature must account for. */
+  requiredDepth?: number
+  /** Distinct callers above which a symbol is a shared library symbol the check does not expand. */
+  libraryFanIn?: number
+  /** The largest share of a feature's required symbols it may exclude, in percent. */
+  maxExcludedPercent?: number
+  /** Names of access-check symbols a feature must account for when reached; empty selects the WordPress list when its profile is on. */
+  guards?: string[]
+  /** Names of state-writing symbols a feature must account for when reached; empty selects the WordPress list when its profile is on. */
+  mutations?: string[]
 }
 
 /** A framework profile that reads entry points: WordPress, or one of the HTTP route profiles. */
@@ -1178,7 +1190,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:128`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:143`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1199,6 +1211,12 @@ export interface Config {
    * no way for two plugins' separate configs to drift apart.
    */
   emptySweepsToFinish?: number
+  /**
+   * Share of the indexed feature map's entry points recorded features must
+   * cover before the mission can complete, in percent; `0` drops the
+   * condition. Without an indexed feature map there is nothing to cover.
+   */
+  minEntryMappedPercent?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->
@@ -3760,7 +3778,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:249`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:250`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */

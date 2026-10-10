@@ -53,7 +53,7 @@ function stubAgent(rawId: string): StubAgent {
   return { agent, session, inbox, setStatus(value) { status = value } }
 }
 
-async function harness(config: { screenSpotCheckPercent?: number; emptySweepsToFinish?: number } = {}) {
+async function harness(config: { screenSpotCheckPercent?: number; emptySweepsToFinish?: number; minEntryMappedPercent?: number } = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -498,6 +498,107 @@ describe('hard ledger weaknesses and chains', () => {
       type: 'hard/flaw/recorded', data: { id: 'W-1', ...weakness },
     } as never)
     expect(state.flaws).toEqual([{ id: 'W-1', ...weakness }])
+  })
+})
+
+describe('hard ledger feature map', () => {
+  const entries = ['ajax:inline_save', 'ajax:heartbeat', 'rest:WP_REST_Posts_Controller.update_item', 'script:wp-admin/post.php', 'http:POST /api/posts']
+  const index = { commit: 'c'.repeat(40), derivation: 'd1', entryPoints: entries.map((key, n) => ({ key, handler: n === 4 ? null : `h${n}` })) }
+  const feature = {
+    name: 'Quick Edit a post',
+    summary: 'An editor changes a post title, status, and terms inline from the list table.',
+    entryPoints: ['ajax:inline_save'],
+    symbols: [{ symbol: 'wp_ajax_inline_save', role: 'entry' as const }, { symbol: 'check_ajax_referer', role: 'guard' as const }],
+    excluded: [{ symbol: 'esc_html', reason: 'utility' as const }, { symbol: 'wp_insert_post', reason: 'other-feature' as const, note: 'post creation' }],
+    states: [{ kind: 'table', key: 'wp_posts', access: 'write' as const }],
+    check: { commit: 'c'.repeat(40), reach: 108, required: 31 },
+  }
+
+  it('records the indexed entry points once per derivation', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.featureMap(root.agent)).toBeUndefined()
+    expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual([])
+    expect(ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)).toBe(true)
+    expect(ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)).toBe(false)
+    expect(ctx.hardLedger.recordFeatureMapIndexed(root.agent, { ...index, derivation: 'd2', entryPoints: index.entryPoints.slice(0, 2) })).toBe(true)
+    expect(ctx.hardLedger.featureMap(root.agent)).toEqual({ ...index, derivation: 'd2', entryPoints: index.entryPoints.slice(0, 2) })
+    expect(root.session.snapshotEvents().filter(event => event.type === 'hard/featuremap/indexed')).toHaveLength(2)
+  })
+
+  it('assigns FE ids, revises an existing id, and validates fields', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.recordFeature(root.agent, feature)).toBe('FE-1')
+    expect(ctx.hardLedger.recordFeature(root.agent, { ...feature, name: 'Bulk edit posts', entryPoints: ['ajax:heartbeat'] })).toBe('FE-2')
+    expect(ctx.hardLedger.recordFeature(root.agent, { ...feature, id: 'FE-1', summary: 'Revised summary.' })).toBe('FE-1')
+    expect(ctx.hardLedger.features(root.agent)).toEqual([
+      { id: 'FE-1', ...feature, summary: 'Revised summary.' },
+      { id: 'FE-2', ...feature, name: 'Bulk edit posts', entryPoints: ['ajax:heartbeat'] },
+    ])
+    expect(() => ctx.hardLedger.recordFeature(root.agent, { ...feature, id: 'FE-9' })).toThrow('unknown feature id FE-9')
+    expect(() => ctx.hardLedger.recordFeature(root.agent, { ...feature, name: ' ' })).toThrow('name must be a non-empty string')
+    expect(() => ctx.hardLedger.recordFeature(root.agent, { ...feature, summary: '' })).toThrow('summary must be a non-empty string')
+  })
+
+  it('links two recorded features and refuses unknown ids and self links', async () => {
+    const { ctx, root } = await harness()
+    expect(ctx.hardLedger.features(root.agent)).toEqual([])
+    expect(ctx.hardLedger.featureLinks(root.agent)).toEqual([])
+    expect(() => {
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'x' })
+    }).toThrow('unknown feature id FE-1, FE-2')
+    ctx.hardLedger.recordFeature(root.agent, feature)
+    ctx.hardLedger.recordFeature(root.agent, { ...feature, name: 'Trash a post' })
+    ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'both write wp_posts.post_status' })
+    expect(ctx.hardLedger.featureLinks(root.agent)).toEqual([{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'both write wp_posts.post_status' }])
+    expect(() => {
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-7', kind: 'calls', note: 'x' })
+    }).toThrow('unknown feature id FE-7')
+    expect(() => {
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-1', kind: 'calls', note: 'x' })
+    }).toThrow('a feature cannot link to itself')
+    expect(() => {
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-2', kind: 'calls', note: ' ' })
+    }).toThrow('note must be a non-empty string')
+  })
+
+  it('owes unmapped entry points until features cover the required share', async () => {
+    const { ctx, root } = await harness({ emptySweepsToFinish: 0 })
+    ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)
+    expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(5)
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([
+      '5 of 5 entry points are in no recorded feature; features must cover 80%: map them with hard_record_feature',
+      ...entries.map(key => `entry point ${key} is in no feature`),
+    ])
+    expect(ctx.hardLedger.completionAssessment(root.agent).blockers).toContain(
+      '5 of 5 entry points are in no recorded feature; features must cover 80%: map them with hard_record_feature',
+    )
+    ctx.hardLedger.recordFeature(root.agent, { ...feature, entryPoints: entries.slice(0, 3) })
+    expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual(entries.slice(3))
+    expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(2)
+    ctx.hardLedger.recordFeature(root.agent, { ...feature, entryPoints: [entries[3]!] })
+    expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(0)
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
+    expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual([entries[4]])
+  })
+
+  it('drops the coverage condition at 0 percent and refuses an out-of-range percent', async () => {
+    const { ctx, root } = await harness({ minEntryMappedPercent: 0 })
+    ctx.hardLedger.recordFeatureMapIndexed(root.agent, index)
+    expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(0)
+    expect(() => new HardLedger(new Context(), { minEntryMappedPercent: 101 })).toThrow('minEntryMappedPercent must be a safe integer from 0 through 100')
+    const bare = new Context()
+    await bare.plugin(SessionStore)
+    await bare.plugin(SessionProjectionRegistry)
+    expect(new HardLedger(bare)).toBeInstanceOf(HardLedger)
+  })
+
+  it('folds feature map events onto a cached state that predates them', () => {
+    let state = applyHardLedgerProjection(emptyHardLedgerState(), { type: 'hard/feature/linked', data: { from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'n' } } as never)
+    state = applyHardLedgerProjection(state, { type: 'hard/featuremap/indexed', data: index } as never)
+    state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-1', ...feature } } as never)
+    expect(state.featureLinks).toEqual([{ from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'n' }])
+    expect(state.featureMap).toEqual(index)
+    expect(state.features).toEqual([{ id: 'FE-1', ...feature }])
   })
 })
 
@@ -1163,7 +1264,7 @@ describe('hard ledger aggregates over folded state', () => {
       { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: ['s'], source: 'harness' } },
     ])
     const assessment = completionAssessmentFromState(state, {
-      screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptySweepsToFinish: 0,
+      screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptySweepsToFinish: 0, minEntryMappedPercent: 80,
     })
     expect(assessment.complete).toBe(false)
     // The re-opened cells are open work on their own; the floor blocker must
@@ -1322,11 +1423,12 @@ describe('hard ledger aggregates over folded state', () => {
       { type: 'hard/hypothesis/state', data: { id: 'H-1', statement: 's', status: 'testing' } },
       { type: 'hard/hypothesis/state', data: { id: 'H-2', statement: 's', status: 'refuted', reason: 'r' } },
     ])
-    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100 })).toEqual({
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100, minEntryMappedPercent: 80 })).toEqual({
       pendingFindings: 1, flakyFindings: 1, openHypotheses: 1, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 1,
       unchainedMaterial: 0,
+      unmappedEntryPoints: 0,
     })
-    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0 }).screenReReads).toBe(0)
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0, minEntryMappedPercent: 80 }).screenReReads).toBe(0)
   })
 
   it('carries screenability, exclusions, and blind clears through the client wire view', () => {

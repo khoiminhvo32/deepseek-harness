@@ -160,6 +160,63 @@ recordFlaw( agent: Agent, request: Omit<HardFlawData, 'id' | 'findingId' | 'hypo
 flaws(agent: Agent): readonly HardFlawData[]
 
 /**
+ * Record the entry points of the feature map indexed for the pinned
+ * commit, unless the session already holds this derivation.
+ * @param agent - the live agent whose session receives the record.
+ * @param data - the commit, the import derivation, and the entry points.
+ * @returns whether a record was appended.
+ */
+recordFeatureMapIndexed(agent: Agent, data: HardFeatureMapIndexedData): boolean
+
+/**
+ * Append one feature the caller already checked against the feature map
+ * and return its id; naming an existing id revises that feature.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the feature without an id, or with the existing id it revises.
+ * @returns the feature id.
+ * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, or a text error for a blank field.
+ */
+recordFeature(agent: Agent, request: Omit<HardFeatureData, 'id'> & { id?: string }): HardFeatureId
+
+/**
+ * Append one relation between two recorded features.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the two feature ids, the relation kind, and a note.
+ * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link,
+ *   or a text error for a blank note.
+ */
+linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string }): void
+
+/**
+ * The latest record of every feature, in first-record order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per feature id.
+ */
+features(agent: Agent): readonly HardFeatureData[]
+
+/**
+ * Feature relations in record order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per relation.
+ */
+featureLinks(agent: Agent): readonly HardFeatureLinkData[]
+
+/**
+ * The latest indexed feature map of the session.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the indexed entry points, or undefined before any index.
+ */
+featureMap(agent: Agent): HardFeatureMapIndexedData | undefined
+
+/**
+ * Indexed entry points no recorded feature names. The math lives in
+ * `unmappedEntryPointsFromState`.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns the unmapped `kind:key` entry points.
+ */
+unmappedEntryPoints(agent: Agent): readonly string[]
+
+/**
  * The ids a chain hypothesis may link: every recorded weakness, then every
  * confirmed finding no weakness already names. The math lives in
  * `chainMaterialFromState`.

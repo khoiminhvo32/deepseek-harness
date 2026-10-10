@@ -17,6 +17,9 @@ export type HardHypothesisId = Branded<'HardHypothesisId'>
 /** Opaque identity of one recorded weakness, `W-<n>`. */
 export type HardFlawId = Branded<'HardFlawId'>
 
+/** Opaque identity of one recorded feature, `FE-<n>`. */
+export type HardFeatureId = Branded<'HardFeatureId'>
+
 /** Verification outcome of one finding, decided by the verifier only. */
 export type HardVerdict = 'confirmed' | 'refuted' | 'flaky'
 
@@ -159,6 +162,62 @@ export interface HardHypothesisStateData {
    * so the change is additive.
    */
   readonly links?: readonly string[]
+}
+
+/** One entry point of an indexed feature map: `kind:key` and the handler the facts resolve, null when unresolved. */
+export interface HardFeatureEntryRef {
+  readonly key: string
+  readonly handler: string | null
+}
+
+/**
+ * The entry points of the pinned commit's feature map, recorded when the map
+ * is indexed for the session, so the open work that asks for unmapped entry
+ * points derives from the log. `derivation` identifies the import.
+ */
+export interface HardFeatureMapIndexedData {
+  readonly commit: string
+  readonly derivation: string
+  readonly entryPoints: readonly HardFeatureEntryRef[]
+}
+
+/** What a symbol does in a feature. */
+export type HardFeatureRole = 'entry' | 'guard' | 'mutation' | 'helper'
+
+/** Why a required symbol is not part of a feature. */
+export type HardFeatureExclusionReason = 'utility' | 'other-feature' | 'unreachable'
+
+/**
+ * One feature the harness checked against the feature map before the record
+ * was appended: its entry points (`kind:key`), its symbols with their roles,
+ * the required symbols it excludes and why, and the state it reads or
+ * writes. `check` records what the harness computed: the pinned commit, the
+ * reach size, and the required-set size. Recording an existing id revises
+ * that feature.
+ */
+export interface HardFeatureData {
+  readonly id: HardFeatureId
+  /** One-line feature name. */
+  readonly name: string
+  /** What the feature does and for whom. */
+  readonly summary: string
+  readonly entryPoints: readonly string[]
+  readonly symbols: readonly { readonly symbol: string; readonly role: HardFeatureRole }[]
+  readonly excluded: readonly { readonly symbol: string; readonly reason: HardFeatureExclusionReason; readonly note?: string }[]
+  /** State the feature reads or writes: kind (table, option, meta, file, cache, session, …), key, and access. */
+  readonly states: readonly { readonly kind: string; readonly key: string; readonly access: 'read' | 'write' }[]
+  readonly check: { readonly commit: string; readonly reach: number; readonly required: number }
+}
+
+/** How one feature relates to another. */
+export type HardFeatureLinkKind = 'calls' | 'shares-state' | 'gates' | 'enables'
+
+/** One relation between two recorded features. */
+export interface HardFeatureLinkData {
+  readonly from: HardFeatureId
+  readonly to: HardFeatureId
+  readonly kind: HardFeatureLinkKind
+  readonly note: string
 }
 
 /**

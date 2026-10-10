@@ -10,6 +10,9 @@ import type {
   HardCoverageCellData,
   HardFindingProposedData,
   HardFindingVerdictData,
+  HardFeatureData,
+  HardFeatureLinkData,
+  HardFeatureMapIndexedData,
   HardFlawData,
   HardFlowDocData,
   HardGateDecisionData,
@@ -41,6 +44,18 @@ declare module '@deepseek-ai/dsh-session/types' {
      * weakness list chain hypotheses link.
      */
     'hard/flaw/recorded': HardFlawData
+    /**
+     * The entry points of the feature map indexed for the pinned commit; the
+     * ledger folds the latest one as the set features must cover.
+     */
+    'hard/featuremap/indexed': HardFeatureMapIndexedData
+    /**
+     * One feature the harness checked against the feature map; recording an
+     * existing id revises it, and the ledger folds the latest per id.
+     */
+    'hard/feature/recorded': HardFeatureData
+    /** One relation between two recorded features. */
+    'hard/feature/linked': HardFeatureLinkData
     /**
      * One flow document recorded for a module, with every citation already
      * resolved against the pinned commit; the ledger folds it as the durable

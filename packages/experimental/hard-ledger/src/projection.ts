@@ -16,6 +16,7 @@ import {
   coverageProgressFromState,
   matrixCellsFromState,
   DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+  DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
   DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
 } from './aggregate.ts'
 import type { LedgerThresholds } from './aggregate.ts'
@@ -150,6 +151,37 @@ const matrixSchema = zod.object({
   }).optional(),
 })
 
+/** Validates one folded feature map index. */
+const featureMapSchema = zod.object({
+  commit: zod.string().min(1),
+  derivation: zod.string().min(1),
+  entryPoints: zod.array(zod.object({ key: zod.string().min(1), handler: zod.string().min(1).nullable() })).readonly(),
+})
+
+/** Validates one folded feature record. */
+const featureSchema = zod.object({
+  id: zod.string().min(1),
+  name: zod.string().min(1),
+  summary: zod.string().min(1),
+  entryPoints: zod.array(zod.string().min(1)).readonly(),
+  symbols: zod.array(zod.object({ symbol: zod.string().min(1), role: zod.enum(['entry', 'guard', 'mutation', 'helper']) })).readonly(),
+  excluded: zod.array(zod.object({
+    symbol: zod.string().min(1),
+    reason: zod.enum(['utility', 'other-feature', 'unreachable']),
+    note: zod.string().min(1).optional(),
+  })).readonly(),
+  states: zod.array(zod.object({ kind: zod.string().min(1), key: zod.string().min(1), access: zod.enum(['read', 'write']) })).readonly(),
+  check: zod.object({ commit: zod.string().min(1), reach: zod.number().int().min(0), required: zod.number().int().min(0) }),
+})
+
+/** Validates one folded feature relation. */
+const featureLinkSchema = zod.object({
+  from: zod.string().min(1),
+  to: zod.string().min(1),
+  kind: zod.enum(['calls', 'shares-state', 'gates', 'enables']),
+  note: zod.string().min(1),
+})
+
 /** Validates persisted projection state before it seeds a fold. */
 export const hardLedgerStateSchema = zod.object({
   findings: zod.array(zod.object({ proposed: proposedSchema, verdict: verdictSchema.optional() })),
@@ -159,6 +191,10 @@ export const hardLedgerStateSchema = zod.object({
   flowDocs: zod.array(flowDocSchema).optional(),
   // Optional: cached states from before the weakness event fold without one.
   flaws: zod.array(flawSchema).optional(),
+  // Optional: cached states from before the feature map events fold without them.
+  featureMap: featureMapSchema.optional(),
+  features: zod.array(featureSchema).optional(),
+  featureLinks: zod.array(featureLinkSchema).optional(),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
   recentSweeps: zod.array(sweepSummarySchema).max(HARD_SWEEP_WINDOW).readonly(),
   goalId: zod.string().min(1).optional(),
@@ -194,6 +230,18 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
     }
     case 'hard/flaw/recorded':
       return { ...state, flaws: [...state.flaws ?? [], event.data] }
+    case 'hard/featuremap/indexed':
+      return { ...state, featureMap: event.data }
+    case 'hard/feature/recorded': {
+      const features = state.features ?? []
+      const index = features.findIndex(record => record.id === event.data.id)
+      return {
+        ...state,
+        features: index === -1 ? [...features, event.data] : features.map((record, position) => position === index ? event.data : record),
+      }
+    }
+    case 'hard/feature/linked':
+      return { ...state, featureLinks: [...state.featureLinks ?? [], event.data] }
     case 'hard/coverage/cell': {
       const key = (record: { module: string; bugClass: string }): string => `${record.module}\u0000${record.bugClass}`
       const index = state.coverage.findIndex(record => key(record) === key(event.data))
@@ -365,6 +413,7 @@ export type HardLedgerProjectionDefinition = Omit<
 export function hardLedgerProjectionDefinition(thresholds: LedgerThresholds = {
   screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
   emptySweepsToFinish: DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+  minEntryMappedPercent: DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
 }): HardLedgerProjectionDefinition {
   return {
     key: 'hardLedger',

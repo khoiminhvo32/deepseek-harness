@@ -1117,6 +1117,41 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-deepread -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-featuremap -->
+<a id="deepseek-aidsh-experimental-hard-featuremap"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-featuremap`
+
+- `inject`: `agents` · `hardLedger` · `hardCpg`
+- `source`: [`packages/experimental/hard-featuremap/src/index.ts:51`](../packages/experimental/hard-featuremap/src/index.ts)
+
+```ts config-catalog
+/** Feature map plugin config. */
+export interface Config {
+  /** Import facts. Off by default; it needs `hard-cpg` enabled. */
+  enabled?: boolean
+  /** Absolute path of the shared database file. Required when enabled. */
+  dbPath?: string
+  /** The framework profile. */
+  framework?: HardFramework
+  /**
+   * Repository-relative directories (`.` for the root) whose top-level PHP
+   * files are requested directly. Empty selects the profile's directories:
+   * {@link WORDPRESS_SCRIPT_DIRS} under the WordPress profile, none otherwise.
+   */
+  scriptDirs?: string[]
+  /** Import in the background when a mission arms. */
+  indexOnArm?: boolean
+}
+
+/**
+ * The framework profile that reads hooks and entry points: `wordpress`, or
+ * `none` for call edges only.
+ */
+export type HardFramework = 'none' | 'wordpress'
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-featuremap -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-handoff -->
 <a id="deepseek-aidsh-experimental-hard-handoff"></a>
 

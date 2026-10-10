@@ -45,9 +45,9 @@ const gitDir = join(suiteRoot, 'snapshots', 'target.git')
 execFileSync('git', ['clone', '--quiet', '--bare', targetRepo, gitDir], { env: GIT_ENV })
 
 const FACTS = [
-  { k: 'header', format: 1 },
+  { k: 'header', format: 2 },
   { k: 'file', path: 'index.php' },
-  { k: 'method', id: 'main', name: 'main', file: 'index.php', line: 1, end: 1 },
+  { k: 'method', id: 'main', name: 'main', file: 'index.php', owner: null, line: 1, end: 1 },
   { k: 'call', caller: 'main', name: 'helper', target: 'helper', resolved: [], file: 'index.php', line: 1, dispatch: 'static', args: [] },
   { k: 'end' },
 ].map(row => JSON.stringify(row)).join('\n') + '\n'
@@ -236,7 +236,7 @@ describe('hardCpg.facts', () => {
     await setMode('ok')
     const { ctx, root, shell, gitDir: ownGitDir } = await harness({ excludePaths: ['poc'], heapMb: 2048, stepTimeoutMinutes: 3 })
     const built = await ctx.hardCpg.facts(root)
-    expect(built).toMatchObject({ commit, reused: false, counts: { files: 1, methods: 1, calls: 1 } })
+    expect(built).toMatchObject({ commit, reused: false, counts: { files: 1, types: 0, methods: 1, calls: 1 } })
     expect(built.path).toMatch(new RegExp(`^${join(dirname(ownGitDir), 'cpg', commit)}/[0-9a-f]{16}/facts\\.jsonl$`))
     expect(readFileSync(built.path, 'utf8')).toBe(FACTS)
     expect(shell.specs.map(spec => spec.command)).toEqual([
@@ -342,7 +342,7 @@ describe('building on arming', () => {
 
   it('starts a background build when a live agent arms and logs the counts', async () => {
     const { info, shell } = await armedBuild('ok')
-    expect(info).toHaveBeenCalledWith(`hard-cpg: facts for ${commit} ready: 1 files, 1 methods, 1 calls`)
+    expect(info).toHaveBeenCalledWith(`hard-cpg: facts for ${commit} ready: 1 files, 0 types, 1 methods, 1 calls`)
     expect(shell.specs).toHaveLength(3)
   })
 

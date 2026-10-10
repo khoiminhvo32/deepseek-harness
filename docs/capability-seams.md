@@ -15,6 +15,8 @@ flowchart LR
   svc_hardVerifier["ctx.hardVerifier<br/>Executed proofs of effect with recomputed CVSS 4.0 scores"]
   pkg_hard_cpg["hard-cpg"]
   svc_hardCpg["ctx.hardCpg<br/>Joern call-graph facts for the pinned snapshot commit"]
+  pkg_hard_featuremap["hard-featuremap"]
+  svc_hardFeatureMap["ctx.hardFeatureMap<br/>Shared SQLite feature map over Joern facts"]
   pkg_hmr["hmr"]
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
@@ -343,6 +345,7 @@ flowchart LR
   pkg_fs_ssh --> svc_fs
   pkg_goal --> svc_goals
   pkg_hard_cpg --> svc_hardCpg
+  pkg_hard_featuremap --> svc_hardFeatureMap
   pkg_hard_ledger --> svc_hardLedger
   pkg_hard_verifier --> svc_hardVerifier
   pkg_hmr --> svc_hmr
@@ -474,6 +477,7 @@ flowchart LR
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
+  svc_hardCpg --> pkg_hard_featuremap
   svc_hardLedger --> pkg_hard_stopgate
   svc_hardLedger --> pkg_hard_tools
   svc_hardLedger --> pkg_hard_verifier
@@ -588,7 +592,8 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | `ctx.hardLedger` | `seam` | `hard-ledger` | - | `hard-tools`, `hard-verifier`, `hard-stopgate` | - | Validates and appends hard/* session events and serves the hardLedger session projection; ids are assigned from projected counts. |
 | `ctx.hardVerifier` | `seam` | `hard-verifier` | - | `hard-tools` | - | Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger. |
-| `ctx.hardCpg` | `seam` | `hard-cpg` | - | - | - | Exports the pinned commit, runs the Joern PHP frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest. |
+| `ctx.hardCpg` | `seam` | `hard-cpg` | - | `hard-featuremap` | - | Exports the pinned commit, runs the Joern PHP frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest. |
+| `ctx.hardFeatureMap` | `seam` | `hard-featuremap` | - | - | - | Imports hard-cpg facts into one derived database: symbols, call sites, source-tagged call edges with repairs, and WordPress hooks and entry points. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
 | `ctx.pluginRegistryProbe` | `core` | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | Races public registry responses on the Host; the Client owns the initial registry recommendation. |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |

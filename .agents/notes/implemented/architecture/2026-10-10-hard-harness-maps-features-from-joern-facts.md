@@ -21,6 +21,8 @@ Joern supplies facts; the model names and groups features; the harness checks th
 - **Exclusion is explicit.** `excludePaths` defaults to empty, matching the mission's whole-commit denominator; a deployment whose snapshot holds PoC stubs excludes them by path.
 - **The deployment installs Joern.** The bundle mounts `hard-cpg` switched off; enabling it requires `joernHome`, and the build script does not download the 1.7 GB distribution.
 - **PHP first.** The first export targets the PHP frontend because the measured mission was WordPress; other frontends join with their own measurements.
+- **Repairs are rules over the facts, each tagged.** `hard-featuremap` adds an edge for a call Joern left unresolved only when the facts name exactly one target, and tags it `repair` (type lineage, relative calls, the issue 3050 class-qualified free function), `unique-name` (a dynamic call whose method name only one method carries), or `hook` (a literal hook firing to its registered callbacks). On WordPress 7.1.3 this links all 24 `wp_insert_post` call sites that grep finds.
+- **The feature map database is derived.** One SQLite file holds every project and snapshot, keyed by target root, commit, and a derivation digest; because facts can always be imported again, a file stamped with another schema version is dropped and rebuilt instead of migrated.
 
 ## Alternatives considered
 

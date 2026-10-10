@@ -153,7 +153,7 @@ export class HardCpg extends Service {
         const agent = ctx.agents.get(session.id)
         if (agent === undefined) return
         this.facts(agent).then((facts) => {
-          ctx.logger.info(`hard-cpg: facts for ${facts.commit} ready: ${facts.counts.files} files, ${facts.counts.methods} methods, ${facts.counts.calls} calls`)
+          ctx.logger.info(`hard-cpg: facts for ${facts.commit} ready: ${facts.counts.files} files, ${facts.counts.types} types, ${facts.counts.methods} methods, ${facts.counts.calls} calls`)
         }, (error: unknown) => {
           ctx.logger.warn(`hard-cpg: building facts on arming failed: ${String(error)}`)
         })

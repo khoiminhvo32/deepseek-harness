@@ -1,5 +1,5 @@
 /**
- * The packaged Joern query. It writes fact format 1 (see `facts.ts`) for one
+ * The packaged Joern query. It writes fact format 2 (see `facts.ts`) for one
  * code property graph and takes two parameters, `cpgFile` and `outFile`. The
  * service writes this text into each build directory and passes only that
  * file and harness-built paths to Joern.
@@ -8,8 +8,9 @@
 
 /** The Scala source of the packaged query; its digest keys the fact cache. */
 export const HARD_CPG_FACTS_QUERY = String.raw`// Exports the facts hard-cpg reads from one code property graph as JSON Lines,
-// in fact format 1: a header, then files, internal methods, and call sites
-// with resolved internal targets and bounded argument summaries, then an end
+// in fact format 2: a header, then files, internal type declarations with
+// their parents, internal methods with their owning type, and call sites with
+// resolved internal targets and bounded argument summaries, then an end
 // marker. Usage: --param cpgFile=<cpg> --param outFile=<jsonl>.
 import io.shiftleft.semanticcpg.language._
 import io.shiftleft.codepropertygraph.generated.nodes.{Block, Expression, Literal}
@@ -32,10 +33,21 @@ import java.nio.charset.StandardCharsets
       ujson.Obj("arr" -> ujson.Arr.from(arrayItems(b).map(ujson.Str(_))))
     case other => ujson.Obj("code" -> bounded(other.code, 120))
   }
-  emit(ujson.Obj("k" -> "header", "format" -> 1))
+  emit(ujson.Obj("k" -> "header", "format" -> 2))
   cpg.file.name.filterNot(_.startsWith("<")).foreach(f => emit(ujson.Obj("k" -> "file", "path" -> f)))
+  // A file's top-level code, closures, and every method also sit in synthetic
+  // type declarations; only declared classes, interfaces, and traits are types here.
+  val methodNames = cpg.method.fullName.toSet
+  def declared(fullName: String): Boolean =
+    !fullName.endsWith("<global>") && !fullName.contains("<lambda>") && !methodNames.contains(fullName)
+  cpg.typeDecl.isExternal(false).filter(t => declared(t.fullName)).foreach { t =>
+    emit(ujson.Obj("k" -> "type", "id" -> t.fullName, "name" -> t.name, "file" -> t.filename,
+      "line" -> line(t.lineNumber), "inherits" -> ujson.Arr.from(t.inheritsFromTypeFullName.l.map(ujson.Str(_)))))
+  }
   cpg.method.isExternal(false).foreach { m =>
+    val owner = m.definingTypeDecl.fullName.filter(declared).headOption
     emit(ujson.Obj("k" -> "method", "id" -> m.fullName, "name" -> m.name, "file" -> m.filename,
+      "owner" -> owner.map(ujson.Str(_)).getOrElse(ujson.Null),
       "line" -> line(m.lineNumber), "end" -> line(m.lineNumberEnd)))
   }
   cpg.call.filterNot(_.name.startsWith("<operator")).foreach { c =>

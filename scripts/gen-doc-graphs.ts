@@ -128,8 +128,16 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'hard-cpg',
     title: 'Joern call-graph facts for the pinned snapshot commit',
     mode: 'seam',
-    consumers: [],
+    consumers: ['hard-featuremap'],
     note: 'Exports the pinned commit, runs the Joern PHP frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest.',
+  },
+  {
+    key: 'hardFeatureMap',
+    pkg: 'hard-featuremap',
+    title: 'Shared SQLite feature map over Joern facts',
+    mode: 'seam',
+    consumers: [],
+    note: 'Imports hard-cpg facts into one derived database: symbols, call sites, source-tagged call edges with repairs, and WordPress hooks and entry points.',
   },
   {
     key: 'hmr',

@@ -1,4 +1,4 @@
-/** The optional hard bundle mounts all eleven hard plugins and the web coverage panel as one layer. */
+/** The optional hard bundle mounts all twelve hard plugins and the web coverage panel as one layer. */
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import * as yaml from 'js-yaml'
 
 describe('Hard bundle', () => {
-  it('publishes one layer containing the eleven hard plugins and the web-only panel row', () => {
+  it('publishes one layer containing the twelve hard plugins and the web-only panel row', () => {
     const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
       publishConfig: { access: string }
       dsh: { bundle: { patch: string } }
@@ -19,6 +19,7 @@ describe('Hard bundle', () => {
       '@deepseek-ai/dsh-experimental-hard-audit': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-cpg': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-deepread': 'workspace:*',
+      '@deepseek-ai/dsh-experimental-hard-featuremap': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-handoff': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-ledger': 'workspace:*',
       '@deepseek-ai/dsh-experimental-hard-mission': 'workspace:*',
@@ -46,6 +47,11 @@ describe('Hard bundle', () => {
       { id: 'hard-deepread', name: '@deepseek-ai/dsh-experimental-hard-deepread' },
       { id: 'hard-audit', name: '@deepseek-ai/dsh-experimental-hard-audit' },
       { id: 'hard-cpg', name: '@deepseek-ai/dsh-experimental-hard-cpg' },
+      {
+        id: 'hard-featuremap',
+        name: '@deepseek-ai/dsh-experimental-hard-featuremap',
+        config: { dbPath: { __jsExpr: "dshHomePath('hard', 'featuremap.db')" } },
+      },
       {
         id: 'ui-hard',
         name: '@deepseek-ai/dsh-experimental-client-ui-hard',

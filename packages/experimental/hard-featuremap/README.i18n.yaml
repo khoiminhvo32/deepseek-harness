@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hard-featuremap/README.md
+/:
+  en: 841d6cb772be7657
+  zh: d4f1fa8eeb66aeac
+/deepseek-ai-dsh-experimental-hard-featuremap:
+  en: e8cae2449b6ce595
+  zh: c414bf76b9446162
+/deepseek-ai-dsh-experimental-hard-featuremap/summary:
+  en: 19813ab312f923c8
+  zh: 9a8cd76ef61f7b1b
+/deepseek-ai-dsh-experimental-hard-featuremap/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/deepseek-ai-dsh-experimental-hard-featuremap/use-this-package:
+  en: 1dc70da5b302d512
+  zh: 660c4260118dab3d
+/deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation/design:
+  en: 8910e931171a9ce9
+  zh: e5975c959d46ec6a
+/deepseek-ai-dsh-experimental-hard-featuremap/understand-the-implementation/source-map:
+  en: 26410a7cc2cf1a99
+  zh: 7a758ab899b16900
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience:
+  en: d011c035d41bb8d9
+  zh: d011c035d41bb8d9
+/deepseek-ai-dsh-experimental-hard-featuremap/model-experience/kv-cache-effect:
+  en: 5d65c2e0579db6a2
+  zh: 5d65c2e0579db6a2
+/deepseek-ai-dsh-experimental-hard-featuremap/known-limitations-and-deferred-work:
+  en: e403f78ce1a1f732
+  zh: 64ee87629f08835c
+/deepseek-ai-dsh-experimental-hard-featuremap/known-limitations-and-deferred-work/dev-note:
+  en: 833d0322ab356f2b
+  zh: 4f007866c5d0ef2c

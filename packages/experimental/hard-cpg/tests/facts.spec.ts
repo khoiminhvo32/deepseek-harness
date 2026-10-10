@@ -13,9 +13,10 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const HEADER = { k: 'header', format: 1 }
+const HEADER = { k: 'header', format: 2 }
+const TYPE = { k: 'type', id: 'WP_REST_Posts_Controller', name: 'WP_REST_Posts_Controller', file: 'wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php', line: 17, inherits: ['WP_REST_Controller'] }
 const FILE = { k: 'file', path: 'wp-admin/admin-ajax.php' }
-const METHOD = { k: 'method', id: 'wp_ajax_inline_save', name: 'wp_ajax_inline_save', file: 'wp-admin/includes/ajax-actions.php', line: 2001, end: 2120 }
+const METHOD = { k: 'method', id: 'wp_ajax_inline_save', name: 'wp_ajax_inline_save', file: 'wp-admin/includes/ajax-actions.php', owner: null, line: 2001, end: 2120 }
 const CALL = {
   k: 'call',
   caller: 'wp-admin/admin-ajax.php:<global>',
@@ -45,10 +46,11 @@ async function readAll(path: string): Promise<HardCpgFact[]> {
 
 describe('readHardCpgFacts', () => {
   it('yields every fact between the header and the end row', async () => {
-    const path = await factFile([HEADER, FILE, METHOD, CALL, { ...METHOD, id: 'x', line: null, end: null }, END])
+    const owned = { ...METHOD, id: 'WP_REST_Posts_Controller.update_item', owner: 'WP_REST_Posts_Controller', line: null, end: null }
+    const path = await factFile([HEADER, FILE, TYPE, METHOD, CALL, owned, END])
     const facts = await readAll(path)
-    expect(facts).toEqual([FILE, METHOD, CALL, { ...METHOD, id: 'x', line: null, end: null }])
-    expect(await countHardCpgFacts(path)).toEqual({ files: 1, methods: 2, calls: 1 })
+    expect(facts).toEqual([FILE, TYPE, METHOD, CALL, owned])
+    expect(await countHardCpgFacts(path)).toEqual({ files: 1, types: 1, methods: 2, calls: 1 })
   })
 
   it.each([
@@ -58,7 +60,7 @@ describe('readHardCpgFacts', () => {
     ['a row after the end', [HEADER, END, FILE], 'row 3: a row follows the end row'],
     ['a missing end row', [HEADER, FILE], 'row 2: the end row is missing, so the export was cut short'],
     ['a row that is not JSON', [HEADER, '{"k":"file",', END], 'row 2: not JSON'],
-    ['an unknown fact format', [{ k: 'header', format: 2 }, END], 'row 1:'],
+    ['an earlier fact format', [{ k: 'header', format: 1 }, END], 'row 1:'],
     ['an unknown row kind', [HEADER, { k: 'type', name: 'x' }, END], 'row 2:'],
     ['an unexpected field', [HEADER, { ...FILE, extra: true }, END], 'row 2:'],
     ['an invalid dispatch', [HEADER, { ...CALL, dispatch: 'virtual' }, END], 'row 2:'],

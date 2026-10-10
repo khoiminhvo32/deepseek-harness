@@ -54,6 +54,7 @@ Experimental prototypes may change their contracts and carry no support promise.
 | [`hard-deepread`](hard-deepread/README.md) | The Phase B deep-reading contract: flow documents and subagent fan-out | — |
 | [`hard-audit`](hard-audit/README.md) | Opt-in shadow audit: a fresh, blind reader re-reads a sample of cleared cells | — |
 | [`hard-cpg`](hard-cpg/README.md) | Opt-in Joern call-graph facts for the pinned commit, built with a fixed packaged query | `ctx.hardCpg` |
+| [`hard-featuremap`](hard-featuremap/README.md) | Opt-in shared SQLite feature map: repaired call edges, WordPress hooks, and entry points | `ctx.hardFeatureMap` |
 | [`hard-ledger`](hard-ledger/README.md) | Durable findings, hypotheses, coverage, and sweep state over `hard/*` session events | `ctx.hardLedger` |
 | [`hard-verifier`](hard-verifier/README.md) | Executes findings' proofs of effect and recomputes their CVSS 4.0 scores | `ctx.hardVerifier` |
 | [`hard-tools`](hard-tools/README.md) | Model-facing finding, hypothesis, coverage, and sweep tools | registers tools on `ctx.tools` |

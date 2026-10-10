@@ -1252,6 +1252,38 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'hardFeatureMap',
+    summary: 'The feature map service on the `hardFeatureMap` key.',
+    description: 'The feature map service on the `hardFeatureMap` key. Imports are shared: concurrent requests for one project, commit, and derivation wait for one import, and an earlier import of the same derivation is reused.',
+    methods: [
+      {
+        signature: 'async index(agent: Agent): Promise<HardFeatureMapSnapshot>',
+        description: 'Import the facts of the agent\'s pinned commit, or reuse an earlier import.',
+        parameters: [{ name: 'agent', description: 'an agent whose session armed a hard mission.' }],
+        returns: 'the imported snapshot.',
+        throws: ['HarnessError `HARD_FEATUREMAP_DISABLED`, `HARD_FEATUREMAP_NOT_ARMED`, or any `hardCpg.facts` error.'],
+      },
+      {
+        signature: 'async callers(snapshot: number, symbol: string): Promise<HardEdgeRow[]>',
+        description: 'Every edge into a symbol of one snapshot.',
+        parameters: [{ name: 'snapshot', description: 'snapshot id from {@link index}.' }, { name: 'symbol', description: 'callee symbol id.' }],
+        returns: 'the edges, each with the rule that made it.',
+      },
+      {
+        signature: 'async callees(snapshot: number, symbol: string): Promise<HardEdgeRow[]>',
+        description: 'Every edge out of a symbol of one snapshot.',
+        parameters: [{ name: 'snapshot', description: 'snapshot id from {@link index}.' }, { name: 'symbol', description: 'caller symbol id.' }],
+        returns: 'the edges, each with the rule that made it.',
+      },
+      {
+        signature: 'async entryPoints(snapshot: number): Promise<HardEntryPoint[]>',
+        description: 'The entry points of one snapshot.',
+        parameters: [{ name: 'snapshot', description: 'snapshot id from {@link index}.' }],
+        returns: 'the entry points.',
+      },
+    ],
+  },
+  {
     key: 'hardLedger',
     summary: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
     description: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
@@ -5685,15 +5717,39 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardCpgFactCounts',
-    declaration: 'export interface HardCpgFactCounts {\n    readonly files: number;\n    readonly methods: number;\n    readonly calls: number;\n}',
+    declaration: 'export interface HardCpgFactCounts {\n    readonly files: number;\n    readonly types: number;\n    readonly methods: number;\n    readonly calls: number;\n}',
   },
   {
     name: 'HardCpgFacts',
     declaration: 'export interface HardCpgFacts {\n    readonly commit: string;\n    readonly path: string;\n    readonly counts: HardCpgFactCounts;\n    readonly reused: boolean;\n}',
   },
   {
+    name: 'HardEdgeRow',
+    declaration: 'export interface HardEdgeRow {\n    readonly caller: string;\n    readonly callee: string;\n    readonly file: string;\n    readonly line: number | null;\n    readonly source: HardEdgeSource;\n}',
+  },
+  {
+    name: 'HardEdgeSource',
+    declaration: 'export type HardEdgeSource = \'joern\' | \'repair\' | \'unique-name\' | \'hook\';',
+  },
+  {
     name: 'HardEmptySweepProof',
     declaration: 'export type HardEmptySweepProof = {\n    readonly kind: \'hypothesis\';\n    readonly hypothesisId: string;\n} | {\n    readonly kind: \'cell\';\n    readonly module: string;\n    readonly bugClass: string;\n};',
+  },
+  {
+    name: 'HardEntryAuth',
+    declaration: 'export type HardEntryAuth = \'public\' | \'authenticated\' | \'unknown\';',
+  },
+  {
+    name: 'HardEntryKind',
+    declaration: 'export type HardEntryKind = \'ajax\' | \'admin-post\' | \'rest\' | \'shortcode\' | \'script\';',
+  },
+  {
+    name: 'HardEntryPoint',
+    declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n}',
+  },
+  {
+    name: 'HardFeatureMapSnapshot',
+    declaration: 'export interface HardFeatureMapSnapshot {\n    readonly id: number;\n    readonly commit: string;\n    readonly stats: HardSnapshotStats;\n    readonly reused: boolean;\n}',
   },
   {
     name: 'HardFindingCause',
@@ -5766,6 +5822,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardMissionArmedData',
     declaration: 'export interface HardMissionArmedData {\n    readonly objective: string;\n    readonly targetRepo: string;\n    readonly commit: string;\n    readonly snapshot?: HardTargetSnapshot;\n    readonly modules: readonly string[];\n    readonly bugClasses: readonly string[];\n    readonly inertModules?: readonly string[];\n    readonly unscreenedModules?: readonly string[];\n    readonly exclusions?: HardMatrixExclusions;\n    readonly ignoredEntryCount?: number;\n    readonly goalId?: string;\n}',
+  },
+  {
+    name: 'HardSnapshotStats',
+    declaration: 'export interface HardSnapshotStats {\n    readonly files: number;\n    readonly types: number;\n    readonly symbols: number;\n    readonly callSites: number;\n    readonly edges: Readonly<Record<HardEdgeSource, number>>;\n    readonly hooks: number;\n    readonly entryPoints: number;\n}',
   },
   {
     name: 'HardSweepSummaryData',

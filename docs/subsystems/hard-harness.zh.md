@@ -59,6 +59,49 @@ Types: [Agent](core.zh.md)
 
 Source: [`packages/experimental/hard-cpg/src/index.ts`](../../packages/experimental/hard-cpg/src/index.ts)
 
+<a id="ctxhardfeaturemap--hardfeaturemap"></a>
+
+### `ctx.hardFeatureMap` — `HardFeatureMap`
+
+The feature map service on the `hardFeatureMap` key. Imports are shared: concurrent requests for one project, commit, and derivation wait for one import, and an earlier import of the same derivation is reused.
+
+```ts cordis-catalog
+/**
+ * Import the facts of the agent's pinned commit, or reuse an earlier import.
+ * @param agent - an agent whose session armed a hard mission.
+ * @returns the imported snapshot.
+ * @throws HarnessError `HARD_FEATUREMAP_DISABLED`, `HARD_FEATUREMAP_NOT_ARMED`, or any `hardCpg.facts` error.
+ */
+async index(agent: Agent): Promise<HardFeatureMapSnapshot>
+
+/**
+ * Every edge into a symbol of one snapshot.
+ * @param snapshot - snapshot id from {@link index}.
+ * @param symbol - callee symbol id.
+ * @returns the edges, each with the rule that made it.
+ */
+async callers(snapshot: number, symbol: string): Promise<HardEdgeRow[]>
+
+/**
+ * Every edge out of a symbol of one snapshot.
+ * @param snapshot - snapshot id from {@link index}.
+ * @param symbol - caller symbol id.
+ * @returns the edges, each with the rule that made it.
+ */
+async callees(snapshot: number, symbol: string): Promise<HardEdgeRow[]>
+
+/**
+ * The entry points of one snapshot.
+ * @param snapshot - snapshot id from {@link index}.
+ * @returns the entry points.
+ */
+async entryPoints(snapshot: number): Promise<HardEntryPoint[]>
+```
+
+Types: [Agent](core.zh.md)
+
+Source: [`packages/experimental/hard-featuremap/src/index.ts`](../../packages/experimental/hard-featuremap/src/index.ts)
+
 <a id="ctxhardledger--hardledger"></a>
 
 ### `ctx.hardLedger` — `HardLedger`

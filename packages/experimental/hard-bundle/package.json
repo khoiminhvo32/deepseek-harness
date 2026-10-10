@@ -42,6 +42,7 @@
     "@deepseek-ai/dsh-experimental-hard-audit": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-cpg": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-deepread": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hard-featuremap": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-handoff": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-ledger": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-mission": "workspace:*",

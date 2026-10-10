@@ -333,6 +333,7 @@
       "@deepseek-ai/dsh-experimental-hard-standby": ["./packages/experimental/hard-standby/src"],
       "@deepseek-ai/dsh-experimental-hard-handoff": ["./packages/experimental/hard-handoff/src"],
       "@deepseek-ai/dsh-experimental-hard-cpg": ["./packages/experimental/hard-cpg/src"],
+      "@deepseek-ai/dsh-experimental-hard-featuremap": ["./packages/experimental/hard-featuremap/src"],
       "@deepseek-ai/dsh-experimental-hard-rounds": ["./packages/experimental/hard-rounds/src"],
       "@deepseek-ai/dsh-experimental-hard-deepread": ["./packages/experimental/hard-deepread/src"],
       "@deepseek-ai/dsh-util-crypto": ["./packages/util/crypto/src"],

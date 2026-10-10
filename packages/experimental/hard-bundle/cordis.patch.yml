@@ -31,6 +31,12 @@
     # opts in with `enabled: true` and `joernHome`.
     - id: hard-cpg
       name: '@deepseek-ai/dsh-experimental-hard-cpg'
+    # Mounted off: the feature map imports hard-cpg facts, so a deployment
+    # enables it together with hard-cpg.
+    - id: hard-featuremap
+      name: '@deepseek-ai/dsh-experimental-hard-featuremap'
+      config:
+        dbPath: !!js dshHomePath('hard', 'featuremap.db')
     # The browser coverage panel rides this same bundle: a Web composition
     # (base + web-app) mounts it, a headless one does not. The check reads the
     # launch-time startedBundles, so the panel follows the composition the

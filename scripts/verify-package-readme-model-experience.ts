@@ -103,6 +103,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/experimental/inspector-profile': { kind: 'none', reason: 'The bundle mounts developer inspection plugins without contributing model context.' },
   'packages/experimental/hard-bundle': { kind: 'none', reason: 'The bundle composes the hard mission and stop-gate plugins without adding model context of its own.' },
   'packages/experimental/hard-cpg': { kind: 'none', reason: 'Builds Joern fact files on disk without contributing model context or Session events.' },
+  'packages/experimental/hard-featuremap': { kind: 'none', reason: 'Imports Joern facts into a derived database without contributing model context or Session events.' },
   'packages/experimental/hard-ledger': { kind: 'none', reason: 'Ledger events and folds are durable log records that never enter a model request directly.' },
   'packages/experimental/hard-verifier': { kind: 'none', reason: 'The service executes proofs and records verdicts; the tools consumer owns all model-visible results.' },
   'packages/experimental/session-inspector': { kind: 'none', reason: 'The conversation view entries add no model-facing input.' },

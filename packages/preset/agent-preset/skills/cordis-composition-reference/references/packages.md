@@ -194,6 +194,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-hard-audit` | yes | Has a fresh, blind reader re-read a sample of cleared hard-harness coverage cells and records each result beside the clear, in shadow mode |
 | `@deepseek-ai/dsh-experimental-hard-cpg` | yes | Builds Joern call-graph facts for the hard harness's pinned snapshot commit with a fixed packaged query and caches them per commit |
 | `@deepseek-ai/dsh-experimental-hard-deepread` | yes | The deep-reading pass template for the hard mission: flow-document contract and subagent fan-out guidance |
+| `@deepseek-ai/dsh-experimental-hard-featuremap` | yes | Imports Joern facts into a shared SQLite feature map with repaired call edges, WordPress hooks, and entry points |
 | `@deepseek-ai/dsh-experimental-hard-handoff` | yes | Injects a durable ledger handoff after each successful compaction so the mission resumes with verified facts |
 | `@deepseek-ai/dsh-experimental-hard-ledger` | yes | Durable findings, hypotheses, and coverage ledger over typed hard/* session events |
 | `@deepseek-ai/dsh-experimental-hard-mission` | yes | Arms the configured long-running objective as a durable session goal and teaches the mission contract through a system-prompt section |

@@ -2,7 +2,8 @@
  * The JSON Lines fact format the packaged Joern query writes, and a reader
  * that validates it. A fact file is one `header` row, then `file`, `method`,
  * and `call` rows in any order, then one `end` row; a file without the end row
- * is a truncated export and fails to read.
+ * is a truncated export and fails to read. Format 2 added `type` rows and the
+ * method `owner`.
  * @module @deepseek-ai/dsh-experimental-hard-cpg/facts
  */
 
@@ -12,7 +13,7 @@ import { z } from 'zod'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 /** The fact format version the packaged query writes and the reader accepts. */
-export const HARD_CPG_FACTS_FORMAT = 1
+export const HARD_CPG_FACTS_FORMAT = 2
 
 const lineNumber = z.number().int().nonnegative().nullable()
 
@@ -26,7 +27,16 @@ const argSchema = z.union([
 const rowSchema = z.discriminatedUnion('k', [
   z.strictObject({ k: z.literal('header'), format: z.literal(HARD_CPG_FACTS_FORMAT) }),
   z.strictObject({ k: z.literal('file'), path: z.string() }),
-  z.strictObject({ k: z.literal('method'), id: z.string(), name: z.string(), file: z.string(), line: lineNumber, end: lineNumber }),
+  z.strictObject({ k: z.literal('type'), id: z.string(), name: z.string(), file: z.string(), line: lineNumber, inherits: z.array(z.string()) }),
+  z.strictObject({
+    k: z.literal('method'),
+    id: z.string(),
+    name: z.string(),
+    file: z.string(),
+    owner: z.string().nullable(),
+    line: lineNumber,
+    end: lineNumber,
+  }),
   z.strictObject({
     k: z.literal('call'),
     caller: z.string(),
@@ -47,9 +57,11 @@ type Row = z.infer<typeof rowSchema>
 export type HardCpgArg = z.infer<typeof argSchema>
 
 /**
- * One fact: a target file (repository-relative path), an internal method
- * (`id` is Joern's full name), or a call site whose `resolved` lists the
- * internal methods the graph links it to (empty when unresolved).
+ * One fact: a target file (repository-relative path), a declared type with
+ * the full names it inherits from, an internal method (`id` is Joern's full
+ * name; `owner` is its declared type, null for free functions and file-level
+ * code), or a call site whose `resolved` lists the internal methods the graph
+ * links it to (empty when unresolved).
  */
 export type HardCpgFact = Exclude<Row, { k: 'header' } | { k: 'end' }>
 
@@ -85,6 +97,7 @@ export async function* readHardCpgFacts(path: string): AsyncGenerator<HardCpgFac
 /** Counts of each fact kind in one file. */
 export interface HardCpgFactCounts {
   readonly files: number
+  readonly types: number
   readonly methods: number
   readonly calls: number
 }
@@ -96,9 +109,10 @@ export interface HardCpgFactCounts {
  * @throws HarnessError `HARD_CPG_FACTS_INVALID` as {@link readHardCpgFacts} does.
  */
 export async function countHardCpgFacts(path: string): Promise<HardCpgFactCounts> {
-  const counts = { files: 0, methods: 0, calls: 0 }
+  const counts = { files: 0, types: 0, methods: 0, calls: 0 }
   for await (const fact of readHardCpgFacts(path)) {
     if (fact.k === 'file') counts.files += 1
+    else if (fact.k === 'type') counts.types += 1
     else if (fact.k === 'method') counts.methods += 1
     else counts.calls += 1
   }

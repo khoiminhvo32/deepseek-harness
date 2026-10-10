@@ -103,6 +103,9 @@ describe.skipIf(joernHome === '')('hard-cpg with Joern through the sandboxed she
     const rows: HardCpgFact[] = []
     for await (const fact of readHardCpgFacts(facts.path)) rows.push(fact)
     expect(rows.filter(row => row.k === 'file').map(row => row.path)).toEqual(['post.php'])
+    expect(rows).toContainEqual({ k: 'type', id: 'Hooks', name: 'Hooks', file: 'post.php', line: 5, inherits: [] })
+    expect(rows).toContainEqual(expect.objectContaining({ k: 'method', id: 'Hooks.on_save', owner: 'Hooks' }))
+    expect(rows).toContainEqual(expect.objectContaining({ k: 'method', id: 'can_edit', owner: null }))
     expect(rows).toContainEqual(expect.objectContaining({ k: 'call', name: 'can_edit', resolved: ['can_edit'], file: 'post.php', line: 3 }))
     expect(rows).toContainEqual(expect.objectContaining({ k: 'call', name: 'add_action', args: [{ lit: '"save"' }, { arr: ['$this', '"on_save"'] }] }))
   }, 300_000)

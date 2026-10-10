@@ -67,6 +67,7 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-hard-bundle',
       '@deepseek-ai/dsh-experimental-hard-cpg',
       '@deepseek-ai/dsh-experimental-hard-deepread',
+      '@deepseek-ai/dsh-experimental-hard-featuremap',
       '@deepseek-ai/dsh-experimental-hard-handoff',
       '@deepseek-ai/dsh-experimental-hard-ledger',
       '@deepseek-ai/dsh-experimental-hard-mission',

@@ -569,7 +569,7 @@ describe('hard_update_hypothesis and methodology tools', () => {
       ],
     }, root.agent))
     expect(value.cells).toEqual([
-      { bugClass: 'cmdi', verdict: 'suspicious', reopenedSinks: [], crossCheckFailed: expect.stringContaining('failed with exit 2') as unknown },
+      { bugClass: 'cmdi', verdict: 'suspicious', reopenedSinks: [], crossCheckFailed: expect.stringContaining('failed with exit 2') as string },
       { bugClass: 'sqli', verdict: 'suspicious', reopenedSinks: [] },
     ])
     expect(ctx.hardLedger.coverage(root.agent).find(cell => cell.bugClass === 'cmdi')).toMatchObject({ verdict: 'suspicious', source: 'harness' })

@@ -65,6 +65,7 @@ describe('release families', () => {
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',
       '@deepseek-ai/dsh-experimental-hard-audit',
       '@deepseek-ai/dsh-experimental-hard-bundle',
+      '@deepseek-ai/dsh-experimental-hard-cpg',
       '@deepseek-ai/dsh-experimental-hard-deepread',
       '@deepseek-ai/dsh-experimental-hard-handoff',
       '@deepseek-ai/dsh-experimental-hard-ledger',

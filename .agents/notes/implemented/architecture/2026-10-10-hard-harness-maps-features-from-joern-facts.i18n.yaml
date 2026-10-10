@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-10-hard-harness-maps-features-from-joern-facts.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-10-hard-harness-maps-features-from-joern-facts.md
+/agent-note-the-hard-harness-maps-features-from-joern-facts:
+  en: 38142171c63a145e
+  zh: b30d31bfe9d3bd17
+/agent-note-the-hard-harness-maps-features-from-joern-facts/problem:
+  en: 0aa25385d042ff99
+  zh: 51fe38f5b4b8cdb3
+/agent-note-the-hard-harness-maps-features-from-joern-facts/decision:
+  en: c4833d583e494534
+  zh: bba82c9fcbcf3773
+/agent-note-the-hard-harness-maps-features-from-joern-facts/alternatives-considered:
+  en: dd9cb7daddf19362
+  zh: a01479d03e255d97
+/agent-note-the-hard-harness-maps-features-from-joern-facts/consequences:
+  en: 1e749a59091550b4
+  zh: 8bff020a53086d24

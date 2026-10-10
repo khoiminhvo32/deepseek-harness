@@ -124,6 +124,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Runs proofs of concept through the shell seam under the HARD-PASS marker contract and records durable verdicts through the ledger.',
   },
   {
+    key: 'hardCpg',
+    pkg: 'hard-cpg',
+    title: 'Joern call-graph facts for the pinned snapshot commit',
+    mode: 'seam',
+    consumers: [],
+    note: 'Exports the pinned commit, runs the Joern PHP frontend and the packaged query through the shell seam, and caches validated JSON Lines facts per commit and query digest.',
+  },
+  {
     key: 'hmr',
     pkg: 'hmr',
     title: 'Serialized module and configuration reloads',

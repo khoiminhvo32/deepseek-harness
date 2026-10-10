@@ -38,6 +38,27 @@ The hard-harness design record (.agents/plans/2026-10-04-hard-harness-design.md)
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxhardcpg--hardcpg"></a>
+
+### `ctx.hardCpg` — `HardCpg`
+
+The Joern facts service on the `hardCpg` key. Builds run through the shell seam, write only beside the snapshot store, and are shared: concurrent requests for the same commit and query wait for one build.
+
+```ts cordis-catalog
+/**
+ * The facts of the agent's pinned commit, built on first request and
+ * reused from the cache afterwards.
+ * @param agent - an agent whose session armed a hard mission.
+ * @returns the validated fact file and its counts.
+ * @throws HarnessError `HARD_CPG_DISABLED`, `HARD_CPG_NOT_ARMED`, `HARD_CPG_NO_SNAPSHOT`, `HARD_CPG_FAILED`, or `HARD_CPG_FACTS_INVALID`.
+ */
+async facts(agent: Agent): Promise<HardCpgFacts>
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/experimental/hard-cpg/src/index.ts`](../../packages/experimental/hard-cpg/src/index.ts)
+
 <a id="ctxhardledger--hardledger"></a>
 
 ### `ctx.hardLedger` — `HardLedger`

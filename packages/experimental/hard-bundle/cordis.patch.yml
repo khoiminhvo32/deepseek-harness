@@ -27,6 +27,10 @@
     # deployment opts in with `enabled: true`.
     - id: hard-audit
       name: '@deepseek-ai/dsh-experimental-hard-audit'
+    # Mounted off: building facts needs a Joern installation, so a deployment
+    # opts in with `enabled: true` and `joernHome`.
+    - id: hard-cpg
+      name: '@deepseek-ai/dsh-experimental-hard-cpg'
     # The browser coverage panel rides this same bundle: a Web composition
     # (base + web-app) mounts it, a headless one does not. The check reads the
     # launch-time startedBundles, so the panel follows the composition the

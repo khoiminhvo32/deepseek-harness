@@ -40,6 +40,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-experimental-client-ui-hard": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-audit": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hard-cpg": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-deepread": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-handoff": "workspace:*",
     "@deepseek-ai/dsh-experimental-hard-ledger": "workspace:*",

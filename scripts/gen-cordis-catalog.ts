@@ -52,6 +52,7 @@ export { REGION_BEGIN, REGION_END }
 export const SERVICE_PAGE: Record<string, string> = {
   hardLedger: 'hard-harness.md',
   hardVerifier: 'hard-harness.md',
+  hardCpg: 'hard-harness.md',
   speechToText: 'voice-input.md',
   speechController: 'voice-input.md',
   otel: 'otel.md',
@@ -858,6 +859,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   HardFlowDocData: 'flow-document payload is owned by packages/experimental/hard-ledger/README.md',
   HardFlawData: 'weakness payload is owned by packages/experimental/hard-ledger/README.md',
   HardFlawId: 'weakness id brand is owned by packages/experimental/hard-ledger/README.md',
+  HardCpgFacts: 'Joern fact file handle is owned by packages/experimental/hard-cpg/README.md',
   HardLedgerFindingEntry: 'folded finding record is owned by packages/experimental/hard-ledger/README.md',
   HardCoverageMatrix: 'armed coverage matrix is owned by packages/experimental/hard-ledger/README.md',
   CoverageProgress: 'coverage aggregate shape is owned by packages/experimental/hard-ledger/README.md',

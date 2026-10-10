@@ -192,6 +192,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` | yes | Experimental computer use through an installed Cua Driver MCP executable |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | no | Experimental computer-use provider embedding the Cua Driver native npm SDK |
 | `@deepseek-ai/dsh-experimental-hard-audit` | yes | Has a fresh, blind reader re-read a sample of cleared hard-harness coverage cells and records each result beside the clear, in shadow mode |
+| `@deepseek-ai/dsh-experimental-hard-cpg` | yes | Builds Joern call-graph facts for the hard harness's pinned snapshot commit with a fixed packaged query and caches them per commit |
 | `@deepseek-ai/dsh-experimental-hard-deepread` | yes | The deep-reading pass template for the hard mission: flow-document contract and subagent fan-out guidance |
 | `@deepseek-ai/dsh-experimental-hard-handoff` | yes | Injects a durable ledger handoff after each successful compaction so the mission resumes with verified facts |
 | `@deepseek-ai/dsh-experimental-hard-ledger` | yes | Durable findings, hypotheses, and coverage ledger over typed hard/* session events |

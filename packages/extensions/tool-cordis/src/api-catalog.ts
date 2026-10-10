@@ -1238,6 +1238,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'hardCpg',
+    summary: 'The Joern facts service on the `hardCpg` key.',
+    description: 'The Joern facts service on the `hardCpg` key. Builds run through the shell seam, write only beside the snapshot store, and are shared: concurrent requests for the same commit and query wait for one build.',
+    methods: [
+      {
+        signature: 'async facts(agent: Agent): Promise<HardCpgFacts>',
+        description: 'The facts of the agent\'s pinned commit, built on first request and reused from the cache afterwards.',
+        parameters: [{ name: 'agent', description: 'an agent whose session armed a hard mission.' }],
+        returns: 'the validated fact file and its counts.',
+        throws: ['HarnessError `HARD_CPG_DISABLED`, `HARD_CPG_NOT_ARMED`, `HARD_CPG_NO_SNAPSHOT`, `HARD_CPG_FAILED`, or `HARD_CPG_FACTS_INVALID`.'],
+      },
+    ],
+  },
+  {
     key: 'hardLedger',
     summary: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
     description: 'The hard-harness ledger: validates and appends `hard/*` events, and serves findings, hypotheses, coverage, the armed coverage matrix, and open-work state from the projection.',
@@ -5668,6 +5682,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardCoverageVerdict',
     declaration: 'export type HardCoverageVerdict = \'cleared\' | \'suspicious\' | \'uncovered\';',
+  },
+  {
+    name: 'HardCpgFactCounts',
+    declaration: 'export interface HardCpgFactCounts {\n    readonly files: number;\n    readonly methods: number;\n    readonly calls: number;\n}',
+  },
+  {
+    name: 'HardCpgFacts',
+    declaration: 'export interface HardCpgFacts {\n    readonly commit: string;\n    readonly path: string;\n    readonly counts: HardCpgFactCounts;\n    readonly reused: boolean;\n}',
   },
   {
     name: 'HardEmptySweepProof',

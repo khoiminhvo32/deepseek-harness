@@ -1064,6 +1064,37 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-audit -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-cpg -->
+<a id="deepseek-aidsh-experimental-hard-cpg"></a>
+
+## `@deepseek-ai/dsh-experimental-hard-cpg`
+
+- `inject`: `agents` · `shell` · `hardLedger`
+- `source`: [`packages/experimental/hard-cpg/src/index.ts:38`](../packages/experimental/hard-cpg/src/index.ts)
+
+```ts config-catalog
+/** Joern facts plugin config. */
+export interface Config {
+  /** Build facts. Off by default: a deployment opts in once Joern is installed. */
+  enabled?: boolean
+  /** Absolute path of the Joern distribution (the `joern-cli` directory). Required when enabled. */
+  joernHome?: string
+  /**
+   * Repository-relative paths the frontend skips, such as PoC stubs inside
+   * the snapshot that redefine target functions. Empty by default: the facts
+   * cover the whole pinned commit unless the deployment says otherwise.
+   */
+  excludePaths?: string[]
+  /** JVM heap for the frontend and the query, in MiB. */
+  heapMb?: number
+  /** Time budget per step (export, frontend, query), in minutes. */
+  stepTimeoutMinutes?: number
+  /** Start building facts in the background when a mission arms. */
+  buildOnArm?: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-cpg -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-deepread -->
 <a id="deepseek-aidsh-experimental-hard-deepread"></a>
 

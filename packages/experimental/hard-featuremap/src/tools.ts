@@ -13,7 +13,7 @@ import type { GenericCallView, ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { HardLedger } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { checkFeature, requiredSet } from './check.ts'
 import type { HardFeatureGraph, HardFeaturePolicy } from './check.ts'
-import type { HardEdgeRow, HardSymbolRow } from './store.ts'
+import type { HardEdgeRow, HardSymbolRow } from './types.ts'
 import type { HardEntryPoint } from './wordpress.ts'
 
 /** What the tools read from the feature map service. */

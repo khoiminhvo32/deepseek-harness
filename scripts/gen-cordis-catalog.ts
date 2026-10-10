@@ -864,6 +864,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   HardFeatureId: 'feature id brand is owned by packages/experimental/hard-ledger/README.md',
   HardFeatureLinkData: 'feature relation payload is owned by packages/experimental/hard-ledger/README.md',
   HardFeatureMapIndexedData: 'feature map index payload is owned by packages/experimental/hard-ledger/README.md',
+  HardFeatureGraphView: 'feature graph panel payload is owned by packages/experimental/hard-featuremap/README.md',
+  HardSymbolDetail: 'symbol detail panel payload is owned by packages/experimental/hard-featuremap/README.md',
   HardCpgFacts: 'Joern fact file handle is owned by packages/experimental/hard-cpg/README.md',
   HardFeatureMapSnapshot: 'feature map snapshot handle is owned by packages/experimental/hard-featuremap/README.md',
   HardEdgeRow: 'feature map call edge row is owned by packages/experimental/hard-featuremap/README.md',

@@ -44,7 +44,7 @@ kind: "package-reference"
 ### Design
 
 - **日志派生状态。** `findings`、`hypotheses`、`coverage`、`sweepCount`、`coverageMatrix` 与 `openWork` 读取 `hardLedger` 会话投影——对 `hard/*` 事件的纯折叠，框架在恢复时重建并随每次提交增量推进；没有并行存储，日志保持唯一事实来源，fork/重启行为天然跟随会话。
-- **客户端 wire 视图。** 投影定义携带 `wire` 视图——一份严格模式的摘要：已武装矩阵、每格最新判定与判定方、覆盖聚合、以及使用服务自身阈值的门评估——以 `hardLedger` 为键发布到 session store，供 Web 覆盖面板读取。客户端安全词汇位于 `./client` 子路径且仅含类型：那里任何内容都不得把运行时 import 拖进浏览器包。
+- **客户端 wire 视图。** 投影定义携带 `wire` 视图——一份严格模式的摘要：已武装矩阵、每格最新判定与判定方、覆盖聚合、以及使用服务自身阈值的门评估——以 `hardLedger` 为键发布到 session store，供 Web 覆盖面板读取；功能地图建立索引后，还包含每个已索引入口点及其是否被功能覆盖、每个功能的最新记录与功能关系，供功能地图面板读取。客户端安全词汇位于 `./client` 子路径且仅含类型：那里任何内容都不得把运行时 import 拖进浏览器包。
 - **从日志分配顺序 id。** `F-<n>`、`H-<n>` 与 `W-<n>` 计数器统计各自类型的历史事件；假设迁移会对照日志中已存在的 id 校验成员资格。
 - **弱点与链。** `recordFlaw` 追加 `hard/flaw/recorded`：无论单独影响多小都作为串联素材保留的弱点，写明它给予攻击者什么以及需要什么。携带 `links` 的假设是对两个或更多不同的已记录弱点或已确认 finding 的链；不带 links 的迁移保留原有链接。一旦存在两个或更多弱点或已确认 finding（被某个弱点点名的已确认 finding 只通过该弱点计一次），`openWork` 列出每个尚未被任何链式假设链接的条目，因此完成门会一直阻塞到每个条目都被考虑过——提出后附理由驳回的链也算考虑过。
 - **功能地图。** `recordFeatureMapIndexed` 追加 `hard/featuremap/indexed`，记录为固定提交建立索引的功能地图入口点，每个导入派生只记录一次。`recordFeature` 追加 `hard/feature/recorded`，记录调用方已按地图检查过的功能，分配 `FE-n` 或修订所点名的已有 id；`linkFeature` 在两个已记录功能之间追加 `hard/feature/linked`。只要已记录功能覆盖的已索引入口点少于 `minEntryMappedPercent`，`openWork` 就会点名未映射的入口点，因此完成门保持阻塞；`unmappedEntryPoints` 读回这些入口点。

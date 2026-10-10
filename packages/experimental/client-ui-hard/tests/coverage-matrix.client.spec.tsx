@@ -2,22 +2,15 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { HardLedgerClientView } from '@deepseek-ai/dsh-experimental-hard-ledger/client'
-import type { SessionListState, SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { CoverageMatrix, type CoverageMatrixProps } from '../src/client/CoverageMatrix.tsx'
 // The locale-namespace merge for `hard` lives beside the registrations.
 import type {} from '../src/client/mount.ts'
-import { zh } from '../src/client/locales.ts'
+import { panelProps } from './panel-props.client.ts'
 
 afterEach(() => {
   cleanup()
 })
-
-const SESSION = 'hard-session' as SessionId
 
 const MATRIX: HardLedgerClientView['matrix'] = {
   modules: ['data/manuals', 'src'],
@@ -38,11 +31,6 @@ const LEGEND_LABELS = [
   '未覆盖',
   '机器无法筛查此模块',
 ]
-
-/** The panel never reads tab chrome; the props type still carries the seat hook. */
-const unusedTabInfo = (): never => {
-  throw new Error('CoverageMatrix does not read tab info')
-}
 
 /** One folded wire view with the given cells and gate, over the armed 2×2 matrix. */
 function view(overrides: {
@@ -68,38 +56,7 @@ function view(overrides: {
 }
 
 function bench(projection: { state: 'idle' | 'loading' | 'ready' | 'error'; view: HardLedgerClientView | undefined } = { state: 'ready', view: undefined }): CoverageMatrixProps {
-  const sessions = createSnapshotStore<SessionListState>({
-    ids: [SESSION],
-    byId: { [SESSION]: { id: SESSION, displayTitle: SESSION, running: false, retainedBy: {}, blank: false, updatedAt: 0 } },
-    phase: 'ready',
-    projectionsBySession: {
-      [SESSION]: { state: projection.state, error: null, values: projection.view === undefined ? {} : { hardLedger: projection.view } },
-    },
-  })
-  const session = createSnapshotStore<SessionSnapshot>({
-    sessionId: SESSION,
-    pendingSubmissions: [],
-    running: false,
-    subagent: null,
-    removed: false,
-    openState: 'open',
-    openError: null,
-    hasMore: false,
-    loadingOlder: false,
-    promptError: null,
-    blank: false,
-    lastAgentError: null,
-    promptAttempted: false,
-    awaitingFirstTurn: false,
-  })
-  return {
-    sessionId: SESSION,
-    useSession: bindSnapshotSelector(session),
-    useSessions: bindSnapshotSelector(sessions),
-    useProjection: (key: string) => key === 'hardLedger' ? projection.view : undefined,
-    useTabInfo: unusedTabInfo,
-    t: makeTranslate(zh, commonZh),
-  } as CoverageMatrixProps
+  return panelProps(projection).props
 }
 
 describe('CoverageMatrix', () => {

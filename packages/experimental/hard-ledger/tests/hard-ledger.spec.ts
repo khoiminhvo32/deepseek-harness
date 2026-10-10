@@ -592,6 +592,29 @@ describe('hard ledger feature map', () => {
     expect(new HardLedger(bare)).toBeInstanceOf(HardLedger)
   })
 
+  it('publishes the feature map through the client wire view as features and links arrive', () => {
+    const definition = hardLedgerProjectionDefinition()
+    expect(definition.wire.view(emptyHardLedgerState()).featureMap).toBeUndefined()
+    let state = applyHardLedgerProjection(emptyHardLedgerState(), { type: 'hard/featuremap/indexed', data: index } as never)
+    expect(definition.wire.view(state).featureMap).toEqual({
+      commit: index.commit,
+      entryPoints: index.entryPoints.map(entry => ({ ...entry, mapped: false })),
+      features: [],
+      links: [],
+    })
+    state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-1', ...feature } } as never)
+    state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-2', ...feature, entryPoints: ['ajax:heartbeat'] } } as never)
+    state = applyHardLedgerProjection(state, { type: 'hard/feature/linked', data: { from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'wp_posts' } } as never)
+    const view = definition.wire.view(state)
+    expect(definition.wire.viewSchema.parse(view)).toEqual(view)
+    expect(view.featureMap?.entryPoints.map(entry => entry.mapped)).toEqual([true, true, false, false, false])
+    expect(view.featureMap?.features[0]).toEqual({
+      id: 'FE-1', name: feature.name, summary: feature.summary, entryPoints: ['ajax:inline_save'], symbols: feature.symbols,
+      excluded: 2, states: feature.states, reach: 108, required: 31,
+    })
+    expect(view.featureMap?.links).toEqual([{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'wp_posts' }])
+  })
+
   it('folds feature map events onto a cached state that predates them', () => {
     let state = applyHardLedgerProjection(emptyHardLedgerState(), { type: 'hard/feature/linked', data: { from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'n' } } as never)
     state = applyHardLedgerProjection(state, { type: 'hard/featuremap/indexed', data: index } as never)

@@ -347,6 +347,22 @@ const clientViewSchema = zod.object({
     harness: zod.number().int().min(0),
   }),
   blindClears: zod.number().int().min(0),
+  featureMap: zod.object({
+    commit: zod.string(),
+    entryPoints: zod.array(zod.object({ key: zod.string(), handler: zod.string().nullable(), mapped: zod.boolean() })),
+    features: zod.array(zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      summary: zod.string(),
+      entryPoints: zod.array(zod.string()),
+      symbols: zod.array(zod.object({ symbol: zod.string(), role: zod.enum(['entry', 'guard', 'mutation', 'helper']) })),
+      excluded: zod.number().int().min(0),
+      states: zod.array(zod.object({ kind: zod.string(), key: zod.string(), access: zod.enum(['read', 'write']) })),
+      reach: zod.number().int().min(0),
+      required: zod.number().int().min(0),
+    })),
+    links: zod.array(zod.object({ from: zod.string(), to: zod.string(), kind: zod.enum(['calls', 'shares-state', 'gates', 'enables']), note: zod.string() })),
+  }).optional(),
   gate: zod.object({
     complete: zod.boolean(),
     blockers: zod.array(zod.string()),
@@ -388,6 +404,32 @@ function buildHardLedgerView(state: HardLedgerProjectionState, thresholds: Ledge
     bySource: coverageBySourceFromState(state),
     blindClears: blindClearsFromState(state),
     gate: completionAssessmentFromState(state, thresholds),
+    ...featureMapView(state),
+  }
+}
+
+/** The feature map part of the wire view, absent until a map is indexed. */
+function featureMapView(state: HardLedgerProjectionState): Pick<HardLedgerClientView, 'featureMap'> {
+  if (state.featureMap === undefined) return {}
+  const features = state.features ?? []
+  const mapped = new Set(features.flatMap(feature => feature.entryPoints))
+  return {
+    featureMap: {
+      commit: state.featureMap.commit,
+      entryPoints: state.featureMap.entryPoints.map(entry => ({ key: entry.key, handler: entry.handler, mapped: mapped.has(entry.key) })),
+      features: features.map(feature => ({
+        id: feature.id,
+        name: feature.name,
+        summary: feature.summary,
+        entryPoints: [...feature.entryPoints],
+        symbols: feature.symbols.map(member => ({ symbol: member.symbol, role: member.role })),
+        excluded: feature.excluded.length,
+        states: feature.states.map(entry => ({ kind: entry.kind, key: entry.key, access: entry.access })),
+        reach: feature.check.reach,
+        required: feature.check.required,
+      })),
+      links: (state.featureLinks ?? []).map(link => ({ from: link.from, to: link.to, kind: link.kind, note: link.note })),
+    },
   }
 }
 

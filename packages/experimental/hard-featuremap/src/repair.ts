@@ -6,16 +6,9 @@
  */
 
 import { findMethod } from './model.ts'
+import type { HardEdgeSource } from './types.ts'
 import type { FactModel } from './model.ts'
 
-/**
- * Which rule made a call edge: `joern` (the graph's own resolution),
- * `repair` (a type-qualified, relative, or receiverless call resolved through
- * the type lineage, or a free function a class-qualified call meant), `unique-name`
- * (a method call on an unknown receiver whose name only one method carries),
- * or `hook` (a fired hook reaching a registered callback).
- */
-export type HardEdgeSource = 'joern' | 'repair' | 'unique-name' | 'hook'
 
 /** One call edge; `site` is the sequence number of the call site that made it (for a hook edge, the firing site). */
 export interface HardCallEdge {

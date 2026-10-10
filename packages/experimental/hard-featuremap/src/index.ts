@@ -25,12 +25,16 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type { HardFeatureGraph, HardFeaturePolicy } from './check.ts'
 import { FEATURE_MAP_SECTION, featureMapTools } from './tools.ts'
+import { featureMapRoutes } from './web.ts'
+import type {} from '@deepseek-ai/dsh-client-connection'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { HardFeatureMapAccess } from './tools.ts'
 import { readHardCpgFacts } from '@deepseek-ai/dsh-experimental-hard-cpg'
 import { buildModel } from './model.ts'
 import { callEdges } from './repair.ts'
 import { HardFeatureMapStore } from './store.ts'
-import type { HardEdgeRow, HardSnapshotStats } from './store.ts'
+import type { HardSnapshotStats } from './store.ts'
+import type { HardEdgeRow, HardFeatureGraphNode, HardFeatureGraphView, HardSymbolDetail, HardSymbolRow } from './types.ts'
 import { httpEntryPoints } from './http.ts'
 import type { HardHttpFramework } from './http.ts'
 import { hookEdges, WORDPRESS_GUARDS, WORDPRESS_MUTATIONS, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
@@ -39,15 +43,18 @@ import type { HardEntryPoint } from './wordpress.ts'
 export { buildModel, findMethod, lineage } from './model.ts'
 export type { FactModel } from './model.ts'
 export { callEdges } from './repair.ts'
-export type { HardCallEdge, HardEdgeSource } from './repair.ts'
+export type { HardCallEdge } from './repair.ts'
+export type { HardEdgeRow, HardEdgeSource, HardFeatureGraphNode, HardFeatureGraphView, HardSymbolDetail, HardSymbolRow } from './types.ts'
 export { HARD_FEATUREMAP_SCHEMA_VERSION, HardFeatureMapStore } from './store.ts'
-export type { HardEdgeRow, HardSnapshotImport, HardSnapshotStats } from './store.ts'
+export type { HardSnapshotImport, HardSnapshotStats } from './store.ts'
 export { hookEdges, phpString, resolveCallback, WORDPRESS_GUARDS, WORDPRESS_MUTATIONS, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
 export { checkFeature, requiredSet } from './check.ts'
 export type { HardFeatureCheck, HardFeatureClaim, HardFeatureGraph, HardFeaturePolicy, HardRequiredReason, HardRequiredSet } from './check.ts'
 export { FEATURE_MAP_SECTION, featureMapTools } from './tools.ts'
 export type { HardFeatureMapAccess } from './tools.ts'
-export type { HardSymbolRow } from './store.ts'
+export { FEATURE_GRAPH_PATH, SYMBOL_DETAIL_PATH } from './routes.ts'
+export { featureMapRoutes } from './web.ts'
+export type { HardFeatureMapWebAccess } from './web.ts'
 export type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
 export { httpEntryPoints } from './http.ts'
 export type { HardHttpFramework } from './http.ts'
@@ -72,8 +79,8 @@ export const DEFAULT_MAX_EXCLUDED_PERCENT = 50
 
 /** Time budget for reading one cited line from the snapshot store. */
 const LINE_READ_TIMEOUT_MS = 30_000
-/** Captured bytes of one cited line. */
-const LINE_READ_MAX_BYTES = 65_536
+/** Captured bytes of one read of cited or displayed lines. */
+const LINE_READ_MAX_BYTES = 1_048_576
 /** Git with the developer's global and system configuration switched off. */
 const HERMETIC_GIT = 'GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -c core.autocrlf=false'
 
@@ -184,6 +191,14 @@ function integerIn(field: string, value: number, min: number, max: number): numb
   return value
 }
 
+
+
+
+/** The most call edges per direction a symbol detail lists. */
+export const DETAIL_MAX_EDGES = 100
+/** The most source lines a symbol detail carries. */
+export const SOURCE_MAX_LINES = 200
+
 /** One imported snapshot. */
 export interface HardFeatureMapSnapshot {
   /** Snapshot id in the database. */
@@ -229,6 +244,14 @@ export class HardFeatureMap extends Service {
     if (resolved.enabled) {
       ctx.systemPrompt.section({ name: 'hard:feature-map', order: ctx.systemPrompt.getSectionOrder('HARD_FEATURE_MAP'), text: FEATURE_MAP_SECTION })
       for (const tool of featureMapTools(this.access(), ctx.hardLedger)) ctx.effect(() => ctx.tools.register(tool), `hard-featuremap: ${tool.name}`)
+      ctx.inject(['connection'], (web) => {
+        const routes = featureMapRoutes({
+          agent: session => ctx.agents.get(SessionId(session)),
+          featureGraph: (agent, featureId) => this.featureGraph(agent, featureId),
+          symbolDetail: (agent, symbol) => this.symbolDetail(agent, symbol),
+        })
+        for (const entry of routes) web.effect(() => web.connection.fetch.register(entry), `hard-featuremap: ${entry.path}`)
+      })
     }
     if (resolved.enabled && resolved.indexOnArm) {
       ctx.on('session/event', (session, event) => {
@@ -300,6 +323,57 @@ export class HardFeatureMap extends Service {
     return snapshot
   }
 
+  /**
+   * The symbols of one recorded feature and the call edges among them, for display.
+   * @param agent - an agent whose session recorded the feature.
+   * @param featureId - the `FE-n` feature id.
+   * @returns the feature graph, or undefined when the session has no such feature.
+   */
+  async featureGraph(agent: Agent, featureId: string): Promise<HardFeatureGraphView | undefined> {
+    const feature = this.ctx.hardLedger.features(agent).find(entry => entry.id === featureId)
+    if (feature === undefined) return undefined
+    const snapshot = await this.index(agent)
+    const store = await this.store()
+    const roles = new Map<string, HardFeatureGraphNode['role']>(feature.excluded.map(entry => [entry.symbol, 'excluded']))
+    for (const member of feature.symbols) roles.set(member.symbol, member.role)
+    const nodes = [...roles].map(([id, role]) => {
+      const row = store.symbol(snapshot.id, id)
+      return { id, name: row?.name ?? id, role, file: row?.file ?? null, line: row?.line ?? null }
+    })
+    const edges = [...roles.keys()].flatMap(id => store.callees(snapshot.id, id)
+      .filter(edge => roles.has(edge.callee))
+      .map(edge => ({ from: edge.caller, to: edge.callee, source: edge.source })))
+    return { feature: featureId, nodes, edges }
+  }
+
+  /**
+   * One symbol with its call edges and its source at the pinned commit, for display.
+   * @param agent - an agent whose session armed a hard mission.
+   * @param symbol - the symbol id.
+   * @returns the detail, or undefined when the snapshot has no such symbol.
+   */
+  async symbolDetail(agent: Agent, symbol: string): Promise<HardSymbolDetail | undefined> {
+    const snapshot = await this.index(agent)
+    const store = await this.store()
+    const row = store.symbol(snapshot.id, symbol)
+    if (row === undefined) return undefined
+    return {
+      symbol: row,
+      callers: store.callers(snapshot.id, symbol).slice(0, DETAIL_MAX_EDGES),
+      callees: store.callees(snapshot.id, symbol).slice(0, DETAIL_MAX_EDGES),
+      source: await this.sourceOf(agent, row),
+    }
+  }
+
+  /** The lines of one symbol at the pinned commit, bounded; null when its location is unknown or unreadable. */
+  private async sourceOf(agent: Agent, row: HardSymbolRow): Promise<HardSymbolDetail['source']> {
+    if (row.line === null) return null
+    const end = Math.max(row.line, row.end ?? row.line)
+    const last = Math.min(end, row.line + SOURCE_MAX_LINES - 1)
+    const text = await this.readLines(agent, row.file, row.line, last)
+    return text === undefined ? null : { startLine: row.line, lines: text.split('\n'), truncated: last < end }
+  }
+
   /** The reads the feature map tools use. */
   private access(): HardFeatureMapAccess {
     return {
@@ -327,12 +401,17 @@ export class HardFeatureMap extends Service {
   }
 
   /** One line of a file at the agent's pinned commit, read from the snapshot store; undefined when it does not exist. */
-  private async lineText(agent: Agent, file: string, line: number): Promise<string | undefined> {
+  private lineText(agent: Agent, file: string, line: number): Promise<string | undefined> {
+    return this.readLines(agent, file, line, line)
+  }
+
+  /** Lines `first` through `last` of a file at the agent's pinned commit; undefined when none exist. */
+  private async readLines(agent: Agent, file: string, first: number, last: number): Promise<string | undefined> {
     const matrix = this.ctx.hardLedger.coverageMatrix(agent)
     const gitDir = matrix?.snapshot?.gitDir
-    if (matrix === undefined || gitDir === undefined || !Number.isSafeInteger(line) || line < 1) return undefined
+    if (matrix === undefined || gitDir === undefined || !Number.isSafeInteger(first) || first < 1 || last < first) return undefined
     const spec = this.ctx.shell.resolve({
-      command: `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} show ${shellQuote(`${matrix.commit}:${file}`)} | sed -n '${line}p'`,
+      command: `${HERMETIC_GIT} --git-dir=${shellQuote(gitDir)} show ${shellQuote(`${matrix.commit}:${file}`)} | sed -n '${first},${last}p'`,
       workdir: dirname(gitDir),
       timeoutMs: LINE_READ_TIMEOUT_MS,
       stdoutMaxBytes: LINE_READ_MAX_BYTES,

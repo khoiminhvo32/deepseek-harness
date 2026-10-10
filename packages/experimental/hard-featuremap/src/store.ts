@@ -9,7 +9,8 @@
 import { mkdir, open } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import type { HardCallEdge, HardEdgeSource } from './repair.ts'
+import type { HardCallEdge } from './repair.ts'
+import type { HardEdgeRow, HardEdgeSource, HardSymbolRow } from './types.ts'
 import type { FactModel } from './model.ts'
 import type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
 
@@ -132,16 +133,6 @@ export interface HardSnapshotStats {
   readonly entryPoints: number
 }
 
-/** One symbol as a query returns it. */
-export interface HardSymbolRow {
-  readonly id: string
-  readonly name: string
-  readonly kind: 'function' | 'method' | 'script'
-  readonly owner: string | null
-  readonly file: string
-  readonly line: number | null
-  readonly end: number | null
-}
 
 type SymbolRecord = {
   id: string
@@ -153,14 +144,6 @@ type SymbolRecord = {
   end: number | null
 }
 
-/** One edge as a query returns it: the other end, where the call is, and which rule made it. */
-export interface HardEdgeRow {
-  readonly caller: string
-  readonly callee: string
-  readonly file: string
-  readonly line: number | null
-  readonly source: HardEdgeSource
-}
 
 /** The open feature-map database. */
 export class HardFeatureMapStore {

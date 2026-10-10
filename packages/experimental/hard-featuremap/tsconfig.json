@@ -17,6 +17,8 @@
     { "path": "../hard-cpg" },
     { "path": "../../shell/shell" },
     { "path": "../../core/system-prompt" },
-    { "path": "../../core/tools" }
+    { "path": "../../core/tools" },
+    { "path": "../../core/session" },
+    { "path": "../../client/connection/tsconfig.host.json" }
   ]
 }

@@ -5,10 +5,11 @@ import { registerHardUi } from './mount.ts'
 
 export { inject } from './mount.ts'
 export type { CoverageMatrixProps } from './CoverageMatrix.tsx'
+export type { FeatureMapProps } from './FeatureMap.tsx'
 export type { HardKey } from './locales.ts'
 
 /**
- * Register the hard-harness locale dictionaries and the coverage tab on the Client Context.
+ * Register the hard-harness locale dictionaries, the coverage tab, and the feature map tab on the Client Context.
  * @param ctx - Client Context with the declared `inject` services available.
  */
 export function apply(ctx: ClientContext): void {

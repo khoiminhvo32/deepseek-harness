@@ -1264,6 +1264,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['HarnessError `HARD_FEATUREMAP_DISABLED`, `HARD_FEATUREMAP_NOT_ARMED`, or any `hardCpg.facts` error.'],
       },
       {
+        signature: 'async featureGraph(agent: Agent, featureId: string): Promise<HardFeatureGraphView | undefined>',
+        description: 'The symbols of one recorded feature and the call edges among them, for display.',
+        parameters: [{ name: 'agent', description: 'an agent whose session recorded the feature.' }, { name: 'featureId', description: 'the `FE-n` feature id.' }],
+        returns: 'the feature graph, or undefined when the session has no such feature.',
+      },
+      {
+        signature: 'async symbolDetail(agent: Agent, symbol: string): Promise<HardSymbolDetail | undefined>',
+        description: 'One symbol with its call edges and its source at the pinned commit, for display.',
+        parameters: [{ name: 'agent', description: 'an agent whose session armed a hard mission.' }, { name: 'symbol', description: 'the symbol id.' }],
+        returns: 'the detail, or undefined when the snapshot has no such symbol.',
+      },
+      {
         signature: 'async callers(snapshot: number, symbol: string): Promise<HardEdgeRow[]>',
         description: 'Every edge into a symbol of one snapshot.',
         parameters: [{ name: 'snapshot', description: 'snapshot id from {@link index}.' }, { name: 'symbol', description: 'callee symbol id.' }],
@@ -5803,6 +5815,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardFeatureExclusionReason = \'utility\' | \'other-feature\' | \'unreachable\';',
   },
   {
+    name: 'HardFeatureGraphNode',
+    declaration: 'export interface HardFeatureGraphNode {\n    readonly id: string;\n    readonly name: string;\n    readonly role: \'entry\' | \'guard\' | \'mutation\' | \'helper\' | \'excluded\';\n    readonly file: string | null;\n    readonly line: number | null;\n}',
+  },
+  {
+    name: 'HardFeatureGraphView',
+    declaration: 'export interface HardFeatureGraphView {\n    readonly feature: string;\n    readonly nodes: readonly HardFeatureGraphNode[];\n    readonly edges: readonly {\n        readonly from: string;\n        readonly to: string;\n        readonly source: HardEdgeSource;\n    }[];\n}',
+  },
+  {
     name: 'HardFeatureId',
     declaration: 'export type HardFeatureId = Branded<\'HardFeatureId\'>;',
   },
@@ -5905,6 +5925,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardSweepSummaryData',
     declaration: 'export interface HardSweepSummaryData {\n    readonly phase: \'A\' | \'B\';\n    readonly cellsTouched: number;\n    readonly newFindings: number;\n    readonly emptyProof?: string;\n    readonly emptyProofRef?: HardEmptySweepProof;\n    readonly emptyProofFlowDoc?: string;\n}',
+  },
+  {
+    name: 'HardSymbolDetail',
+    declaration: 'export interface HardSymbolDetail {\n    readonly symbol: HardSymbolRow;\n    readonly callers: readonly HardEdgeRow[];\n    readonly callees: readonly HardEdgeRow[];\n    readonly source: {\n        readonly startLine: number;\n        readonly lines: readonly string[];\n        readonly truncated: boolean;\n    } | null;\n}',
+  },
+  {
+    name: 'HardSymbolRow',
+    declaration: 'export interface HardSymbolRow {\n    readonly id: string;\n    readonly name: string;\n    readonly kind: \'function\' | \'method\' | \'script\';\n    readonly owner: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly end: number | null;\n}',
   },
   {
     name: 'HardTargetSnapshot',

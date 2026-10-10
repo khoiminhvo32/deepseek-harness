@@ -13,6 +13,7 @@
     { "path": "../../client/ui-session" },
     { "path": "../../client/ui-sidebar-right" },
     { "path": "../../client/ui-slots" },
+    { "path": "../hard-featuremap" },
     { "path": "../hard-ledger" },
     { "path": "../../core/session" }
   ]

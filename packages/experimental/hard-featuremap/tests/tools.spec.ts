@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -17,7 +17,8 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import HardLedger from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardCpgFacts } from '@deepseek-ai/dsh-experimental-hard-cpg'
-import { HardFeatureMap } from '@deepseek-ai/dsh-experimental-hard-featuremap'
+import { FEATURE_GRAPH_PATH, HardFeatureMap, SYMBOL_DETAIL_PATH } from '@deepseek-ai/dsh-experimental-hard-featuremap'
+import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
@@ -47,6 +48,7 @@ await writeFile(factsPath, [
   { k: 'file', path: 'ajax.php' },
   method('wp_ajax_save', 2), method('wp_ajax_trash', 6), method('check_ajax_referer', 20), method('current_user_can', 30),
   method('save_post', 40), method('update_post_meta', 50), method('log_change', 60),
+  { ...method('ghost', 0), line: null, end: null }, { ...method('open_end', 1), end: null },
   call('wp_ajax_save', 'check_ajax_referer', 3), call('wp_ajax_save', 'save_post', 4), call('save_post', 'update_post_meta', 41),
   call('wp_ajax_trash', 'current_user_can', 7), call('wp_ajax_trash', 'update_post_meta', 8),
   { k: 'end' },
@@ -79,6 +81,31 @@ class LocalShell extends Service {
   }
 }
 
+/** A Web connection on the `connection` key that keeps the registered fetch routes. */
+class FakeConnection extends Service {
+  readonly routes = new Map<string, ConnectionFetchRoute>()
+  readonly fetch = {
+    register: (route: ConnectionFetchRoute) => {
+      this.routes.set(route.path, route)
+      return () => {
+        this.routes.delete(route.path)
+        return Promise.resolve()
+      }
+    },
+  }
+
+  constructor(ctx: Context) {
+    super(ctx, 'connection')
+  }
+
+  async get(path: string, query: Record<string, string>): Promise<{ status: number; body: unknown }> {
+    const route = this.routes.get(path)
+    if (route === undefined) throw new Error(`no route ${path}`)
+    const response = await route.fetch(new Request(`http://host${path}?${new URLSearchParams(query).toString()}`))
+    return { status: response.status, body: await response.json() }
+  }
+}
+
 let seq = 0
 async function harness(arm: 'snapshot' | 'legacy' = 'snapshot') {
   const ctx = new Context()
@@ -90,6 +117,7 @@ async function harness(arm: 'snapshot' | 'legacy' = 'snapshot') {
   await ctx.plugin(HardLedger, {})
   new FakeCpg(ctx)
   new LocalShell(ctx)
+  const web = new FakeConnection(ctx)
   seq += 1
   await ctx.plugin(HardFeatureMap, {
     enabled: true, dbPath: join(root, `map-${seq}.db`), frameworks: ['wordpress'], scriptDirs: ['none'], indexOnArm: false,
@@ -106,7 +134,7 @@ async function harness(arm: 'snapshot' | 'legacy' = 'snapshot') {
     objective: 'audit', targetRepo: repo, commit: COMMIT, modules: ['.'], bugClasses: ['logic'],
     ...arm === 'snapshot' ? { snapshot: { gitDir, kind: 'git' as const } } : {},
   })
-  return { ctx, agent }
+  return { ctx, agent, web }
 }
 
 async function run(ctx: Context, agent: Agent | undefined, name: string, args: unknown): Promise<ToolExecutionResult> {
@@ -245,5 +273,78 @@ describe('hard_link_feature', () => {
     expect(ctx.tools.get('hard_query_map')?.presentCall?.({ view: 'symbol' })).toEqual({ card: 'generic', title: 'Feature map: symbol', kind: 'other', rawInput: { view: 'symbol' } })
     expect(ctx.tools.get('hard_record_feature')?.presentCall?.(SAVE)).toEqual({ card: 'generic', title: 'Feature: Save a post', kind: 'other', rawInput: 'ajax:save' })
     expect(ctx.tools.get('hard_link_feature')?.presentCall?.({ from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'n' })).toEqual({ card: 'generic', title: 'Feature link: FE-1 calls FE-2', kind: 'other', rawInput: 'n' })
+  })
+})
+
+describe('panel routes', () => {
+  const SAVE_WITHOUT_HELPER = {
+    ...SAVE,
+    symbols: SAVE.symbols.filter(member => member.symbol !== 'save_post'),
+    excluded: [{ symbol: 'save_post', reason: 'utility' }],
+  }
+
+  it('answer a recorded feature\'s symbol graph with each role and edge rule', async () => {
+    const { ctx, agent, web } = await harness()
+    json(await run(ctx, agent, 'hard_record_feature', SAVE_WITHOUT_HELPER))
+    const graph = await web.get(FEATURE_GRAPH_PATH, { session: agent.id, feature: 'FE-1' })
+    expect(graph.status).toBe(200)
+    expect(graph.body).toEqual({
+      feature: 'FE-1',
+      nodes: [
+        { id: 'save_post', name: 'save_post', role: 'excluded', file: 'ajax.php', line: 40 },
+        { id: 'wp_ajax_save', name: 'wp_ajax_save', role: 'entry', file: 'ajax.php', line: 2 },
+        { id: 'check_ajax_referer', name: 'check_ajax_referer', role: 'guard', file: 'ajax.php', line: 20 },
+        { id: 'update_post_meta', name: 'update_post_meta', role: 'mutation', file: 'ajax.php', line: 50 },
+      ],
+      edges: [
+        { from: 'save_post', to: 'update_post_meta', source: 'joern' },
+        { from: 'wp_ajax_save', to: 'check_ajax_referer', source: 'joern' },
+        { from: 'wp_ajax_save', to: 'save_post', source: 'joern' },
+      ],
+    })
+    expect(await web.get(FEATURE_GRAPH_PATH, { session: agent.id, feature: 'FE-9' })).toEqual({ status: 404, body: { error: 'no feature FE-9' } })
+  })
+
+  it('answer a symbol\'s edges and its lines at the pinned commit', async () => {
+    const { ctx, agent, web } = await harness()
+    const detail = await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'wp_ajax_save' })
+    expect(detail).toEqual({
+      status: 200,
+      body: {
+        symbol: { id: 'wp_ajax_save', name: 'wp_ajax_save', kind: 'function', owner: null, file: 'ajax.php', line: 2, end: 4 },
+        callers: [],
+        callees: [
+          { caller: 'wp_ajax_save', callee: 'check_ajax_referer', file: 'ajax.php', line: 3, source: 'joern' },
+          { caller: 'wp_ajax_save', callee: 'save_post', file: 'ajax.php', line: 4, source: 'joern' },
+        ],
+        source: { startLine: 2, lines: ['function wp_ajax_save() {', '  check_ajax_referer("save");', '  save_post();'], truncated: false },
+      },
+    })
+    // log_change sits past the end of the pinned file.
+    expect((await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'log_change' })).body).toMatchObject({ source: null })
+    expect(await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'missing' })).toEqual({ status: 404, body: { error: 'no symbol missing' } })
+    expect(await ctx.hardFeatureMap.featureGraph(agent, 'FE-1')).toBeUndefined()
+    // A symbol without a location has no source; one without an end line reads its first line.
+    expect((await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'ghost' })).body).toMatchObject({ source: null })
+    expect((await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'open_end' })).body).toMatchObject({ source: { startLine: 1, lines: ['<?php'], truncated: false } })
+    // A feature recorded against another derivation can name a symbol this snapshot lacks.
+    ctx.hardLedger.recordFeature(agent, { name: 'Old', summary: 'Recorded earlier.', entryPoints: [], symbols: [{ symbol: 'renamed', role: 'helper' }], excluded: [], states: [], check: { commit: COMMIT, reach: 0, required: 0 } })
+    expect(await ctx.hardFeatureMap.featureGraph(agent, 'FE-1')).toEqual({ feature: 'FE-1', nodes: [{ id: 'renamed', name: 'renamed', role: 'helper', file: null, line: null }], edges: [] })
+  })
+
+  it('refuse a request without its parameters or live agent, and report a failed read', async () => {
+    const { ctx, agent, web } = await harness()
+    expect(await web.get(SYMBOL_DETAIL_PATH, { session: agent.id })).toEqual({ status: 400, body: { error: 'session and symbol are required' } })
+    expect(await web.get(FEATURE_GRAPH_PATH, { session: '', feature: 'FE-1' })).toEqual({ status: 400, body: { error: 'session and feature are required' } })
+    expect(await web.get(FEATURE_GRAPH_PATH, { session: 'gone', feature: 'FE-1' })).toEqual({ status: 404, body: { error: 'session gone has no live agent' } })
+    vi.spyOn(ctx.hardFeatureMap, 'symbolDetail').mockRejectedValueOnce(new Error('store closed'))
+    expect(await web.get(SYMBOL_DETAIL_PATH, { session: agent.id, symbol: 'wp_ajax_save' })).toEqual({ status: 409, body: { error: 'Error: store closed' } })
+  })
+
+  it('register only beside a Web connection and leave on disposal', async () => {
+    const { ctx, web } = await harness()
+    expect([...web.routes.keys()]).toEqual([FEATURE_GRAPH_PATH, SYMBOL_DETAIL_PATH])
+    await ctx.fiber.dispose()
+    expect(web.routes.size).toBe(0)
   })
 })

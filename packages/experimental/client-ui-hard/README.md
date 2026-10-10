@@ -1,5 +1,5 @@
 ---
-description: "Use the experimental Web coverage-matrix panel for hard-harness sessions."
+description: "Use the experimental Web coverage-matrix and feature-map panels for hard-harness sessions."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package adds a right-sidebar tab to the Web client for hard-harness sessions: the armed coverage matrix as a module × bug-class grid, the coverage ratio, the pinned target, and the completion gate's current assessment. It reads the Session's `hardLedger` projection from the shared Session store, where Host projection frames keep it current, and every cell shows its verdict together with who decided it, so a machine screen never reads as a model's own sweep. The browser projection does not extend the stable API Proxy or register model-facing input.
+This package adds two right-sidebar tabs to the Web client for hard-harness sessions. The coverage tab shows the armed module × bug-class matrix, the coverage ratio, the pinned target, and the completion gate; each cell shows its verdict and who decided it. The feature map tab graphs the target's entry points, the features the model recorded, and their links, and opens any feature's symbol graph and any symbol's call edges and source. Both read the Session's `hardLedger` projection, which Host projection frames keep current. Neither extends the stable API Proxy or registers model-facing input.
 
 ## Table of Contents
 
@@ -29,11 +29,17 @@ Switch the hard bundle on for a Web-composition profile: the bundle mounts this 
 
 ### Open the panel
 
-The guide tab in the right sidebar lists a Hard coverage capsule; picking it opens the coverage page in that tab's place. The panel needs no refresh control: projection frames update the matrix while it stays open.
+The guide tab in the right sidebar lists a Meebard coverage matrix capsule and a Meebard feature map capsule; picking one opens that page in the guide tab's place. Neither panel needs a refresh control: projection frames update them while they stay open.
 
 ### Read the matrix
 
 Rows are the armed modules, columns the armed bug classes — both are session data and stay untranslated. Each cell's color names verdict and decider together: blue for a cleared cell the model read itself, green for a batch screen the model cleared without reading, neutral gray for the inert-module screen, red for a cell the harness cross-check reopened, amber for a suspicious call the model made on its own, and a hollow outline for cells without a verdict. A corner dot marks a model clear in a module the harness cannot screen, where nothing but the model's read stands behind the verdict; the mark overlays the color instead of replacing it. Hovering a cell names its module, class, verdict, decider, and any mark. The header shows the ratio, the target repository with the pinned commit, the gate (certified, or open with the first blockers listed), and the blind-clear count when there is one; a line below it states how many tracked files a configured exclusion removed.
+
+### Read the feature map
+
+The feature map tab appears once the mission indexes the target with `hard-featuremap`. The header counts features, mapped entry points out of all indexed ones, and feature links; a collapsed list below the graph names every entry point no recorded feature covers. The overview graph puts each covered entry point in the left column and each feature in the right, with an edge from an entry point to every feature that lists it and an animated edge for each recorded feature link. Positions follow record order, so a new feature lands below the ones already drawn, and a node that appears while the tab is open carries a green ring and a "new" tag for four seconds.
+
+Picking a feature, from the chip row or its node, shows its summary, reach, required and excluded counts, and recorded state, and replaces the overview with the feature's symbol graph from the Host: handlers in the first column and each further call level in the next, excluded symbols dimmed in the last column, guards and state writes outlined, and edges colored by the rule that made them (Joern, repair, unique name, hook). A revised feature record refetches the graph. Picking a symbol lists its callers and callees, each of which opens in turn, and shows its lines at the pinned commit. "All features" returns to the overview.
 
 -----
 
@@ -43,14 +49,18 @@ Rows are the armed modules, columns the armed bug classes — both are session d
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The Client export registers its locale dictionaries, one sidebar tab type (stage one of the two-stage tab registration), and the keyed `sidebar.right.pane.tab` body (stage two) through Cordis effects. Disposing the plugin fiber removes all three, and the builtin guide resumes.
+The Client export registers its locale dictionaries, two sidebar tab types (stage one of the two-stage tab registration), and their keyed `sidebar.right.pane.tab` bodies (stage two) through Cordis effects. Disposing the plugin fiber removes all of them, and the builtin guide resumes.
 
 The component derives everything from the `useSessions` seat: the view comes from `projectionsBySession[sessionId].values.hardLedger`, the wire summary the hard-ledger projection publishes — matrix axes, latest per-cell verdicts with sources, the coverage aggregates, and the gate assessment. Without a projection value the panel shows a loading notice while the baseline reads and an empty notice afterward; with a projection but no arming record it shows the same empty notice. Faces are pure CSS classes over shared state tokens; tooltips are the shared primitive.
+
+The feature map reads `featureMap` from the same view and draws it with React Flow, which the Client bundle inlines. Its layouts are pure functions of record order. The feature graph and symbol detail come from `GET api/hard-featuremap.feature` and `GET api/hard-featuremap.symbol`, which `hard-featuremap` registers on the Web connection; the panel imports only that package's `./client` types, keeps its own copies of the two paths, and a test compares them with the Host constants. A response that arrives after the selection changed is dropped.
 
 | File | Role |
 |---|---|
 | [`src/client/mount.ts`](src/client/mount.ts) | Locale, tab-type, and slot registrations |
 | [`src/client/CoverageMatrix.tsx`](src/client/CoverageMatrix.tsx) | Projection-derived matrix, header, and legend |
+| [`src/client/FeatureMap.tsx`](src/client/FeatureMap.tsx) | Feature map overview, feature graph, and symbol detail |
+| [`src/client/feature-layout.ts`](src/client/feature-layout.ts) | Pure graph layouts and the Host route paths |
 | [`src/client/locales.ts`](src/client/locales.ts) | English and Chinese panel copy |
 | [`src/index.ts`](src/index.ts) | Inert Host entry |
 
@@ -63,6 +73,7 @@ The component derives everything from the `useSessions` seat: the view comes fro
 
 - [Hard bundle](../hard-bundle/README.md) — the layer that mounts this panel on Web compositions.
 - [Hard ledger](../hard-ledger/README.md) — the projection and its client wire view.
+- [Hard feature map](../hard-featuremap/README.md) — the feature map and the routes the feature map tab reads.
 - [Right sidebar](../../client/ui-sidebar-right/README.md) — the tab registry and keyed tab-body seat.
 - [Experimental packages](../README.md) — incubation status and publication policy.
 
@@ -81,7 +92,9 @@ No direct effect; the hard tools own any later model-visible use.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Coverage only** — findings, hypotheses, and round progress are later panels; the matrix is the first surface.
+- **Coverage and features only** — findings, hypotheses, and round progress are later panels.
+- **Feature map needs a live agent** — the feature graph and symbol routes answer only while the session's agent runs; a reopened finished session shows the overview but not the graphs.
+- **No cross-project page** — the feature map database is shared across projects, but the tab shows one session's target only.
 - **No transcript cards** — the `hard/*` events stay out of the conversation; the panel is the reading surface.
 - **Late plugin activation** — after enabling the hard bundle in an already-open conversation, reload the page to receive its `hardLedger` projection.
 

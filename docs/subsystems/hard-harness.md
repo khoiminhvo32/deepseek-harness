@@ -75,6 +75,22 @@ The feature map service on the `hardFeatureMap` key. Imports are shared: concurr
 async index(agent: Agent): Promise<HardFeatureMapSnapshot>
 
 /**
+ * The symbols of one recorded feature and the call edges among them, for display.
+ * @param agent - an agent whose session recorded the feature.
+ * @param featureId - the `FE-n` feature id.
+ * @returns the feature graph, or undefined when the session has no such feature.
+ */
+async featureGraph(agent: Agent, featureId: string): Promise<HardFeatureGraphView | undefined>
+
+/**
+ * One symbol with its call edges and its source at the pinned commit, for display.
+ * @param agent - an agent whose session armed a hard mission.
+ * @param symbol - the symbol id.
+ * @returns the detail, or undefined when the snapshot has no such symbol.
+ */
+async symbolDetail(agent: Agent, symbol: string): Promise<HardSymbolDetail | undefined>
+
+/**
  * Every edge into a symbol of one snapshot.
  * @param snapshot - snapshot id from {@link index}.
  * @param symbol - callee symbol id.

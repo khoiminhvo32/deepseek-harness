@@ -26,6 +26,7 @@ Joern supplies facts; the model names and groups features; the harness checks th
 - **A feature claim must account for what its entry points reach.** The harness computes the required set from the graph (the handlers, near non-library symbols, and every reached guard and state write), and a feature is recorded only when each required symbol is a member or an exclusion with a reason, no guard or state write is excluded as utility, the excluded share stays bounded, and a member outside the reach cites the call at the pinned commit. The model names and groups; the graph decides what it must explain.
 - **Mapping is open work.** Indexing records the entry points in the session, so the open work and the completion gate derive from the log: the gate holds until recorded features cover `minEntryMappedPercent` (default 80) of them. The share is below 100 because some entry points (thin scripts, deprecated actions) carry no feature worth mapping.
 - **The feature map database is derived.** One SQLite file holds every project and snapshot, keyed by target root, commit, and a derivation digest; because facts can always be imported again, a file stamped with another schema version is dropped and rebuilt instead of migrated.
+- **The map view follows the session log.** The Web feature map tab draws entry points, features, and links from the `hardLedger` projection, so it updates as the mission records, and fetches a feature's symbol graph and a symbol's detail from Host routes that `hard-featuremap` registers on the Web connection. The browser bundle imports only display types from `hard-featuremap`, because a runtime import would pull SQLite and the Host service into it. Layouts depend on record order alone, so arriving records never move nodes already drawn.
 
 ## Alternatives considered
 
@@ -33,6 +34,7 @@ Joern supplies facts; the model names and groups features; the harness checks th
 - **Joern's own interface or a Neo4j export for the map view.** Rejected: Joern has no web interface, and its exports show syntax and flow nodes, not features, state, and authorization, and cannot link to ledger records.
 - **Letting the model query Joern directly.** Rejected: an interpreter that runs arbitrary code is not a tool argument the harness can confine.
 - **tree-sitter symbol extraction.** Deferred: lighter and multi-language, but it yields no call resolution or data flow; it stays a fallback for languages Joern reads poorly.
+- **A Remote RPC channel for the panel's graph reads.** Rejected: the reads are plain GETs keyed by session and id, and the Web connection's fetch routes serve them without a generated descriptor.
 - **Repairing Joern's PHP call resolution in Scala.** Rejected: repairs live in TypeScript over the exported facts, where per-file coverage and fixtures test them.
 
 ## Consequences

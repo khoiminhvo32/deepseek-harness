@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/client-ui-hard/README.md
 /:
-  en: 8887953c34a52438
-  zh: 0f3ade06ee296717
+  en: 08cec6013062cbe3
+  zh: 1de56d34af6e3535
 /deepseek-ai-dsh-experimental-client-ui-hard:
   en: 60c6d2516617317c
   zh: 444711bb17a07f1a
 /deepseek-ai-dsh-experimental-client-ui-hard/summary:
-  en: 1a02952e6cfd6333
-  zh: 2af276cca735446a
+  en: a67f7755a60c74db
+  zh: c484d50a1f9fd8ca
 /deepseek-ai-dsh-experimental-client-ui-hard/table-of-contents:
   en: d152484eb41ac6b4
   zh: f14f34fce35a8d90
@@ -18,17 +18,20 @@
   en: e218319c69a5f599
   zh: 7098667268fb4d58
 /deepseek-ai-dsh-experimental-client-ui-hard/use-this-package/open-the-panel:
-  en: 5c34b54bf9315ad5
-  zh: f587efd92d82e4b5
+  en: 69a274cc084e9594
+  zh: b120a0c0d2fa3cd5
 /deepseek-ai-dsh-experimental-client-ui-hard/use-this-package/read-the-matrix:
-  en: e9a9c68ae1a3cab7
-  zh: 3a4754fdca5c9376
+  en: 3ead9ebafba84e6c
+  zh: 4c98a795eeab487f
+/deepseek-ai-dsh-experimental-client-ui-hard/use-this-package/read-the-feature-map:
+  en: 6dbcc06f7273175c
+  zh: c67d0016079fc4cc
 /deepseek-ai-dsh-experimental-client-ui-hard/understand-the-implementation:
-  en: 039cedcf7da6c003
-  zh: bc67741721aa36bc
+  en: 91ad2bb38116fe34
+  zh: dbfdc31547f70835
 /deepseek-ai-dsh-experimental-client-ui-hard/further-exploration:
-  en: 1c08a0f4cf9b73e2
-  zh: 607c38992b71003f
+  en: 1a27f0c06b253d0b
+  zh: b763469ccb0e01d8
 /deepseek-ai-dsh-experimental-client-ui-hard/model-experience:
   en: 47ebeba07d72759d
   zh: 530c20d56a3c95fb
@@ -36,8 +39,8 @@
   en: 1f33f2e002828284
   zh: 7501c9a1b8938bd7
 /deepseek-ai-dsh-experimental-client-ui-hard/known-limitations-and-deferred-work:
-  en: 8403b0cc906afe5d
-  zh: 5f5f23f87d407dc6
+  en: 75f3d754700a061e
+  zh: e2c9348bd84fbe76
 /deepseek-ai-dsh-experimental-client-ui-hard/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: bf458931352ca2bf

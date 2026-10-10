@@ -33,7 +33,7 @@ kind: "package-reference"
     frameworks: [wordpress]
 ```
 
-bundle 把 `dbPath` 设为 harness 主目录下 `hard` 目录中的 `featuremap.db`。`frameworks` 列出要读取的配置档，可选 `wordpress`、`laravel`、`spring`、`aspnet`、`flask`、`fastapi` 与 `express`；留空只保留调用边。请让 `hard-cpg` 的 `language` 与之匹配。`scriptDirs` 列出其顶层 PHP 文件会被直接请求的目录；启用 WordPress 配置档时，留空即选用 WordPress 安装的根目录、`wp-admin`、`wp-admin/network` 与 `wp-admin/user`。启用 `indexOnArm`（默认开启）时，任务武装会在后台导入并记录边的计数。建立索引时还会把入口点记入会话，台账的 `minEntryMappedPercent`（默认 80）会让完成门保持阻塞，直到已记录功能覆盖这一比例。检查从功能的处理函数出发读取 `featureDepth`（默认 4）层调用，不展开拥有超过 `libraryFanIn`（默认 40）个不同调用方的符号，要求 `requiredDepth`（默认 2）层以内的非库符号以及 `guards` 与 `mutations` 中每个被到达的名称（留空时，若启用 WordPress 配置档则选用 WordPress 列表），并允许功能最多排除 `maxExcludedPercent`（默认 50）的必需符号。使用方调用 `ctx.hardFeatureMap.index(agent)` 取得快照 id，再调用 `callers`、`callees` 与 `entryPoints`。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-featuremap)列出全部字段。
+bundle 把 `dbPath` 设为 harness 主目录下 `hard` 目录中的 `featuremap.db`。`frameworks` 列出要读取的配置档，可选 `wordpress`、`laravel`、`spring`、`aspnet`、`flask`、`fastapi` 与 `express`；留空只保留调用边。请让 `hard-cpg` 的 `language` 与之匹配。`scriptDirs` 列出其顶层 PHP 文件会被直接请求的目录；启用 WordPress 配置档时，留空即选用 WordPress 安装的根目录、`wp-admin`、`wp-admin/network` 与 `wp-admin/user`。启用 `indexOnArm`（默认开启）时，任务武装会在后台导入并记录边的计数。建立索引时还会把入口点记入会话，台账的 `minEntryMappedPercent`（默认 80）会让完成门保持阻塞，直到已记录功能覆盖这一比例。检查从功能的处理函数出发读取 `featureDepth`（默认 4）层调用，不展开拥有超过 `libraryFanIn`（默认 40）个不同调用方的符号，要求 `requiredDepth`（默认 2）层以内的非库符号以及 `guards` 与 `mutations` 中每个被到达的名称（留空时，若启用 WordPress 配置档则选用 WordPress 列表），并允许功能最多排除 `maxExcludedPercent`（默认 50）的必需符号。使用方调用 `ctx.hardFeatureMap.index(agent)` 取得快照 id，再调用 `callers`、`callees` 与 `entryPoints`；`featureGraph(agent, featureId)` 与 `symbolDetail(agent, symbol)` 返回[功能地图标签页](../client-ui-hard/README.zh.md#read-the-feature-map)的显示数据。存在 Web 连接时，已启用的插件把这两者提供为 `GET /api/hard-featuremap.feature?session=<id>&feature=<FE-n>` 与 `GET /api/hard-featuremap.symbol?session=<id>&symbol=<id>`；缺少任一参数时返回 400，会话没有存活的 agent 或功能、符号不存在时返回 404，读取失败时返回 409 并附带错误。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-hard-featuremap)列出全部字段。
 
 -----
 
@@ -51,6 +51,7 @@ bundle 把 `dbPath` 设为 harness 主目录下 `hard` 目录中的 `featuremap.
 - **HTTP 路由配置档。** 每条路由是 `http` 类型的入口点，键为 `VERB path`，并附带其路由层守卫。Spring 拼接类上 `@RequestMapping` 的前缀，读取 `@PreAuthorize`、`@Secured` 与 `@RolesAllowed`；ASP.NET Core 展开 `[Route]` 中的 `[controller]` 与 `[action]`，读取 `[Authorize]`，`[AllowAnonymous]` 使路由公开；Flask 与 FastAPI 读取带路径的路由装饰器，并把 `login_required` 等表示访问控制的装饰器视为守卫；Express 读取 `get`、`post` 等路由调用，把最后一个参数视为处理函数（被引用的闭包或同文件函数），其余视为中间件；Laravel 读取带控制器数组、`Controller@method` 字符串或闭包的 `Route::` 调用，以及链式 `middleware`。带守卫的路由为 `authenticated`，显式开放的为 `public`，其余为 `unknown`，因为不读取全局中间件。
 - **每个派生一个快照。** 快照按目标根目录、提交，以及事实缓存键、框架、脚本目录与导入版本的摘要作为键。不同的派生在旧快照旁导入；相同的派生被复用，并发请求共享一次导入。
 - **功能必须交代它到达的内容。** 检查从功能入口点的处理函数出发沿调用边走到 `featureDepth`，在被广泛共享的库符号处停止展开，并计算必需集合：处理函数、近处的非库符号，以及每个被到达的守卫与状态写入。主张必须把每个必需符号列为成员，或带理由（`utility`、`other-feature`、`unreachable`）列为排除项；守卫或状态写入不能以 `utility` 排除；可达范围之外的成员需要 `via`，即被到达的调用方与行号，harness 在固定提交上读取该行并要求其提到该符号；角色为 `guard` 或 `mutation` 的成员本身必须是或调用一个守卫或状态写入。所有不足之处一次报告，只有通过的主张才会写入台账。
+- **显示读取保持有界。** 功能图包含一个已记录功能的成员与排除项以及它们之间的调用边。符号详情最多返回 100 个调用方、100 个被调用方与 200 行源码，源码从固定提交的 harness 快照读取；没有位置或快照的符号没有源码。
 - **派生数据，因此重建。** 带有其他 schema 版本标记的数据库会被删除并重新创建，因为事实随时可以再次导入。
 
 ### Source map
@@ -65,6 +66,9 @@ bundle 把 `dbPath` 设为 harness 主目录下 `hard` 目录中的 `featuremap.
 | [`src/store.ts`](src/store.ts) | SQLite schema、导入与查询 |
 | [`src/check.ts`](src/check.ts) | 可达范围、必需集合与功能完整性检查 |
 | [`src/tools.ts`](src/tools.ts) | 三个模型工具与提示段落 |
+| [`src/web.ts`](src/web.ts) | 功能地图标签页的 Host 路由 |
+| [`src/routes.ts`](src/routes.ts) | 路由路径，不含导入以供 Client 测试使用 |
+| [`src/types.ts`](src/types.ts)、[`src/client.ts`](src/client.ts) | 显示类型及其仅类型的 `./client` 导出 |
 
 </details>
 

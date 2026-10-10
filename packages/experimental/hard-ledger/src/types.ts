@@ -501,6 +501,25 @@ export interface HardLedgerClientView {
   readonly blindClears: number
   /** The harness's current completion assessment with its bounded blockers. */
   readonly gate: { readonly complete: boolean; readonly blockers: readonly string[] }
+  /** The indexed feature map with the recorded features and their relations; absent until a map is indexed. */
+  readonly featureMap?: {
+    readonly commit: string
+    /** Every indexed entry point, with whether a recorded feature covers it. */
+    readonly entryPoints: readonly { readonly key: string; readonly handler: string | null; readonly mapped: boolean }[]
+    /** The latest record of every feature, in first-record order. */
+    readonly features: readonly {
+      readonly id: string
+      readonly name: string
+      readonly summary: string
+      readonly entryPoints: readonly string[]
+      readonly symbols: readonly { readonly symbol: string; readonly role: HardFeatureRole }[]
+      readonly excluded: number
+      readonly states: readonly { readonly kind: string; readonly key: string; readonly access: 'read' | 'write' }[]
+      readonly reach: number
+      readonly required: number
+    }[]
+    readonly links: readonly { readonly from: string; readonly to: string; readonly kind: HardFeatureLinkKind; readonly note: string }[]
+  }
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

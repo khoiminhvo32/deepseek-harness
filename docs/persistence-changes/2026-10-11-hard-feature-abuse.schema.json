@@ -1,0 +1,828 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:hard/entry/declared",
+      "kind": "event",
+      "event": "hard/entry/declared",
+      "surface": false,
+      "digest": "54f36275b85fb962e4fa165351038a0507f65691484172f206150c35bb30d6f8",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auth",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cite",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "handler",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authenticated"
+          },
+          {
+            "kind": "literal",
+            "value": "public"
+          },
+          {
+            "kind": "literal",
+            "value": "unknown"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/entry/declared"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/linked",
+      "kind": "event",
+      "event": "hard/feature/linked",
+      "surface": false,
+      "digest": "eacde8a049a74e19c6a7f9dfe7189ef2caf5b549b34dd9d18a8dbffda2ed27ed",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 11,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "from",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "to",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "calls"
+          },
+          {
+            "kind": "literal",
+            "value": "enables"
+          },
+          {
+            "kind": "literal",
+            "value": "shares-state"
+          },
+          {
+            "kind": "literal",
+            "value": "gates"
+          },
+          {
+            "kind": "union",
+            "types": [
+              9,
+              10
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "harness"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/linked"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/pair",
+      "kind": "event",
+      "event": "hard/feature/pair",
+      "surface": false,
+      "digest": "d666933bbcf615e39a2f7358e416218cf954a44b0038c44217af990b85a8a243",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "missing",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "states",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "stronger",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "weaker",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authentication"
+          },
+          {
+            "kind": "literal",
+            "value": "authorization"
+          },
+          {
+            "kind": "literal",
+            "value": "csrf"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "entry",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "feature",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/pair"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/pair/resolved",
+      "kind": "event",
+      "event": "hard/feature/pair/resolved",
+      "surface": false,
+      "digest": "06b2ac1f171f7cabb3a29fa01df4f084bb1ee5039a8edc6d41dbe39b0a0086c6",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cite",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "ref",
+                "type": 3,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "finding"
+          },
+          {
+            "kind": "literal",
+            "value": "hypothesis"
+          },
+          {
+            "kind": "literal",
+            "value": "safe"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/pair/resolved"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/reviewed",
+      "kind": "event",
+      "event": "hard/feature/reviewed",
+      "surface": false,
+      "digest": "a4cfcf2c6c262dfcae4a01df5a5c4f6194c97931b6592cfbb8536e8a07b7d9d2",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 21,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cases",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "lens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "question",
+                "type": 19,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 19,
+                "optional": false
+              },
+              {
+                "name": "ref",
+                "type": 19,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "input"
+          },
+          {
+            "kind": "literal",
+            "value": "limits"
+          },
+          {
+            "kind": "literal",
+            "value": "race-replay"
+          },
+          {
+            "kind": "literal",
+            "value": "sequence"
+          },
+          {
+            "kind": "literal",
+            "value": "shared-state"
+          },
+          {
+            "kind": "literal",
+            "value": "skip-step"
+          },
+          {
+            "kind": "literal",
+            "value": "wrong-actor"
+          },
+          {
+            "kind": "literal",
+            "value": "wrong-object"
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16,
+              17,
+              18
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "hypothesis"
+          },
+          {
+            "kind": "literal",
+            "value": "finding"
+          },
+          {
+            "kind": "literal",
+            "value": "not-applicable"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": "weakness"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 19
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/reviewed"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/guard/declared",
+      "kind": "event",
+      "event": "hard/guard/declared",
+      "surface": false,
+      "digest": "ea5fa056b01f9c556e5580555456691d47cbd59cd06c3f884823f39f6db3cc30",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cite",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authentication"
+          },
+          {
+            "kind": "literal",
+            "value": "authorization"
+          },
+          {
+            "kind": "literal",
+            "value": "csrf"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/guard/declared"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

@@ -112,6 +112,8 @@ describe('wordpressEntryPoints', () => {
       method('WP_REST_Posts_Controller.update_item', 'WP_REST_Posts_Controller'),
       method('WP_REST_Posts_Controller.prepare_item_for_response', 'WP_REST_Posts_Controller'),
       method('WP_REST_Pages_Controller.get_items', 'WP_REST_Pages_Controller'),
+      // The posts controller's permission callback serves the inherited pages handler too; get_items has none.
+      method('WP_REST_Posts_Controller.update_item_permissions_check', 'WP_REST_Posts_Controller'),
       method('Unrelated.get_items', 'Unrelated'),
       call('wp-admin/admin-ajax.php:<global>', 'add_action', { args: [{ lit: '"wp_ajax_nopriv_heartbeat"' }, { lit: '"wp_ajax_nopriv_heartbeat"' }], file: 'wp-admin/admin-ajax.php', line: 171 }),
       call('x', 'add_action', { args: [{ lit: '"admin_post_export"' }, { lit: '"handle_export"' }], line: 5 }),
@@ -139,6 +141,7 @@ describe('wordpressEntryPoints', () => {
       { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', auth: 'unknown' },
       { kind: 'script', key: 'wp-admin/network/sites.php', handler: null, auth: 'unknown' },
     ])
+    expect(entries.filter(entry => entry.kind === 'rest').map(entry => entry.checks)).toEqual([['WP_REST_Posts_Controller.update_item_permissions_check'], []])
     expect(entries[0]).toMatchObject({ file: 'wp-admin/admin-ajax.php', line: 171 })
     expect(entries[3]).toMatchObject({ file: 'wp-admin/includes/ajax-actions.php', line: 1 })
   })

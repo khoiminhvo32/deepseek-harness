@@ -1056,6 +1056,8 @@ describe('hard_status', () => {
         pendingFindings: 0, flakyFindings: 0, openHypotheses: 0, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 0,
         unchainedMaterial: 0,
         unmappedEntryPoints: 0,
+        unresolvedPairs: 0,
+        unreviewedFeatures: 0,
       },
       gate: { complete: false, blockers: summary.gate.blockers },
     })

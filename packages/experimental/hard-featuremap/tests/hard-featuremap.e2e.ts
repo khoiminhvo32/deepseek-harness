@@ -96,7 +96,7 @@ describe.skipIf(joernHome === '')('hard-featuremap with Joern', () => {
       { caller: 'boot', callee: 'on_init', file: 'post.php', line: 6, source: 'hook' },
     )
     expect(await ctx.hardFeatureMap.entryPoints(snapshot.id)).toContainEqual(
-      { kind: 'ajax', key: 'save', handler: 'boot', file: 'wp-admin/admin-ajax.php', line: 2, auth: 'authenticated', guards: [] },
+      { kind: 'ajax', key: 'save', handler: 'boot', file: 'wp-admin/admin-ajax.php', line: 2, auth: 'authenticated', guards: [], checks: [] },
     )
   }, 300_000)
 

@@ -7,7 +7,7 @@
  */
 
 import { cellSampledForPercent, classScope } from './scope.ts'
-import type { HardCoverageCellData, HardCoverageSource } from './types.ts'
+import type { HardAbuseLens, HardCoverageCellData, HardCoverageSource } from './types.ts'
 import type { HardLedgerProjectionState } from './projection.ts'
 
 /** Default share of screened cells the openWork re-read sends back. */
@@ -18,6 +18,9 @@ export const DEFAULT_EMPTY_SWEEPS_TO_FINISH = 2
 
 /** Default share of indexed entry points recorded features must cover, in percent. */
 export const DEFAULT_MIN_ENTRY_MAPPED_PERCENT = 80
+
+/** Default abuse gate: unresolved guard pairs and unreviewed features block completion. */
+export const DEFAULT_ABUSE_GATE = true
 
 /** Verdicted matrix cells over the matrix cell total, `0/0` without a matrix. */
 export type CoverageProgress = { verdicted: number; total: number }
@@ -47,7 +50,14 @@ export interface LedgerThresholds {
   readonly emptySweepsToFinish: number
   /** Share of indexed entry points recorded features must cover, in percent; `0` drops the condition. */
   readonly minEntryMappedPercent: number
+  /** Whether unresolved guard pairs and features without an abuse review are open work. */
+  readonly abuseGate: boolean
 }
+
+/** Every abuse lens, in the order a review covers them. */
+export const HARD_ABUSE_LENSES: readonly HardAbuseLens[] = [
+  'skip-step', 'wrong-actor', 'wrong-object', 'sequence', 'race-replay', 'input', 'shared-state', 'limits',
+]
 
 /** Re-shape one folded cell so the optional source drops its `| undefined`. */
 function cellData(cell: FoldedCoverageCell): HardCoverageCellData {
@@ -314,6 +324,13 @@ export type OpenWorkCounts = {
   readonly unchainedMaterial: number
   /** Indexed entry points no recorded feature covers, while coverage is below the required share; otherwise 0. */
   readonly unmappedEntryPoints: number
+  /** Guard pairs no resolution closed, while the abuse gate is on. */
+  readonly unresolvedPairs: number
+  /**
+   * Features without their own abuse review plus linked feature pairs without a combined one,
+   * once the mapping share is met and while the abuse gate is on.
+   */
+  readonly unreviewedFeatures: number
 }
 
 /**
@@ -324,7 +341,22 @@ export type OpenWorkCounts = {
  */
 export function unmappedEntryPointsFromState(state: HardLedgerProjectionState): string[] {
   const mapped = new Set((state.features ?? []).flatMap(feature => feature.entryPoints))
-  return (state.featureMap?.entryPoints ?? []).map(entry => entry.key).filter(key => !mapped.has(key))
+  return indexedEntryPointsFromState(state).map(entry => entry.key).filter(key => !mapped.has(key))
+}
+
+/**
+ * The entry points features must cover: the indexed ones, then the ones the
+ * model declared that the index lacks; empty when no feature map is indexed.
+ * @param state - the folded ledger projection state.
+ * @returns each entry point's `kind:key` and handler.
+ */
+export function indexedEntryPointsFromState(state: HardLedgerProjectionState): { key: string; handler: string | null }[] {
+  if (state.featureMap === undefined) return []
+  const indexed = state.featureMap.entryPoints.map(entry => ({ key: entry.key, handler: entry.handler }))
+  const known = new Set(indexed.map(entry => entry.key))
+  const declared = (state.declaredEntries ?? []).filter(entry => !known.has(entry.key))
+    .map(entry => ({ key: entry.key, handler: entry.handler }))
+  return [...indexed, ...declared]
 }
 
 /**
@@ -335,7 +367,7 @@ export function unmappedEntryPointsFromState(state: HardLedgerProjectionState): 
  * @returns the unmapped entry points that block completion, and the indexed total.
  */
 function owedEntryPoints(state: HardLedgerProjectionState, percent: number): { owed: string[]; total: number } {
-  const total = state.featureMap?.entryPoints.length ?? 0
+  const total = indexedEntryPointsFromState(state).length
   const unmapped = unmappedEntryPointsFromState(state)
   return { owed: (total - unmapped.length) * 100 < total * percent ? unmapped : [], total }
 }
@@ -379,8 +411,9 @@ export function unchainedMaterialFromState(state: HardLedgerProjectionState): st
  */
 export function openWorkCountsFromState(
   state: HardLedgerProjectionState,
-  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent'>,
+  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent' | 'abuseGate'>,
 ): OpenWorkCounts {
+  const abuse = owedAbuseWork(state, thresholds)
   return {
     pendingFindings: state.findings.filter(record => record.verdict === undefined).length,
     flakyFindings: state.findings.filter(record => record.verdict?.verdict === 'flaky').length,
@@ -390,7 +423,41 @@ export function openWorkCountsFromState(
     screenReReads: state.coverage.filter(cell => isScreenReRead(cell, thresholds.screenSpotCheckPercent)).length,
     unchainedMaterial: unchainedMaterialFromState(state).length,
     unmappedEntryPoints: owedEntryPoints(state, thresholds.minEntryMappedPercent).owed.length,
+    unresolvedPairs: abuse.pairs.length,
+    unreviewedFeatures: abuse.features.length + abuse.combinations.length,
   }
+}
+
+/**
+ * The abuse work that is open: every unresolved guard pair; and once the
+ * mapping share is met, every recorded feature without its own abuse review
+ * and every pair of linked features no combined review covers. Empty while
+ * the abuse gate is off.
+ * @param state - the folded ledger projection state.
+ * @param thresholds - the mapping share and the abuse gate switch.
+ * @returns the owed pairs, the features owing a review, and the linked feature pairs owing a combined review.
+ */
+function owedAbuseWork(
+  state: HardLedgerProjectionState,
+  thresholds: Pick<LedgerThresholds, 'minEntryMappedPercent' | 'abuseGate'>,
+): { pairs: NonNullable<HardLedgerProjectionState['featurePairs']>; features: string[]; recorded: number; combinations: [string, string][] } {
+  if (!thresholds.abuseGate) return { pairs: [], features: [], recorded: 0, combinations: [] }
+  const pairs = (state.featurePairs ?? []).filter(pair => pair.resolution === undefined)
+  if (state.featureMap === undefined || owedEntryPoints(state, thresholds.minEntryMappedPercent).owed.length > 0) {
+    return { pairs, features: [], recorded: 0, combinations: [] }
+  }
+  const reviews = state.featureReviews ?? []
+  const reviewed = new Set(reviews.filter(review => review.features.length === 1).flatMap(review => review.features))
+  const recorded = (state.features ?? []).map(feature => feature.id)
+  const features = recorded.filter(id => !reviewed.has(id))
+  const combinations: [string, string][] = []
+  for (const link of state.featureLinks ?? []) {
+    const pair: [string, string] = link.from < link.to ? [link.from, link.to] : [link.to, link.from]
+    if (combinations.some(([a, b]) => a === pair[0] && b === pair[1])) continue
+    const covered = reviews.some(review => review.features.length > 1 && pair.every(id => review.features.includes(id)))
+    if (!covered) combinations.push(pair)
+  }
+  return { pairs, features, recorded: recorded.length, combinations }
 }
 
 /** Whether a hypothesis status still owes work. */
@@ -414,14 +481,24 @@ function isScreenReRead(cell: FoldedCoverageCell, percent: number): boolean {
  */
 export function openWorkFromState(
   state: HardLedgerProjectionState,
-  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent'>,
+  thresholds: Pick<LedgerThresholds, 'screenSpotCheckPercent' | 'minEntryMappedPercent' | 'abuseGate'>,
 ): string[] {
   const work: string[] = []
-  // The mapping summary leads: round context shows only the first items, and
-  // features are recorded while the code is read, not after the sweep.
+  // The mapping and abuse summaries lead: round context shows only the first
+  // items, and features are recorded and abused while the code is read.
   const { owed, total } = owedEntryPoints(state, thresholds.minEntryMappedPercent)
   if (owed.length > 0) {
     work.push(`${owed.length} of ${total} entry points are in no recorded feature; features must cover ${thresholds.minEntryMappedPercent}%: map them with hard_record_feature`)
+  }
+  const abuse = owedAbuseWork(state, thresholds)
+  if (abuse.pairs.length > 0) {
+    work.push(`${abuse.pairs.length} guard pair(s) are unresolved: prove each weaker path with a finding or hypothesis, or cite the check that covers it, with hard_resolve_pair`)
+  }
+  if (abuse.features.length > 0) {
+    work.push(`${abuse.features.length} of ${abuse.recorded} features have no abuse review: ask what if each one is used other than intended, with hard_review_feature`)
+  }
+  if (abuse.combinations.length > 0) {
+    work.push(`${abuse.combinations.length} pair(s) of linked features have no combined abuse review: ask what using them together allows that neither allows alone, with hard_review_feature`)
   }
   for (const record of state.findings) {
     if (record.verdict === undefined) work.push(`finding ${record.proposed.id} awaits verification`)
@@ -453,6 +530,12 @@ export function openWorkFromState(
     work.push(`${id} is in no chain hypothesis: link it with another weakness or finding, or propose that chain and refute it with the reason`)
   }
   for (const key of owed.slice(0, 5)) work.push(`entry point ${key} is in no feature`)
+  for (const pair of abuse.pairs) {
+    work.push(`guard pair ${pair.id}: ${pair.weaker.entry} (${pair.weaker.feature}) reaches ${pair.states.join(', ')} without the `
+      + `${pair.category} check that ${pair.stronger.entry} (${pair.stronger.feature}) makes: ${pair.missing.join(', ')}`)
+  }
+  for (const id of abuse.features) work.push(`feature ${id} has no abuse review`)
+  for (const [a, b] of abuse.combinations) work.push(`features ${a} and ${b} are linked but have no combined abuse review`)
   return work
 }
 

@@ -9,7 +9,7 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: 1d4fd2a1a3cc12ae
+  en: df727d1fc6f1fbaf
   zh: ed77a46b28a7a0cc
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
@@ -203,15 +203,27 @@
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap:
   en: bd874b1125d7114b
   zh: bd874b1125d7114b
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-declare-entry-point:
+  en: a48891f0e92e9e5e
+  zh: a48891f0e92e9e5e
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-declare-guard:
+  en: 04c7697053937a51
+  zh: 04c7697053937a51
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-link-feature:
   en: 0108281e5917d245
   zh: 0108281e5917d245
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-query-map:
-  en: 266d859524b81764
-  zh: 266d859524b81764
+  en: 29d47fb96b035c0c
+  zh: 29d47fb96b035c0c
 /tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-record-feature:
-  en: f9e0201eb584e54a
-  zh: f9e0201eb584e54a
+  en: 5f7e07ee8466f0b3
+  zh: 5f7e07ee8466f0b3
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-resolve-pair:
+  en: b730c3f2d64c8bd8
+  zh: b730c3f2d64c8bd8
+/tool-schema-catalog/deepseek-ai-dsh-experimental-hard-featuremap/hard-review-feature:
+  en: 7abe0c18311cf3b2
+  zh: 7abe0c18311cf3b2
 /tool-schema-catalog/deepseek-ai-dsh-tool-schedule:
   en: 9fd2eccb1ee51372
   zh: 9fd2eccb1ee51372

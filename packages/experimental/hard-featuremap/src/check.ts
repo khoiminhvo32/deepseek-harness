@@ -33,9 +33,9 @@ export interface HardFeaturePolicy {
   readonly libraryFanIn: number
   /** The largest share of the required set a claim may exclude, in percent. */
   readonly maxExcludedPercent: number
-  /** Names of access-check symbols; every reached one is required. */
+  /** Names or ids of access-check symbols; every reached one is required. */
   readonly guards: ReadonlySet<string>
-  /** Names of state-writing symbols; every reached one is required. */
+  /** Names or ids of state-writing symbols; every reached one is required. */
   readonly mutations: ReadonlySet<string>
 }
 
@@ -90,8 +90,8 @@ export function requiredSet(graph: HardFeatureGraph, handlers: readonly string[]
     const name = graph.symbol(id)?.name ?? id
     if (level === 0) require(id, 'entry')
     else if (level <= policy.requiredDepth && !library.has(id)) require(id, 'near')
-    if (policy.guards.has(name)) require(id, 'guard')
-    if (policy.mutations.has(name)) require(id, 'mutation')
+    if (policy.guards.has(name) || policy.guards.has(id)) require(id, 'guard')
+    if (policy.mutations.has(name) || policy.mutations.has(id)) require(id, 'mutation')
   }
   return { reach, library, required }
 }
@@ -207,7 +207,7 @@ function reachesName(graph: HardFeatureGraph, start: string, names: ReadonlySet<
   const seen = new Set([start])
   let frontier = [start]
   for (let level = 0; level <= depth; level += 1) {
-    if (frontier.some(id => names.has(graph.symbol(id)?.name ?? id))) return true
+    if (frontier.some(id => names.has(id) || names.has(graph.symbol(id)?.name ?? id))) return true
     frontier = frontier.flatMap(id => graph.callees(id)).filter((id) => {
       if (seen.has(id)) return false
       seen.add(id)

@@ -34,7 +34,7 @@ afterEach(() => {
 const FEATURE = {
   id: 'FE-1', name: 'Save a post', summary: 'An editor saves a post.', entryPoints: ['ajax:save'],
   symbols: [{ symbol: 'wp_ajax_save', role: 'entry' as const }], excluded: 1,
-  states: [{ kind: 'meta', key: 'postmeta', access: 'write' as const }], reach: 4, required: 3,
+  states: [{ kind: 'meta', key: 'postmeta', access: 'write' as const }], reach: 4, required: 3, reviewed: false,
 }
 
 const MAP: FeatureMapView = {
@@ -42,6 +42,7 @@ const MAP: FeatureMapView = {
   entryPoints: [{ key: 'ajax:save', handler: 'wp_ajax_save', mapped: true }, { key: 'script:x.php', handler: null, mapped: false }],
   features: [FEATURE],
   links: [],
+  pairs: [],
 }
 
 const GRAPH: HardFeatureGraphView = {
@@ -110,7 +111,7 @@ describe('feature map layouts', () => {
       ...MAP,
       entryPoints: MAP.entryPoints.map(entry => ({ ...entry, mapped: true })),
       features: [FEATURE, { ...FEATURE, id: 'FE-2', name: 'Trash', entryPoints: many }],
-      links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'n' }],
+      links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'n', source: 'harness' }],
     })
     expect(after.nodes.slice(0, 2)).toEqual(before.nodes.slice(0, 2))
     expect(after.nodes.slice(2).map(node => [node.id, node.x, node.y, node.label])).toEqual([
@@ -118,8 +119,8 @@ describe('feature map layouts', () => {
       ...many.slice(0, 6).map((key, row) => [`entry:FE-2:${key}`, 364, 64 + row * 36, key]),
       ['more:FE-2', 364, 280, '+1'],
     ])
-    expect(after.edges.map(edge => [edge.from, edge.to, edge.kind, edge.label]).filter(edge => edge[2] === 'link')).toEqual([
-      ['feature:FE-1', 'feature:FE-2', 'link', 'shares-state'],
+    expect(after.edges.map(edge => [edge.from, edge.to, edge.kind, edge.label]).filter(edge => edge[2] === 'harness-link')).toEqual([
+      ['feature:FE-1', 'feature:FE-2', 'harness-link', 'shares-state'],
     ])
     expect(after.edges.filter(edge => edge.kind === 'member')).toHaveLength(7)
     const fourth = overviewLayout({ ...MAP, features: [1, 2, 3, 4].map(n => ({ ...FEATURE, id: `FE-${n}` })) })
@@ -246,7 +247,7 @@ describe('FeatureMap', () => {
       ...MAP,
       entryPoints: [MAP.entryPoints[0]!],
       features: [{ ...FEATURE, states: [] }, { ...FEATURE, id: 'FE-2', states: [] }],
-      links: [{ from: 'FE-1', to: 'FE-2', kind: 'gates', note: 'n' }],
+      links: [{ from: 'FE-1', to: 'FE-2', kind: 'gates', note: 'n', source: 'model' }],
     }) }).props} />)
     expect(screen.queryByText(/未映射的入口点/)).toBeNull()
     // jsdom measures no node, so React Flow draws no edge; the summary counts the link.
@@ -272,6 +273,32 @@ describe('FeatureMap', () => {
     })
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByText('正在加载…')).toBeNull()
+  })
+
+  it('shows guard pairs, the abuse review state, and the pairs of the open feature', () => {
+    const pairs: FeatureMapView['pairs'] = [
+      { id: 'P-1', category: 'authorization', weaker: { entry: 'ajax:save', feature: 'FE-1' }, stronger: { entry: 'ajax:trash', feature: 'FE-2' }, missing: ['current_user_can'], states: ['s'], outcome: null },
+      { id: 'P-2', category: 'csrf', weaker: { entry: 'ajax:trash', feature: 'FE-2' }, stronger: { entry: 'ajax:x', feature: 'FE-3' }, missing: ['nonce'], states: ['s'], outcome: 'safe' },
+      { id: 'P-3', category: 'csrf', weaker: { entry: 'ajax:y', feature: 'FE-3' }, stronger: { entry: 'ajax:save', feature: 'FE-1' }, missing: ['nonce'], states: ['s'], outcome: 'finding' },
+    ]
+    const { container } = render(<FeatureMap {...panelProps({ state: 'ready', view: ledger({
+      ...MAP, features: [{ ...FEATURE, reviewed: true }, { ...FEATURE, id: 'FE-2' }], pairs,
+      links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'P-1', source: 'harness' }],
+    }) }).props} />)
+    expect(screen.getByText('守卫差异对：1 个未处理，共 3 个')).toBeTruthy()
+    expect(container.querySelector('.react-flow__node[data-id="feature:FE-1"]')?.textContent).toContain('已审查')
+    fireEvent.click(screen.getAllByText('FE-1 Save a post', { selector: 'button' })[0] ?? document.body)
+    expect(screen.getByText('滥用审查：已完成')).toBeTruthy()
+    expect(screen.getByText(/P-1 · authorization：ajax:save 缺少 ajax:trash 所做的检查（current_user_can）/).textContent).toContain('未处理')
+    expect(screen.getByText(/P-3 · csrf/).textContent).toContain('finding')
+    expect(screen.queryByText(/P-2/)).toBeNull()
+  })
+
+  it('marks a feature without an abuse review as pending', () => {
+    render(<FeatureMap {...panelProps({ state: 'ready', view: ledger(MAP) }).props} />)
+    fireEvent.click(screen.getByText('FE-1 Save a post', { selector: 'button' }))
+    expect(screen.getByText('滥用审查：未完成')).toBeTruthy()
+    expect(screen.queryByText(/守卫差异对/)).toBeNull()
   })
 
   it('reports a failed graph fetch', async () => {

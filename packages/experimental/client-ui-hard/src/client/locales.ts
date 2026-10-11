@@ -51,6 +51,13 @@ export const zh = {
   'map.role.helper': '辅助',
   'map.role.excluded': '已排除',
   'map.fresh': '新',
+  'map.pairs': '守卫差异对：{open} 个未处理，共 {total} 个',
+  'map.reviewed': '已审查',
+  'map.review.done': '滥用审查：已完成',
+  'map.review.pending': '滥用审查：未完成',
+  'map.pair.line': '{id} · {category}：{weaker} 缺少 {stronger} 所做的检查（{missing}）',
+  'map.pair.open': '未处理',
+  'map.legend.harness': 'harness 发现的差异',
 } satisfies Record<string, string>
 
 /** Hard-harness locale key union. */
@@ -104,4 +111,11 @@ export const en = {
   'map.role.helper': 'helper',
   'map.role.excluded': 'excluded',
   'map.fresh': 'new',
+  'map.pairs': 'Guard pairs: {open} open of {total}',
+  'map.reviewed': 'reviewed',
+  'map.review.done': 'Abuse review: done',
+  'map.review.pending': 'Abuse review: pending',
+  'map.pair.line': '{id} · {category}: {weaker} lacks the check {stronger} makes ({missing})',
+  'map.pair.open': 'open',
+  'map.legend.harness': 'harness-found gap',
 } satisfies Record<HardKey, string>

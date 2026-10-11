@@ -981,6 +981,8 @@ export function apply(ctx: Context, config: Config): void {  const ledger = ctx.
                   screenReReads: { type: 'integer', required: true },
                   unchainedMaterial: { type: 'integer', required: true },
                   unmappedEntryPoints: { type: 'integer', required: true },
+                  unresolvedPairs: { type: 'integer', required: true },
+                  unreviewedFeatures: { type: 'integer', required: true },
                 },
               },
               gate: {

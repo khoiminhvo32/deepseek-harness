@@ -9,7 +9,7 @@ import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import HardLedger, { pinnedGitArgs } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type { HardSweepSummaryData } from '@deepseek-ai/dsh-experimental-hard-ledger'
-import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, matrixBoardFromState, openWorkCountsFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
+import { applyHardLedgerProjection, blindClearsFromState, completionAssessmentFromState, matrixBoardFromState, openWorkCountsFromState, coverageBySourceFromState, coverageProgressFromState, DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptyHardLedgerState, hardLedgerProjectionDefinition, hardLedgerStateSchema, matrixCellsFromState, refutationBreakdownFromState } from '@deepseek-ai/dsh-experimental-hard-ledger'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const CLAIM_HASH = 'a'.repeat(64)
@@ -53,7 +53,9 @@ function stubAgent(rawId: string): StubAgent {
   return { agent, session, inbox, setStatus(value) { status = value } }
 }
 
-async function harness(config: { screenSpotCheckPercent?: number; emptySweepsToFinish?: number; minEntryMappedPercent?: number } = {}) {
+type HarnessConfig = { screenSpotCheckPercent?: number; emptySweepsToFinish?: number; minEntryMappedPercent?: number; abuseGate?: boolean }
+
+async function harness(config: HarnessConfig = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -577,7 +579,12 @@ describe('hard ledger feature map', () => {
     expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(2)
     ctx.hardLedger.recordFeature(root.agent, { ...feature, entryPoints: [entries[3]!] })
     expect(ctx.hardLedger.openWorkCounts(root.agent).unmappedEntryPoints).toBe(0)
-    expect(ctx.hardLedger.openWork(root.agent)).toEqual([])
+    // With the share met, the abuse reviews come due.
+    expect(ctx.hardLedger.openWork(root.agent)).toEqual([
+      '2 of 2 features have no abuse review: ask what if each one is used other than intended, with hard_review_feature',
+      'feature FE-1 has no abuse review',
+      'feature FE-2 has no abuse review',
+    ])
     expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual([entries[4]])
   })
 
@@ -611,6 +618,7 @@ describe('hard ledger feature map', () => {
       entryPoints: index.entryPoints.map(entry => ({ ...entry, mapped: false })),
       features: [],
       links: [],
+      pairs: [],
     })
     state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-1', ...feature } } as never)
     state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-2', ...feature, entryPoints: ['ajax:heartbeat'] } } as never)
@@ -620,9 +628,154 @@ describe('hard ledger feature map', () => {
     expect(view.featureMap?.entryPoints.map(entry => entry.mapped)).toEqual([true, true, false, false, false])
     expect(view.featureMap?.features[0]).toEqual({
       id: 'FE-1', name: feature.name, summary: feature.summary, entryPoints: ['ajax:inline_save'], symbols: feature.symbols,
-      excluded: 2, states: feature.states, reach: 108, required: 31,
+      excluded: 2, states: feature.states, reach: 108, required: 31, reviewed: false,
     })
-    expect(view.featureMap?.links).toEqual([{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'wp_posts' }])
+    expect(view.featureMap?.links).toEqual([{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'wp_posts', source: 'model' }])
+  })
+
+  describe('abuse work', () => {
+    const pair = {
+      category: 'authorization' as const,
+      states: ['wp_update_post'],
+      weaker: { entry: 'ajax:heartbeat', feature: 'FE-2' as never },
+      stronger: { entry: 'ajax:inline_save', feature: 'FE-1' as never },
+      missing: ['current_user_can'],
+    }
+    const lenses = ['skip-step', 'wrong-actor', 'wrong-object', 'sequence', 'race-replay', 'input', 'shared-state', 'limits'] as const
+    const allLenses = lenses.map(lens => ({ lens, question: `what if ${lens}?`, outcome: 'refuted' as const, reason: 'checked' }))
+
+    async function mapped(config: { abuseGate?: boolean } = {}) {
+      const setup = await harness({ emptySweepsToFinish: 0, ...config })
+      setup.ctx.hardLedger.recordFeatureMapIndexed(setup.root.agent, { ...index, entryPoints: index.entryPoints.slice(0, 2) })
+      setup.ctx.hardLedger.recordFeature(setup.root.agent, feature)
+      setup.ctx.hardLedger.recordFeature(setup.root.agent, { ...feature, name: 'Heartbeat', entryPoints: ['ajax:heartbeat'] })
+      return setup
+    }
+
+    it('records each guard pair once per weaker entry point and category, and folds its resolution', async () => {
+      const { ctx, root } = await mapped()
+      expect(ctx.hardLedger.recordFeaturePair(root.agent, pair)).toBe('P-1')
+      expect(ctx.hardLedger.recordFeaturePair(root.agent, { ...pair, missing: ['other'] })).toBeUndefined()
+      expect(ctx.hardLedger.recordFeaturePair(root.agent, { ...pair, category: 'csrf', missing: ['check_ajax_referer'] })).toBe('P-2')
+      expect(ctx.hardLedger.openWork(root.agent).slice(0, 2)).toEqual([
+        '2 guard pair(s) are unresolved: prove each weaker path with a finding or hypothesis, or cite the check that covers it, with hard_resolve_pair',
+        '2 of 2 features have no abuse review: ask what if each one is used other than intended, with hard_review_feature',
+      ])
+      expect(ctx.hardLedger.openWork(root.agent)).toContain(
+        'guard pair P-1: ajax:heartbeat (FE-2) reaches wp_update_post without the authorization check that ajax:inline_save (FE-1) makes: current_user_can',
+      )
+      expect(() => { ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-9', outcome: 'safe', reason: 'x' }) }).toThrow('unknown guard pair id P-9')
+      expect(() => { ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-1', outcome: 'safe', reason: 'x' }) }).toThrow('a safe resolution cites the check')
+      expect(() => { ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-1', outcome: 'finding', reason: 'x' }) }).toThrow('outcome finding needs the id of a recorded finding; got none')
+      expect(() => { ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-1', outcome: 'hypothesis', ref: 'H-4', reason: 'x' }) }).toThrow('got H-4')
+      const finding = ctx.hardLedger.proposeFinding(root.agent, findingRequest())
+      ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-1', outcome: 'finding', ref: finding, cite: { file: 'ignored.php', line: 1 }, reason: 'proved' })
+      ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-2', outcome: 'safe', ref: 'ignored', cite: { file: 'a.php', line: 3 }, reason: 'nonce in the shared helper' })
+      expect(ctx.hardLedger.featurePairs(root.agent).map(entry => [entry.id, entry.resolution])).toEqual([
+        ['P-1', { outcome: 'finding', ref: finding, reason: 'proved' }],
+        ['P-2', { outcome: 'safe', cite: { file: 'a.php', line: 3 }, reason: 'nonce in the shared helper' }],
+      ])
+      expect(ctx.hardLedger.openWorkCounts(root.agent)).toMatchObject({ unresolvedPairs: 0, unreviewedFeatures: 2 })
+    })
+
+    it('requires every lens of a single-feature review, real references, and a combined review of linked features', async () => {
+      const { ctx, root } = await mapped()
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-7'], cases: allLenses }) }).toThrow('unknown feature id FE-7')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1', 'FE-1'], cases: allLenses }) }).toThrow('several distinct features')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: [], cases: allLenses }) }).toThrow('several distinct features')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: [] }) }).toThrow('at least one question')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: allLenses.slice(1) }) }).toThrow('missing: skip-step')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: [...allLenses, { lens: 'input', question: 'q', outcome: 'weakness', ref: 'W-3', reason: 'r' }] }) })
+        .toThrow('outcome weakness needs the id of a recorded weakness; got W-3')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: [{ ...allLenses[0]!, question: ' ' }, ...allLenses.slice(1)] }) }).toThrow('question must be a non-empty string')
+      const weakness = ctx.hardLedger.recordFlaw(root.agent, {
+        title: 'Heartbeat refreshes a lock on any post', component: 'wp-admin/includes/ajax-actions.php', grants: 'hold a lock', requires: 'login', sites: ['a.php:1'],
+      })
+      ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: [...allLenses, { lens: 'input', question: 'array id?', outcome: 'weakness', ref: weakness, reason: 'r' }] })
+      ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-2'], cases: allLenses.map(entry => ({ ...entry, ref: 'dropped' })) })
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-2', to: 'FE-1', kind: 'shares-state', note: 'both write post locks', source: 'harness' })
+      ctx.hardLedger.linkFeature(root.agent, { from: 'FE-1', to: 'FE-2', kind: 'calls', note: 'again' })
+      expect(ctx.hardLedger.openWork(root.agent)).toEqual([
+        '1 pair(s) of linked features have no combined abuse review: ask what using them together allows that neither allows alone, with hard_review_feature',
+        'features FE-1 and FE-2 are linked but have no combined abuse review',
+      ])
+      const hypothesis = ctx.hardLedger.writeHypothesis(root.agent, { statement: 'lock then quick edit', status: 'proposed' })
+      ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-2', 'FE-1'], cases: [{ lens: 'sequence', question: 'lock then save?', outcome: 'hypothesis', ref: hypothesis, reason: 'testing' }] })
+      expect(ctx.hardLedger.openWorkCounts(root.agent)).toMatchObject({ unreviewedFeatures: 0 })
+      expect(ctx.hardLedger.featureReviews(root.agent).map(review => review.features)).toEqual([['FE-1'], ['FE-2'], ['FE-1', 'FE-2']])
+      expect(ctx.hardLedger.featureReviews(root.agent)[1]?.cases[0]).toEqual({ lens: 'skip-step', question: 'what if skip-step?', outcome: 'refuted', reason: 'checked' })
+      expect(ctx.hardLedger.featureLinks(root.agent).map(link => link.source)).toEqual(['harness', undefined])
+      ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: allLenses })
+      expect(ctx.hardLedger.featureReviews(root.agent).map(review => review.features)).toEqual([['FE-2'], ['FE-1', 'FE-2'], ['FE-1']])
+    })
+
+    it('counts declared entry points toward the mapping share and replaces declarations by key', async () => {
+      const { ctx, root } = await mapped()
+      const cite = { file: 'index.php', line: 57 }
+      ctx.hardLedger.declareEntryPoint(root.agent, { key: 'custom:delete_user', handler: 'delete_user', auth: 'authenticated', cite })
+      ctx.hardLedger.declareEntryPoint(root.agent, { key: 'custom:delete_user', handler: 'remove_user', auth: 'public', cite })
+      ctx.hardLedger.declareEntryPoint(root.agent, { key: 'ajax:heartbeat', handler: 'h1', auth: 'authenticated', cite })
+      expect(ctx.hardLedger.declaredEntryPoints(root.agent)).toEqual([
+        { key: 'custom:delete_user', handler: 'remove_user', auth: 'public', cite },
+        { key: 'ajax:heartbeat', handler: 'h1', auth: 'authenticated', cite },
+      ])
+      expect(ctx.hardLedger.unmappedEntryPoints(root.agent)).toEqual(['custom:delete_user'])
+      expect(() => { ctx.hardLedger.declareEntryPoint(root.agent, { key: ' ', handler: 'h', auth: 'unknown', cite }) }).toThrow('key must be a non-empty string')
+      ctx.hardLedger.declareGuard(root.agent, { symbol: 'ensure_admin', category: 'authorization', cite, note: 'aborts with 403' })
+      ctx.hardLedger.declareGuard(root.agent, { symbol: 'ensure_admin', category: 'authentication', cite, note: 'redirects to login' })
+      expect(ctx.hardLedger.declaredGuards(root.agent)).toEqual([{ symbol: 'ensure_admin', category: 'authentication', cite, note: 'redirects to login' }])
+      expect(() => { ctx.hardLedger.declareGuard(root.agent, { symbol: 'g', category: 'csrf', cite, note: '' }) }).toThrow('note must be a non-empty string')
+      const definition = hardLedgerProjectionDefinition()
+      expect(definition.wire.view(emptyHardLedgerState()).featureMap).toBeUndefined()
+    })
+
+    it('owes no abuse work while the gate is off and none before the mapping share is met', async () => {
+      const off = await mapped({ abuseGate: false })
+      off.ctx.hardLedger.recordFeaturePair(off.root.agent, pair)
+      expect(off.ctx.hardLedger.openWork(off.root.agent)).toEqual([])
+      const early = await harness({ emptySweepsToFinish: 0 })
+      early.ctx.hardLedger.recordFeatureMapIndexed(early.root.agent, index)
+      early.ctx.hardLedger.recordFeature(early.root.agent, feature)
+      expect(early.ctx.hardLedger.openWorkCounts(early.root.agent)).toMatchObject({ unreviewedFeatures: 0 })
+      const unindexed = await harness({ emptySweepsToFinish: 0 })
+      unindexed.ctx.hardLedger.recordFeature(unindexed.root.agent, feature)
+      expect(unindexed.ctx.hardLedger.openWorkCounts(unindexed.root.agent)).toMatchObject({ unreviewedFeatures: 0 })
+    })
+
+    it('reads empty abuse state and refuses references into it', async () => {
+      const { ctx, root } = await harness()
+      const ledger = ctx.hardLedger
+      const live = root.agent
+      expect([ledger.featurePairs(live), ledger.featureReviews(live), ledger.declaredGuards(live), ledger.declaredEntryPoints(live)])
+        .toEqual([[], [], [], []])
+      expect(() => { ctx.hardLedger.resolveFeaturePair(root.agent, { id: 'P-1', outcome: 'safe', reason: 'r' }) }).toThrow('unknown guard pair id P-1')
+      expect(() => { ctx.hardLedger.reviewFeatures(root.agent, { features: ['FE-1'], cases: allLenses }) }).toThrow('unknown feature id FE-1')
+      // An index without entry points meets the share at once; with no feature recorded there is nothing to review.
+      ctx.hardLedger.recordFeatureMapIndexed(root.agent, { ...index, entryPoints: [] })
+      expect(ctx.hardLedger.openWorkCounts(root.agent)).toMatchObject({ unreviewedFeatures: 0 })
+      const { ctx: other, root: agent } = await mapped()
+      other.hardLedger.recordFeaturePair(agent.agent, pair)
+      expect(other.hardLedger.featurePairs(agent.agent)).toEqual([{ id: 'P-1', ...pair }])
+      expect(applyHardLedgerProjection(emptyHardLedgerState(), { type: 'hard/feature/pair/resolved', data: { id: 'P-1', outcome: 'safe', reason: 'r' } } as never).featurePairs).toEqual([])
+    })
+
+    it('publishes pairs, review marks, and link sources through the wire view', () => {
+      const definition = hardLedgerProjectionDefinition()
+      let state = applyHardLedgerProjection(emptyHardLedgerState(), { type: 'hard/featuremap/indexed', data: index } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/entry/declared', data: { key: 'custom:x', handler: 'x', auth: 'unknown', cite: { file: 'a', line: 1 } } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/feature/recorded', data: { id: 'FE-1', ...feature } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/feature/pair', data: { id: 'P-1', ...pair } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/feature/pair', data: { id: 'P-2', ...pair, category: 'csrf' } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/feature/pair/resolved', data: { id: 'P-2', outcome: 'safe', cite: { file: 'a', line: 1 }, reason: 'r' } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/feature/reviewed', data: { features: ['FE-1'], cases: allLenses } } as never)
+      state = applyHardLedgerProjection(state, { type: 'hard/guard/declared', data: { symbol: 'g', category: 'csrf', cite: { file: 'a', line: 1 }, note: 'n' } } as never)
+      const view = definition.wire.view(state)
+      expect(definition.wire.viewSchema.parse(view)).toEqual(view)
+      expect(view.featureMap?.entryPoints.at(-1)).toEqual({ key: 'custom:x', handler: 'x', mapped: false })
+      expect(view.featureMap?.features[0]?.reviewed).toBe(true)
+      expect(view.featureMap?.pairs.map(entry => [entry.id, entry.outcome])).toEqual([['P-1', null], ['P-2', 'safe']])
+      expect(hardLedgerStateSchema.parse(state)).toEqual(state)
+    })
   })
 
   it('folds feature map events onto a cached state that predates them', () => {
@@ -1297,7 +1450,7 @@ describe('hard ledger aggregates over folded state', () => {
       { type: 'hard/coverage/cell', data: { module: 'src', bugClass: 'sqli', verdict: 'suspicious', declaredSinks: ['s'], source: 'harness' } },
     ])
     const assessment = completionAssessmentFromState(state, {
-      screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptySweepsToFinish: 0, minEntryMappedPercent: 80,
+      screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT, emptySweepsToFinish: 0, minEntryMappedPercent: 80, abuseGate: true,
     })
     expect(assessment.complete).toBe(false)
     // The re-opened cells are open work on their own; the floor blocker must
@@ -1456,12 +1609,14 @@ describe('hard ledger aggregates over folded state', () => {
       { type: 'hard/hypothesis/state', data: { id: 'H-1', statement: 's', status: 'testing' } },
       { type: 'hard/hypothesis/state', data: { id: 'H-2', statement: 's', status: 'refuted', reason: 'r' } },
     ])
-    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100, minEntryMappedPercent: 80 })).toEqual({
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 100, minEntryMappedPercent: 80, abuseGate: true })).toEqual({
       pendingFindings: 1, flakyFindings: 1, openHypotheses: 1, uncoveredCells: 2, suspiciousCells: 1, screenReReads: 1,
       unchainedMaterial: 0,
       unmappedEntryPoints: 0,
+      unresolvedPairs: 0,
+      unreviewedFeatures: 0,
     })
-    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0, minEntryMappedPercent: 80 }).screenReReads).toBe(0)
+    expect(openWorkCountsFromState(state, { screenSpotCheckPercent: 0, minEntryMappedPercent: 80, abuseGate: true }).screenReReads).toBe(0)
   })
 
   it('carries screenability, exclusions, and blind clears through the client wire view', () => {

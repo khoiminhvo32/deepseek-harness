@@ -1276,6 +1276,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the detail, or undefined when the snapshot has no such symbol.',
       },
       {
+        signature: 'policyOf(agent: Agent): HardFeaturePolicy',
+        description: 'The check policy of one session: the configured guards plus the guards the model declared.',
+        parameters: [{ name: 'agent', description: 'an agent whose session armed a hard mission.' }],
+        returns: 'the policy.',
+      },
+      {
+        signature: 'async derivePairs(agent: Agent): Promise<string[]>',
+        description: 'Derive the guard pairs among the entry points of recorded features, record the new ones, and link the two features of each new pair with a harness `shares-state` relation unless one already joins them.',
+        parameters: [{ name: 'agent', description: 'an agent whose session recorded features.' }],
+        returns: 'the ids of the pairs this call recorded.',
+      },
+      {
         signature: 'async callers(snapshot: number, symbol: string): Promise<HardEdgeRow[]>',
         description: 'Every edge into a symbol of one snapshot.',
         parameters: [{ name: 'snapshot', description: 'snapshot id from {@link index}.' }, { name: 'symbol', description: 'callee symbol id.' }],
@@ -1348,10 +1360,62 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['`HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, or a text error for a blank field.'],
       },
       {
-        signature: 'linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData[\'kind\']; note: string }): void',
+        signature: 'linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData[\'kind\']; note: string; source?: \'model\' | \'harness\' }): void',
         description: 'Append one relation between two recorded features.',
         parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the two feature ids, the relation kind, and a note.' }],
         throws: ['`HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link, or a text error for a blank note.'],
+      },
+      {
+        signature: 'recordFeaturePair(agent: Agent, request: Omit<HardFeaturePairData, \'id\'>): HardFeaturePairId | undefined',
+        description: 'Append one guard pair the feature map derived, unless the session already holds a pair for the same weaker entry point and guard category.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the pair without its id.' }],
+        returns: 'the new `P-n` id, or undefined when the pair is already recorded.',
+      },
+      {
+        signature: 'resolveFeaturePair(agent: Agent, request: { id: string; outcome: HardFeaturePairResolvedData[\'outcome\']; ref?: string; cite?: { file: string; line: number }; reason: string }): void',
+        description: 'Append how the model closed one guard pair; a later resolution replaces an earlier one.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the pair id, the outcome, its reference or citation, and the reason.' }],
+        throws: ['`HARD_LEDGER_UNKNOWN_PAIR` for an id never recorded, `HARD_LEDGER_INVALID_RESOLUTION` for a missing or unknown reference or a `safe` outcome without a citation, or a text error for a blank reason.'],
+      },
+      {
+        signature: 'reviewFeatures(agent: Agent, request: { features: readonly string[]; cases: HardFeatureReviewData[\'cases\'] }): void',
+        description: 'Append the model\'s abuse review of one feature, or of features used together.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'request', description: 'the reviewed feature ids and the questions with where each led.' }],
+        throws: ['`HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_REVIEW` for a repeated feature, a single-feature review that skips a lens, an empty review, or a missing or unknown reference, or a text error for a blank question or reason.'],
+      },
+      {
+        signature: 'declareGuard(agent: Agent, data: HardGuardDeclaredData): void',
+        description: 'Append a project-specific guard the caller read at the pinned commit; declaring the same symbol again replaces it.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the guard symbol, its category, the line where it denies, and a note.' }],
+      },
+      {
+        signature: 'declareEntryPoint(agent: Agent, data: HardEntryDeclaredData): void',
+        description: 'Append an entry point the caller read at the pinned commit; declaring the same key again replaces it.',
+        parameters: [{ name: 'agent', description: 'the live agent whose session receives the record.' }, { name: 'data', description: 'the `custom:` key, the handler, who may call it, and the dispatch line.' }],
+      },
+      {
+        signature: 'featurePairs(agent: Agent): readonly (HardFeaturePairData & { readonly resolution?: Omit<HardFeaturePairResolvedData, \'id\'> })[]',
+        description: 'Guard pairs in record order, each with its latest resolution.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per pair.',
+      },
+      {
+        signature: 'featureReviews(agent: Agent): readonly HardFeatureReviewData[]',
+        description: 'The latest abuse review of every reviewed feature set, in record order.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per feature set.',
+      },
+      {
+        signature: 'declaredGuards(agent: Agent): readonly HardGuardDeclaredData[]',
+        description: 'The guards the model declared, the latest per symbol.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per declared guard.',
+      },
+      {
+        signature: 'declaredEntryPoints(agent: Agent): readonly HardEntryDeclaredData[]',
+        description: 'The entry points the model declared, the latest per key.',
+        parameters: [{ name: 'agent', description: 'the live agent whose ledger state is read.' }],
+        returns: 'one record per declared entry point.',
       },
       {
         signature: 'features(agent: Agent): readonly HardFeatureData[]',
@@ -5751,6 +5815,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GrantRecord {\n    readonly kind: \'grant\';\n    readonly payload: unknown;\n}',
   },
   {
+    name: 'HardAbuseLens',
+    declaration: 'export type HardAbuseLens = \'skip-step\' | \'wrong-actor\' | \'wrong-object\' | \'sequence\' | \'race-replay\' | \'input\' | \'shared-state\' | \'limits\';',
+  },
+  {
+    name: 'HardAbuseOutcome',
+    declaration: 'export type HardAbuseOutcome = \'finding\' | \'hypothesis\' | \'weakness\' | \'refuted\' | \'not-applicable\';',
+  },
+  {
     name: 'HardBenignArmResult',
     declaration: 'export type HardBenignArmResult = \'passed\' | \'failed\';',
   },
@@ -5795,12 +5867,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HardEntryAuth = \'public\' | \'authenticated\' | \'unknown\';',
   },
   {
+    name: 'HardEntryDeclaredData',
+    declaration: 'export interface HardEntryDeclaredData {\n    readonly key: string;\n    readonly handler: string;\n    readonly auth: \'public\' | \'authenticated\' | \'unknown\';\n    readonly cite: {\n        readonly file: string;\n        readonly line: number;\n    };\n}',
+  },
+  {
     name: 'HardEntryKind',
-    declaration: 'export type HardEntryKind = \'ajax\' | \'admin-post\' | \'rest\' | \'shortcode\' | \'script\' | \'http\';',
+    declaration: 'export type HardEntryKind = \'ajax\' | \'admin-post\' | \'rest\' | \'shortcode\' | \'script\' | \'http\' | \'custom\';',
   },
   {
     name: 'HardEntryPoint',
-    declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n    readonly guards: readonly string[];\n}',
+    declaration: 'export interface HardEntryPoint {\n    readonly kind: HardEntryKind;\n    readonly key: string;\n    readonly handler: string | null;\n    readonly file: string;\n    readonly line: number | null;\n    readonly auth: HardEntryAuth;\n    readonly guards: readonly string[];\n    readonly checks: readonly string[];\n}',
   },
   {
     name: 'HardFeatureData',
@@ -5828,7 +5904,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'HardFeatureLinkData',
-    declaration: 'export interface HardFeatureLinkData {\n    readonly from: HardFeatureId;\n    readonly to: HardFeatureId;\n    readonly kind: HardFeatureLinkKind;\n    readonly note: string;\n}',
+    declaration: 'export interface HardFeatureLinkData {\n    readonly from: HardFeatureId;\n    readonly to: HardFeatureId;\n    readonly kind: HardFeatureLinkKind;\n    readonly note: string;\n    readonly source?: \'model\' | \'harness\';\n}',
   },
   {
     name: 'HardFeatureLinkKind',
@@ -5841,6 +5917,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardFeatureMapSnapshot',
     declaration: 'export interface HardFeatureMapSnapshot {\n    readonly id: number;\n    readonly commit: string;\n    readonly stats: HardSnapshotStats;\n    readonly reused: boolean;\n}',
+  },
+  {
+    name: 'HardFeaturePairData',
+    declaration: 'export interface HardFeaturePairData {\n    readonly id: HardFeaturePairId;\n    readonly category: HardGuardCategory;\n    readonly states: readonly string[];\n    readonly weaker: {\n        readonly entry: string;\n        readonly feature: HardFeatureId;\n    };\n    readonly stronger: {\n        readonly entry: string;\n        readonly feature: HardFeatureId;\n    };\n    readonly missing: readonly string[];\n}',
+  },
+  {
+    name: 'HardFeaturePairId',
+    declaration: 'export type HardFeaturePairId = Branded<\'HardFeaturePairId\'>;',
+  },
+  {
+    name: 'HardFeaturePairResolvedData',
+    declaration: 'export interface HardFeaturePairResolvedData {\n    readonly id: HardFeaturePairId;\n    readonly outcome: \'finding\' | \'hypothesis\' | \'safe\';\n    readonly ref?: string;\n    readonly cite?: {\n        readonly file: string;\n        readonly line: number;\n    };\n    readonly reason: string;\n}',
+  },
+  {
+    name: 'HardFeaturePolicy',
+    declaration: 'export interface HardFeaturePolicy {\n    readonly depth: number;\n    readonly requiredDepth: number;\n    readonly libraryFanIn: number;\n    readonly maxExcludedPercent: number;\n    readonly guards: ReadonlySet<string>;\n    readonly mutations: ReadonlySet<string>;\n}',
+  },
+  {
+    name: 'HardFeatureReviewData',
+    declaration: 'export interface HardFeatureReviewData {\n    readonly features: readonly HardFeatureId[];\n    readonly cases: readonly {\n        readonly lens: HardAbuseLens;\n        readonly question: string;\n        readonly outcome: HardAbuseOutcome;\n        readonly ref?: string;\n        readonly reason: string;\n    }[];\n}',
   },
   {
     name: 'HardFeatureRole',
@@ -5885,6 +5981,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HardFlowDocSections',
     declaration: 'export interface HardFlowDocSections {\n    readonly entryPoints: number;\n    readonly dataflows: number;\n    readonly trustBoundaries: number;\n    readonly stateMachines: number;\n    readonly assumptions: number;\n    readonly quirks: number;\n}',
+  },
+  {
+    name: 'HardGuardCategory',
+    declaration: 'export type HardGuardCategory = \'csrf\' | \'authentication\' | \'authorization\';',
+  },
+  {
+    name: 'HardGuardDeclaredData',
+    declaration: 'export interface HardGuardDeclaredData {\n    readonly symbol: string;\n    readonly category: HardGuardCategory;\n    readonly cite: {\n        readonly file: string;\n        readonly line: number;\n    };\n    readonly note: string;\n}',
   },
   {
     name: 'HardHypothesisId',
@@ -6560,7 +6664,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'OpenWorkCounts',
-    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n    readonly unchainedMaterial: number;\n    readonly unmappedEntryPoints: number;\n};',
+    declaration: 'export type OpenWorkCounts = {\n    readonly pendingFindings: number;\n    readonly flakyFindings: number;\n    readonly openHypotheses: number;\n    readonly uncoveredCells: number;\n    readonly suspiciousCells: number;\n    readonly screenReReads: number;\n    readonly unchainedMaterial: number;\n    readonly unmappedEntryPoints: number;\n    readonly unresolvedPairs: number;\n    readonly unreviewedFeatures: number;\n};',
   },
   {
     name: 'OptionalSessionSeq',

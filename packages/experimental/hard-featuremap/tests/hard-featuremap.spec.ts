@@ -103,6 +103,10 @@ describe('hard-featuremap config', () => {
     expect(() => new HardFeatureMap(new Context(), { enabled: true, dbPath: 'map.db' })).toThrow('dbPath must be an absolute path')
   })
 
+  it('refuses a guard pattern that is not a regular expression', () => {
+    expect(() => new HardFeatureMap(new Context(), { csrfGuardPattern: '(' })).toThrow('csrfGuardPattern is not a valid regular expression')
+  })
+
   it('refuses check tunables out of range', () => {
     expect(() => new HardFeatureMap(new Context(), { featureDepth: 0 })).toThrow('featureDepth must be a safe integer from 1 through 8')
     expect(() => new HardFeatureMap(new Context(), { featureDepth: 2, requiredDepth: 3 })).toThrow('requiredDepth must be a safe integer from 1 through 2')

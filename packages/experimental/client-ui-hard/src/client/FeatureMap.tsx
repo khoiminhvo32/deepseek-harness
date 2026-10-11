@@ -35,6 +35,7 @@ const FRESH_MS = 4000
 const EDGE_COLOR: Record<LayoutEdge['kind'], string> = {
   member: 'var(--dsw-alias-border-l2)',
   link: 'var(--dsw-alias-state-business-primary)',
+  'harness-link': 'var(--dsw-alias-state-error-primary)',
   joern: 'var(--dsw-alias-label-tertiary)',
   repair: 'var(--dsw-alias-state-warn-primary)',
   'unique-name': 'var(--dsw-alias-state-error-primary)',
@@ -129,6 +130,7 @@ function flowNodes(nodes: readonly LayoutNode[], fresh: ReadonlySet<string>, sel
         <div className={css.nodeBody} title={node.detail}>
           <span className={css.nodeLabel}>{node.count === undefined ? node.label : t('map.unmapped', { count: node.count })}</span>
           {node.role === undefined ? null : <span className={css.nodeRole}>{t(ROLE_LABEL[node.role])}</span>}
+          {node.reviewed === true ? <span className={css.nodeRole}>{t('map.reviewed')}</span> : null}
           {fresh.has(node.id) ? <span className={css.freshMark}>{t('map.fresh')}</span> : null}
         </div>
       ),
@@ -143,8 +145,8 @@ function flowEdges(edges: readonly LayoutEdge[]): Edge[] {
     source: edge.from,
     target: edge.to,
     ...edge.label === undefined ? {} : { label: edge.label },
-    style: { stroke: EDGE_COLOR[edge.kind] },
-    animated: edge.kind === 'link',
+    style: edge.kind === 'harness-link' ? { stroke: EDGE_COLOR[edge.kind], strokeDasharray: '6 4' } : { stroke: EDGE_COLOR[edge.kind] },
+    animated: edge.kind === 'link' || edge.kind === 'harness-link',
   }))
 }
 
@@ -189,6 +191,12 @@ export function FeatureMap({ sessionId, useSessions, t }: FeatureMapProps): Reac
         <span className={css.summary}>
           {t('map.summary', { features: map.features.length, mapped: mappedCount, total: map.entryPoints.length, links: map.links.length })}
         </span>
+        {map.pairs.length === 0 ? null : (
+          <span className={css.pairs}>
+            <i style={{ background: EDGE_COLOR['harness-link'] }} title={t('map.legend.harness')} />
+            {t('map.pairs', { open: map.pairs.filter(pair => pair.outcome === null).length, total: map.pairs.length })}
+          </span>
+        )}
         <span className={css.commit}>{map.commit.slice(0, 12)}</span>
       </div>
       <div className={css.features} role="list">
@@ -218,6 +226,13 @@ export function FeatureMap({ sessionId, useSessions, t }: FeatureMapProps): Reac
               {t('map.states')}: {record.states.map(entry => `${entry.access} ${entry.kind}:${entry.key}`).join(', ')}
             </span>
           )}
+          <span className={record.reviewed ? css.meta : css.pending}>{t(record.reviewed ? 'map.review.done' : 'map.review.pending')}</span>
+          {map.pairs.filter(pair => pair.weaker.feature === record.id || pair.stronger.feature === record.id).map(pair => (
+            <span key={pair.id} className={pair.outcome === null ? css.pairOpen : css.meta}>
+              {t('map.pair.line', { id: pair.id, category: pair.category, weaker: pair.weaker.entry, stronger: pair.stronger.entry, missing: pair.missing.join(', ') })}
+              {' · '}{pair.outcome ?? t('map.pair.open')}
+            </span>
+          ))}
           {graph?.state === 'loading' ? <span className={css.meta} role="status">{t('map.loading')}</span> : null}
           {graph?.state === 'error' ? <span className={css.error} role="alert">{t('map.error', { message: graph.message })}</span> : null}
           <div className={css.legend}>

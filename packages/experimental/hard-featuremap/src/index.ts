@@ -24,7 +24,10 @@ import type {} from '@deepseek-ai/dsh-experimental-hard-ledger'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import { requiredSet } from './check.ts'
 import type { HardFeatureGraph, HardFeaturePolicy } from './check.ts'
+import { guardCategories, guardPairs } from './pairs.ts'
+import type { HardGuardProfile } from './pairs.ts'
 import { FEATURE_MAP_SECTION, featureMapTools } from './tools.ts'
 import { featureMapRoutes } from './web.ts'
 import type {} from '@deepseek-ai/dsh-client-connection'
@@ -82,10 +85,12 @@ export type { HardSnapshotImport, HardSnapshotStats } from './store.ts'
 export { hookEdges, phpString, resolveCallback, WORDPRESS_GUARDS, WORDPRESS_MUTATIONS, wordpressEntryPoints, wordpressHooks } from './wordpress.ts'
 export { checkFeature, requiredSet } from './check.ts'
 export type { HardFeatureCheck, HardFeatureClaim, HardFeatureGraph, HardFeaturePolicy, HardRequiredReason, HardRequiredSet } from './check.ts'
-export { FEATURE_MAP_SECTION, featureMapTools } from './tools.ts'
+export { FEATURE_MAP_SECTION, featureMapTools, HARD_DENY_EVIDENCE } from './tools.ts'
 export type { HardFeatureMapAccess } from './tools.ts'
 export { FEATURE_GRAPH_PATH, SYMBOL_DETAIL_PATH } from './routes.ts'
 export { featureMapRoutes } from './web.ts'
+export { guardCategories, guardPairs, HARD_GUARD_CATEGORIES } from './pairs.ts'
+export type { HardGuardProfile } from './pairs.ts'
 export type { HardFeatureMapWebAccess } from './web.ts'
 export type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
 export { httpEntryPoints } from './http.ts'
@@ -99,6 +104,14 @@ export const HARD_FRAMEWORKS: readonly HardFramework[] = ['wordpress', 'laravel'
 
 /** The directories whose top-level PHP files a WordPress install serves directly. */
 export const WORDPRESS_SCRIPT_DIRS: readonly string[] = ['.', 'wp-admin', 'wp-admin/network', 'wp-admin/user']
+
+/** Default CSRF guard names across frameworks. */
+export const DEFAULT_CSRF_GUARD_PATTERN = 'csrf|xsrf|nonce|referer|antiforgery|verifytoken'
+/** Default authentication guard names across frameworks: logged-in checks, login decorators, auth middleware, a bare Authorize. */
+export const DEFAULT_AUTHENTICATION_GUARD_PATTERN =
+  'logged_?in|login_required|is_?authenticated|authenticate|requireauth|ensureauth|jwt|passport|^\\[?authorize\\]?$|^auth(:|$)'
+/** Default guard candidate names across frameworks. */
+export const DEFAULT_GUARD_CANDIDATE_PATTERN = 'auth|perm|allow|role|admin|owner|policy|acl|guard|access|forbid|denied|login|logged|^can[_A-Z]|^can$'
 
 /** Default call levels the feature check follows. */
 export const DEFAULT_FEATURE_DEPTH = 4
@@ -122,7 +135,7 @@ function shellQuote(value: string): string {
 }
 
 /** Bumped when the rows an import derives from the same facts change. */
-const IMPORT_VERSION = 2
+const IMPORT_VERSION = 3
 
 /** Feature map plugin config. */
 export interface Config {
@@ -152,6 +165,12 @@ export interface Config {
   guards?: string[]
   /** Names of state-writing symbols a feature must account for when reached; empty selects the WordPress list when its profile is on. */
   mutations?: string[]
+  /** Case-insensitive pattern of guard names that check request forgery. */
+  csrfGuardPattern?: string
+  /** Case-insensitive pattern of guard names that check who the caller is; other guards check what the caller may do. */
+  authenticationGuardPattern?: string
+  /** Case-insensitive pattern of symbol names hard_query_map suggests as guard candidates. */
+  guardCandidatePattern?: string
 }
 
 /** Schemastery config for the feature map plugin. */
@@ -167,6 +186,9 @@ export const Config: z<Config> = z.object({
   maxExcludedPercent: z.number().step(1).min(0).max(100).default(DEFAULT_MAX_EXCLUDED_PERCENT),
   guards: z.array(z.string()).default([]),
   mutations: z.array(z.string()).default([]),
+  csrfGuardPattern: z.string().default(DEFAULT_CSRF_GUARD_PATTERN),
+  authenticationGuardPattern: z.string().default(DEFAULT_AUTHENTICATION_GUARD_PATTERN),
+  guardCandidatePattern: z.string().default(DEFAULT_GUARD_CANDIDATE_PATTERN),
 })
 
 /** Fully materialized plugin inputs. */
@@ -177,6 +199,8 @@ interface ResolvedConfig {
   readonly scriptDirs: readonly string[]
   readonly indexOnArm: boolean
   readonly policy: HardFeaturePolicy
+  readonly guardPatterns: { readonly csrf: RegExp; readonly authentication: RegExp }
+  readonly guardCandidates: RegExp
 }
 
 /** Validate config even when the service is constructed outside Loader normalization. */
@@ -206,6 +230,11 @@ function resolveConfig(config: Config): ResolvedConfig {
     frameworks,
     scriptDirs: scriptDirs.map(dir => normalize(dir)),
     indexOnArm: config.indexOnArm ?? true,
+    guardPatterns: {
+      csrf: patternOf('csrfGuardPattern', config.csrfGuardPattern ?? DEFAULT_CSRF_GUARD_PATTERN),
+      authentication: patternOf('authenticationGuardPattern', config.authenticationGuardPattern ?? DEFAULT_AUTHENTICATION_GUARD_PATTERN),
+    },
+    guardCandidates: patternOf('guardCandidatePattern', config.guardCandidatePattern ?? DEFAULT_GUARD_CANDIDATE_PATTERN),
     policy: {
       depth: featureDepth,
       requiredDepth,
@@ -214,6 +243,15 @@ function resolveConfig(config: Config): ResolvedConfig {
       guards: listOr(config.guards ?? [], WORDPRESS_GUARDS),
       mutations: listOr(config.mutations ?? [], WORDPRESS_MUTATIONS),
     },
+  }
+}
+
+/** Compile one case-insensitive pattern config field, failing loud on a bad pattern. */
+function patternOf(field: string, source: string): RegExp {
+  try {
+    return new RegExp(source, 'i')
+  } catch (error: unknown) {
+    throw new TypeError(`${field} is not a valid regular expression: ${String(error)}`)
   }
 }
 
@@ -262,6 +300,8 @@ export class HardFeatureMap extends Service {
 
   private readonly resolved: ResolvedConfig
   private readonly importing = new Map<string, Promise<HardFeatureMapSnapshot>>()
+  /** Reached guards and state writes per snapshot, declared guards, and entry point. */
+  private readonly reached = new Map<string, { guards: string[]; writes: string[] }>()
   private opened: Promise<HardFeatureMapStore> | undefined
 
   constructor(ctx: Context, config: Config = {}) {
@@ -417,23 +457,125 @@ export class HardFeatureMap extends Service {
         const snapshot = await this.index(agent)
         return { id: snapshot.id, commit: snapshot.commit }
       },
-      graph: async (snapshot) => {
-        const store = await this.store()
-        const entries = new Map(store.entryPoints(snapshot).map(entry => [`${entry.kind}:${entry.key}`, entry]))
-        return {
-          symbol: id => store.symbol(snapshot, id),
-          callees: id => store.calleeIds(snapshot, id),
-          fanIn: id => store.fanIn(snapshot, id),
-          entryPoint: key => entries.get(key),
-        } satisfies HardFeatureGraph
-      },
-      entryPoints: snapshot => this.entryPoints(snapshot),
+      graph: (agent, snapshot) => this.graphOf(agent, snapshot),
+      entryPoints: (agent, snapshot) => this.entriesOf(agent, snapshot),
       findSymbols: async (snapshot, text, limit) => (await this.store()).findSymbols(snapshot, text, limit),
+      symbol: async (snapshot, id) => (await this.store()).symbol(snapshot, id),
       callers: (snapshot, symbol) => this.callers(snapshot, symbol),
       callees: (snapshot, symbol) => this.callees(snapshot, symbol),
+      guardCandidates: async (agent, snapshot) => {
+        const known = this.policyOf(agent).guards
+        return (await this.store()).guardCandidates(snapshot, this.resolved.guardCandidates).filter(row => !known.has(row.symbol))
+      },
+      derivePairs: agent => this.derivePairs(agent),
       lineText: (agent, file, line) => this.lineText(agent, file, line),
-      policy: this.resolved.policy,
+      policyOf: agent => this.policyOf(agent),
     }
+  }
+
+  /**
+   * The check policy of one session: the configured guards plus the guards the model declared.
+   * @param agent - an agent whose session armed a hard mission.
+   * @returns the policy.
+   */
+  policyOf(agent: Agent): HardFeaturePolicy {
+    const declared = this.ctx.hardLedger.declaredGuards(agent).map(guard => guard.symbol)
+    const base = this.resolved.policy
+    return declared.length === 0 ? base : { ...base, guards: new Set([...base.guards, ...declared]) }
+  }
+
+  /** The indexed entry points of a snapshot followed by the ones the session declared that the index lacks. */
+  private async entriesOf(agent: Agent, snapshot: number): Promise<HardEntryPoint[]> {
+    const indexed = await this.entryPoints(snapshot)
+    const known = new Set(indexed.map(entry => `${entry.kind}:${entry.key}`))
+    const declared = this.ctx.hardLedger.declaredEntryPoints(agent).filter(entry => !known.has(entry.key)).map(entry => ({
+      kind: 'custom' as const,
+      key: entry.key.slice(entry.key.indexOf(':') + 1),
+      handler: entry.handler,
+      file: entry.cite.file,
+      line: entry.cite.line,
+      auth: entry.auth,
+      guards: [],
+      checks: [],
+    }))
+    return [...indexed, ...declared]
+  }
+
+  /** The graph queries of one snapshot, with the session's declared entry points. */
+  private async graphOf(agent: Agent, snapshot: number): Promise<HardFeatureGraph> {
+    const store = await this.store()
+    const entries = new Map((await this.entriesOf(agent, snapshot)).map(entry => [`${entry.kind}:${entry.key}`, entry]))
+    return {
+      symbol: id => store.symbol(snapshot, id),
+      callees: id => store.calleeIds(snapshot, id),
+      fanIn: id => store.fanIn(snapshot, id),
+      entryPoint: key => entries.get(key),
+    }
+  }
+
+  /**
+   * Derive the guard pairs among the entry points of recorded features, record the new ones, and link
+   * the two features of each new pair with a harness `shares-state` relation unless one already joins them.
+   * @param agent - an agent whose session recorded features.
+   * @returns the ids of the pairs this call recorded.
+   */
+  async derivePairs(agent: Agent): Promise<string[]> {
+    const snapshot = await this.index(agent)
+    const graph = await this.graphOf(agent, snapshot.id)
+    const policy = this.policyOf(agent)
+    const declared = this.ctx.hardLedger.declaredGuards(agent)
+    const scope = `${snapshot.id}\u0000${declared.map(guard => guard.symbol).join('\u0000')}`
+    const entries = new Map((await this.entriesOf(agent, snapshot.id)).map(entry => [`${entry.kind}:${entry.key}`, entry]))
+    const profiles: HardGuardProfile[] = []
+    const seen = new Set<string>()
+    for (const feature of this.ctx.hardLedger.features(agent)) {
+      const states = feature.states.filter(state => state.access === 'write').map(state => `${state.kind}:${state.key}`)
+      for (const key of feature.entryPoints) {
+        const entry = entries.get(key)
+        if (seen.has(key) || entry?.handler === undefined || entry.handler === null) continue
+        seen.add(key)
+        const reached = this.reachedChecks(`${scope}\u0000${key}`, graph, [entry.handler, ...entry.checks], policy)
+        profiles.push({
+          key, auth: entry.auth, feature: feature.id, guards: [...entry.guards, ...reached.guards], writes: [...reached.writes, ...states],
+        })
+      }
+    }
+    const categoryOf = guardCategories(new Map(declared.map(guard => [guard.symbol, guard.category])), this.resolved.guardPatterns)
+    const created: string[] = []
+    for (const pair of guardPairs(profiles, categoryOf)) {
+      const id = this.ctx.hardLedger.recordFeaturePair(agent, pair)
+      if (id === undefined) continue
+      created.push(id)
+      const ends = [pair.weaker.feature, pair.stronger.feature]
+      const linked = this.ctx.hardLedger.featureLinks(agent).some(link => link.kind === 'shares-state' && ends.includes(link.from) && ends.includes(link.to))
+      if (pair.weaker.feature !== pair.stronger.feature && !linked) {
+        this.ctx.hardLedger.linkFeature(agent, {
+          from: pair.weaker.feature,
+          to: pair.stronger.feature,
+          kind: 'shares-state',
+          note: `${id}: both reach ${pair.states.join(', ')}; ${pair.weaker.entry} lacks the ${pair.category} check ${pair.stronger.entry} makes`,
+          source: 'harness',
+        })
+      }
+    }
+    return created
+  }
+
+  /** The guards and state writes reached from one entry point's handler and pre-handler checks, cached per snapshot and declared guards. */
+  private reachedChecks(
+    cacheKey: string,
+    graph: HardFeatureGraph,
+    start: readonly string[],
+    policy: HardFeaturePolicy,
+  ): { guards: string[]; writes: string[] } {
+    const cached = this.reached.get(cacheKey)
+    if (cached !== undefined) return cached
+    const set = requiredSet(graph, start, policy)
+    // Symbol ids, so a declared guard's category applies and a method names its class.
+    const of = (reason: 'guard' | 'mutation') => [...set.required].filter(([, reasons]) => reasons.includes(reason)).map(([id]) => id)
+    const result = { guards: of('guard'), writes: of('mutation') }
+    this.reached.set(cacheKey, result)
+    return result
   }
 
   /** One line of a file at the agent's pinned commit, read from the snapshot store; undefined when it does not exist. */

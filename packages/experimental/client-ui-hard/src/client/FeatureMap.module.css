@@ -198,3 +198,19 @@
   cursor: pointer;
   color: var(--dsw-alias-label-secondary);
 }
+.pairs {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.pairs i {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.pending,
+.pairOpen {
+  color: var(--dsw-alias-state-warn-primary);
+}

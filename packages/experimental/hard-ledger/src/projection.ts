@@ -14,7 +14,9 @@ import {
   completionAssessmentFromState,
   coverageBySourceFromState,
   coverageProgressFromState,
+  indexedEntryPointsFromState,
   matrixCellsFromState,
+  DEFAULT_ABUSE_GATE,
   DEFAULT_EMPTY_SWEEPS_TO_FINISH,
   DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
   DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
@@ -180,6 +182,35 @@ const featureLinkSchema = zod.object({
   to: zod.string().min(1),
   kind: zod.enum(['calls', 'shares-state', 'gates', 'enables']),
   note: zod.string().min(1),
+  source: zod.enum(['model', 'harness']).optional(),
+})
+
+/** Validates one folded guard pair with its resolution. */
+const featurePairSchema = zod.object({
+  id: zod.string().min(1),
+  category: zod.enum(['csrf', 'authentication', 'authorization']),
+  states: zod.array(zod.string().min(1)).readonly(),
+  weaker: zod.object({ entry: zod.string().min(1), feature: zod.string().min(1) }),
+  stronger: zod.object({ entry: zod.string().min(1), feature: zod.string().min(1) }),
+  missing: zod.array(zod.string().min(1)).readonly(),
+  resolution: zod.object({
+    outcome: zod.enum(['finding', 'hypothesis', 'safe']),
+    ref: zod.string().min(1).optional(),
+    cite: zod.object({ file: zod.string().min(1), line: zod.number().int().min(1) }).optional(),
+    reason: zod.string().min(1),
+  }).optional(),
+})
+
+/** Validates one folded abuse review. */
+const featureReviewSchema = zod.object({
+  features: zod.array(zod.string().min(1)).min(1).readonly(),
+  cases: zod.array(zod.object({
+    lens: zod.enum(['skip-step', 'wrong-actor', 'wrong-object', 'sequence', 'race-replay', 'input', 'shared-state', 'limits']),
+    question: zod.string().min(1),
+    outcome: zod.enum(['finding', 'hypothesis', 'weakness', 'refuted', 'not-applicable']),
+    ref: zod.string().min(1).optional(),
+    reason: zod.string().min(1),
+  })).readonly(),
 })
 
 /** Validates persisted projection state before it seeds a fold. */
@@ -195,6 +226,22 @@ export const hardLedgerStateSchema = zod.object({
   featureMap: featureMapSchema.optional(),
   features: zod.array(featureSchema).optional(),
   featureLinks: zod.array(featureLinkSchema).optional(),
+  // Optional: cached states from before the guard pair and abuse review events fold without them.
+  featurePairs: zod.array(featurePairSchema).optional(),
+  featureReviews: zod.array(featureReviewSchema).optional(),
+  // Optional: cached states from before the guard and entry declarations fold without them.
+  declaredGuards: zod.array(zod.object({
+    symbol: zod.string().min(1),
+    category: zod.enum(['csrf', 'authentication', 'authorization']),
+    cite: zod.object({ file: zod.string().min(1), line: zod.number().int().min(1) }),
+    note: zod.string().min(1),
+  })).optional(),
+  declaredEntries: zod.array(zod.object({
+    key: zod.string().min(1),
+    handler: zod.string().min(1),
+    auth: zod.enum(['public', 'authenticated', 'unknown']),
+    cite: zod.object({ file: zod.string().min(1), line: zod.number().int().min(1) }),
+  })).optional(),
   sweeps: zod.object({ A: zod.number().int().min(0), B: zod.number().int().min(0) }),
   recentSweeps: zod.array(sweepSummarySchema).max(HARD_SWEEP_WINDOW).readonly(),
   goalId: zod.string().min(1).optional(),
@@ -242,6 +289,25 @@ export function applyHardLedgerProjection(state: HardLedgerProjectionState, even
     }
     case 'hard/feature/linked':
       return { ...state, featureLinks: [...state.featureLinks ?? [], event.data] }
+    case 'hard/feature/pair':
+      return { ...state, featurePairs: [...state.featurePairs ?? [], event.data] }
+    case 'hard/feature/pair/resolved': {
+      const { id, ...resolution } = event.data
+      return { ...state, featurePairs: (state.featurePairs ?? []).map(pair => pair.id === id ? { ...pair, resolution } : pair) }
+    }
+    case 'hard/feature/reviewed': {
+      const key = event.data.features.join('+')
+      const reviews = (state.featureReviews ?? []).filter(review => review.features.join('+') !== key)
+      return { ...state, featureReviews: [...reviews, event.data] }
+    }
+    case 'hard/guard/declared': {
+      const guards = (state.declaredGuards ?? []).filter(guard => guard.symbol !== event.data.symbol)
+      return { ...state, declaredGuards: [...guards, event.data] }
+    }
+    case 'hard/entry/declared': {
+      const entries = (state.declaredEntries ?? []).filter(entry => entry.key !== event.data.key)
+      return { ...state, declaredEntries: [...entries, event.data] }
+    }
     case 'hard/coverage/cell': {
       const key = (record: { module: string; bugClass: string }): string => `${record.module}\u0000${record.bugClass}`
       const index = state.coverage.findIndex(record => key(record) === key(event.data))
@@ -360,8 +426,21 @@ const clientViewSchema = zod.object({
       states: zod.array(zod.object({ kind: zod.string(), key: zod.string(), access: zod.enum(['read', 'write']) })),
       reach: zod.number().int().min(0),
       required: zod.number().int().min(0),
+      reviewed: zod.boolean(),
     })),
-    links: zod.array(zod.object({ from: zod.string(), to: zod.string(), kind: zod.enum(['calls', 'shares-state', 'gates', 'enables']), note: zod.string() })),
+    links: zod.array(zod.object({
+      from: zod.string(), to: zod.string(), kind: zod.enum(['calls', 'shares-state', 'gates', 'enables']), note: zod.string(),
+      source: zod.enum(['model', 'harness']),
+    })),
+    pairs: zod.array(zod.object({
+      id: zod.string(),
+      category: zod.enum(['csrf', 'authentication', 'authorization']),
+      weaker: zod.object({ entry: zod.string(), feature: zod.string() }),
+      stronger: zod.object({ entry: zod.string(), feature: zod.string() }),
+      missing: zod.array(zod.string()),
+      states: zod.array(zod.string()),
+      outcome: zod.enum(['finding', 'hypothesis', 'safe']).nullable(),
+    })),
   }).optional(),
   gate: zod.object({
     complete: zod.boolean(),
@@ -413,10 +492,11 @@ function featureMapView(state: HardLedgerProjectionState): Pick<HardLedgerClient
   if (state.featureMap === undefined) return {}
   const features = state.features ?? []
   const mapped = new Set(features.flatMap(feature => feature.entryPoints))
+  const reviewed = new Set((state.featureReviews ?? []).filter(review => review.features.length === 1).flatMap(review => review.features))
   return {
     featureMap: {
       commit: state.featureMap.commit,
-      entryPoints: state.featureMap.entryPoints.map(entry => ({ key: entry.key, handler: entry.handler, mapped: mapped.has(entry.key) })),
+      entryPoints: indexedEntryPointsFromState(state).map(entry => ({ ...entry, mapped: mapped.has(entry.key) })),
       features: features.map(feature => ({
         id: feature.id,
         name: feature.name,
@@ -427,8 +507,18 @@ function featureMapView(state: HardLedgerProjectionState): Pick<HardLedgerClient
         states: feature.states.map(entry => ({ kind: entry.kind, key: entry.key, access: entry.access })),
         reach: feature.check.reach,
         required: feature.check.required,
+        reviewed: reviewed.has(feature.id),
       })),
-      links: (state.featureLinks ?? []).map(link => ({ from: link.from, to: link.to, kind: link.kind, note: link.note })),
+      links: (state.featureLinks ?? []).map(link => ({ from: link.from, to: link.to, kind: link.kind, note: link.note, source: link.source ?? 'model' })),
+      pairs: (state.featurePairs ?? []).map(pair => ({
+        id: pair.id,
+        category: pair.category,
+        weaker: { ...pair.weaker },
+        stronger: { ...pair.stronger },
+        missing: [...pair.missing],
+        states: [...pair.states],
+        outcome: pair.resolution?.outcome ?? null,
+      })),
     },
   }
 }
@@ -456,6 +546,7 @@ export function hardLedgerProjectionDefinition(thresholds: LedgerThresholds = {
   screenSpotCheckPercent: DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
   emptySweepsToFinish: DEFAULT_EMPTY_SWEEPS_TO_FINISH,
   minEntryMappedPercent: DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
+  abuseGate: DEFAULT_ABUSE_GATE,
 }): HardLedgerProjectionDefinition {
   return {
     key: 'hardLedger',

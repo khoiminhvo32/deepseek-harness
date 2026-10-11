@@ -71,8 +71,8 @@ describe('HardFeatureMapStore', () => {
     ])
     expect(store.callees(id, 'save_post')).toEqual([{ caller: 'save_post', callee: 'Hooks.on_save', file: 'code.php', line: 30, source: 'hook' }])
     expect(store.entryPoints(id)).toEqual([
-      { kind: 'ajax', key: 'save', handler: 'wp_ajax_save', file: 'wp-admin/admin-ajax.php', line: 5, auth: 'authenticated', guards: [] },
-      { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', file: 'wp-admin/admin-ajax.php', line: null, auth: 'unknown', guards: [] },
+      { kind: 'ajax', key: 'save', handler: 'wp_ajax_save', file: 'wp-admin/admin-ajax.php', line: 5, auth: 'authenticated', guards: [], checks: [] },
+      { kind: 'script', key: 'wp-admin/admin-ajax.php', handler: 'wp-admin/admin-ajax.php:<global>', file: 'wp-admin/admin-ajax.php', line: null, auth: 'unknown', guards: [], checks: [] },
     ])
     expect(store.symbol(id, 'save_post')).toEqual({ id: 'save_post', name: 'save_post', kind: 'function', owner: null, file: 'code.php', line: 1, end: 2 })
     expect(store.symbol(id, 'missing')).toBeUndefined()

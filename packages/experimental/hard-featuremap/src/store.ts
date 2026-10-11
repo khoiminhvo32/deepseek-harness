@@ -15,7 +15,7 @@ import type { FactModel } from './model.ts'
 import type { HardEntryAuth, HardEntryKind, HardEntryPoint, HardHook } from './wordpress.ts'
 
 /** The physical layout version, stored in `PRAGMA user_version`. */
-export const HARD_FEATUREMAP_SCHEMA_VERSION = 2
+export const HARD_FEATUREMAP_SCHEMA_VERSION = 3
 
 const SCHEMA = `
 CREATE TABLE project (
@@ -101,7 +101,8 @@ CREATE TABLE entry_point (
   file TEXT NOT NULL,
   line INTEGER,
   auth TEXT NOT NULL,
-  guards TEXT NOT NULL
+  guards TEXT NOT NULL,
+  checks TEXT NOT NULL
 );
 CREATE INDEX entry_point_snapshot ON entry_point (snapshot_id, kind);
 `
@@ -232,8 +233,10 @@ export class HardFeatureMapStore {
       const hook = db.prepare('INSERT INTO hook (snapshot_id, site, op, name, callback, callback_text, caller, file, line) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       for (const h of input.hooks) hook.run(snapshot, h.site, h.op, h.name, h.callback, h.callbackText, h.caller, h.file, h.line)
       const entry = db.prepare(
-        'INSERT INTO entry_point (snapshot_id, kind, key, handler, file, line, auth, guards) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      for (const p of input.entryPoints) entry.run(snapshot, p.kind, p.key, p.handler, p.file, p.line, p.auth, JSON.stringify(p.guards))
+        'INSERT INTO entry_point (snapshot_id, kind, key, handler, file, line, auth, guards, checks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      for (const p of input.entryPoints) {
+        entry.run(snapshot, p.kind, p.key, p.handler, p.file, p.line, p.auth, JSON.stringify(p.guards), JSON.stringify(p.checks))
+      }
       db.exec('COMMIT')
       return snapshot
     } catch (error: unknown) {
@@ -338,12 +341,33 @@ export class HardFeatureMapStore {
   }
 
   /**
+   * Symbols that look like access checks: their name matches the pattern, or
+   * they make a call whose arguments name a 401 or 403 status or an access
+   * denial. Suggestions for the model, never guards by themselves.
+   * @param snapshot - snapshot id.
+   * @param pattern - the name pattern.
+   * @returns the candidates in symbol order, each with why it was suggested.
+   */
+  guardCandidates(snapshot: number, pattern: RegExp): { symbol: string; file: string; line: number | null; reasons: ('name' | 'denies')[] }[] {
+    const symbols = this.db.prepare('SELECT id, name, file, line FROM symbol WHERE snapshot_id = ? ORDER BY id').all(snapshot) as
+      { id: string; name: string; file: string; line: number | null }[]
+    const denying = new Set((this.db.prepare(`SELECT DISTINCT caller FROM call_site WHERE snapshot_id = ? AND (
+      args LIKE '%401%' OR args LIKE '%403%' OR lower(args) LIKE '%forbidden%' OR lower(args) LIKE '%unauthori%'
+      OR lower(args) LIKE '%access denied%' OR lower(args) LIKE '%permission denied%' OR lower(args) LIKE '%not allowed%')`).all(snapshot) as
+      { caller: string }[]).map(row => row.caller))
+    return symbols.flatMap((row) => {
+      const reasons: ('name' | 'denies')[] = [...pattern.test(row.name) ? ['name' as const] : [], ...denying.has(row.id) ? ['denies' as const] : []]
+      return reasons.length === 0 ? [] : [{ symbol: row.id, file: row.file, line: row.line, reasons }]
+    })
+  }
+
+  /**
    * The entry points of one snapshot.
    * @param snapshot - snapshot id.
    * @returns entry points ordered by kind and key.
    */
   entryPoints(snapshot: number): HardEntryPoint[] {
-    const sql = 'SELECT kind, key, handler, file, line, auth, guards FROM entry_point WHERE snapshot_id = ? ORDER BY kind, key'
+    const sql = 'SELECT kind, key, handler, file, line, auth, guards, checks FROM entry_point WHERE snapshot_id = ? ORDER BY kind, key'
     const rows = this.db.prepare(sql).all(snapshot) as {
       kind: HardEntryKind
       key: string
@@ -352,7 +376,8 @@ export class HardFeatureMapStore {
       line: number | null
       auth: HardEntryAuth
       guards: string
+      checks: string
     }[]
-    return rows.map(row => ({ ...row, guards: JSON.parse(row.guards) as string[] }))
+    return rows.map(row => ({ ...row, guards: JSON.parse(row.guards) as string[], checks: JSON.parse(row.checks) as string[] }))
   }
 }

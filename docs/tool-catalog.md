@@ -33,7 +33,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-experimental-hard-tools` | `hard_clear_modules`, `hard_mark_coverage`, `hard_mark_module`, `hard_record_flaw`, `hard_record_flow`, `hard_status`, `hard_submit_finding`, `hard_sweep_summary`, `hard_update_hypothesis` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardVerifier`, `ctx.shell for proof execution`, `a live Agent` | `tool/call`, `hard/finding/proposed`, `hard/finding/verdict`, `hard/hypothesis/state`, `hard/flow/doc`, `hard/coverage/cell`, `hard/sweep/summary`, `tool/result` | - | hard_submit_finding verifies synchronously through the shell seam and never trusts model-run proofs; hard_update_hypothesis drives the hypothesis lifecycle, and the coverage and sweep tools record methodology state with mandatory empty-sweep proof. |
-| `@deepseek-ai/dsh-experimental-hard-featuremap` | `hard_link_feature`, `hard_query_map`, `hard_record_feature` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardCpg facts`, `ctx.shell for cited lines`, `a live Agent with an armed mission` | `tool/call`, `hard/featuremap/indexed`, `hard/feature/recorded`, `hard/feature/linked`, `tool/result` | - | Mounted only when the deployment enables the feature map; hard_record_feature records a feature only after the completeness check against the pinned commit passes. |
+| `@deepseek-ai/dsh-experimental-hard-featuremap` | `hard_declare_entry_point`, `hard_declare_guard`, `hard_link_feature`, `hard_query_map`, `hard_record_feature`, `hard_resolve_pair`, `hard_review_feature` | `ctx.tools`, `ctx.hardLedger`, `ctx.hardCpg facts`, `ctx.shell for cited lines`, `a live Agent with an armed mission` | `tool/call`, `hard/featuremap/indexed`, `hard/feature/recorded`, `hard/feature/linked`, `tool/result` | - | Mounted only when the deployment enables the feature map; hard_record_feature records a feature only after the completeness check against the pinned commit passes. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
@@ -1948,6 +1948,98 @@ hard_submit_finding verifies synchronously through the shell seam and never trus
 
 ## `@deepseek-ai/dsh-experimental-hard-featuremap`
 
+### `hard_declare_entry_point`
+
+Declare an entry point no framework profile finds, such as a case of a hand-written router, so features can cover it. Cite the dispatch line that reaches the handler; it must name the handler.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "A short name; the entry point becomes custom:<name>."
+    },
+    "handler": {
+      "type": "string",
+      "description": "The handler symbol id (view symbol)."
+    },
+    "auth": {
+      "type": "string",
+      "description": "Who can reach it as routed.",
+      "enum": [
+        "public",
+        "authenticated",
+        "unknown"
+      ]
+    },
+    "file": {
+      "type": "string",
+      "description": "The file of the dispatch line, target-repo relative."
+    },
+    "line": {
+      "type": "integer",
+      "description": "The dispatch line."
+    }
+  },
+  "required": [
+    "name",
+    "handler",
+    "auth",
+    "file",
+    "line"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+### `hard_declare_guard`
+
+Declare an access check the target wrote itself, so the feature check and the guard pairs count it. Cite the line in its body where it denies: an exception, an abort or exit, a 401 or 403 status, or an access-denial message; a bare return false is not enough.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "The guard symbol id (view symbol)."
+    },
+    "category": {
+      "type": "string",
+      "description": "What it checks: request forgery, who the caller is, or what the caller may do.",
+      "enum": [
+        "csrf",
+        "authentication",
+        "authorization"
+      ]
+    },
+    "file": {
+      "type": "string",
+      "description": "The file of the denying line, target-repo relative."
+    },
+    "line": {
+      "type": "integer",
+      "description": "The denying line."
+    },
+    "note": {
+      "type": "string",
+      "description": "What the guard checks."
+    }
+  },
+  "required": [
+    "symbol",
+    "category",
+    "file",
+    "line",
+    "note"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
 ### `hard_link_feature`
 
 Record how two recorded features relate: calls, shares-state (both read or write the same state), gates (one checks access for the other), or enables (one sets up state the other needs).
@@ -1992,7 +2084,7 @@ Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/exper
 
 ### `hard_query_map`
 
-Read the feature map of the pinned commit. view features lists the recorded features with their entry points, member counts, and state, the recorded links, and how many entry points features cover; view entry-points lists entry points (kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry points must account for.
+Read the feature map of the pinned commit. view features lists the recorded features with their entry points, member counts, state, and whether each has an abuse review, the recorded links, and how many entry points features cover; view pairs lists the guard pairs with how each was closed; view guards lists the known and declared guards and suggests candidates (symbols named like access checks or denying with 401/403); view entry-points lists entry points (kind:key, handler, routing guards, whether a feature covers it); view symbol finds symbol ids by name; view callers and callees list the call edges of one symbol with the rule that made each edge; view required computes what a feature with the given entry points must account for.
 
 ```json
 {
@@ -2003,6 +2095,8 @@ Read the feature map of the pinned commit. view features lists the recorded feat
       "description": "What to read.",
       "enum": [
         "features",
+        "pairs",
+        "guards",
         "entry-points",
         "symbol",
         "callers",
@@ -2186,6 +2280,129 @@ Record one feature of the target after the harness checks it against the feature
     "summary",
     "entry_points",
     "symbols"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+### `hard_resolve_pair`
+
+Close one guard pair. finding or hypothesis names the F-n or H-n that proves or tests the weaker path; safe cites the line of the check that covers the weaker path, which must name a known guard or show a denial.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pair_id": {
+      "type": "string",
+      "description": "The P-n pair id."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "finding",
+        "hypothesis",
+        "safe"
+      ]
+    },
+    "ref": {
+      "type": "string",
+      "description": "The F-n or H-n id for finding and hypothesis."
+    },
+    "file": {
+      "type": "string",
+      "description": "For safe: the file of the covering check, target-repo relative."
+    },
+    "line": {
+      "type": "integer",
+      "description": "For safe: the line of the covering check."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why the outcome holds."
+    }
+  },
+  "required": [
+    "pair_id",
+    "outcome",
+    "reason"
+  ]
+}
+```
+
+Source: [`packages/experimental/hard-featuremap/src/tools.ts`](../packages/experimental/hard-featuremap/src/tools.ts)
+
+### `hard_review_feature`
+
+Record an abuse review. With one feature, ask at least one what-if question for every lens; with two or more linked features, ask what using them together allows that neither allows alone. Each question records where it led: finding, hypothesis, or weakness with its F-n, H-n, or W-n id (a weakness becomes chain material), refuted, or not-applicable, with the reason.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "features": {
+      "type": "array",
+      "description": "One FE-n id, or the FE-n ids used together.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "description": "The what-if questions.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lens": {
+            "type": "string",
+            "enum": [
+              "skip-step",
+              "wrong-actor",
+              "wrong-object",
+              "sequence",
+              "race-replay",
+              "input",
+              "shared-state",
+              "limits"
+            ]
+          },
+          "question": {
+            "type": "string",
+            "description": "The what-if question."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "finding",
+              "hypothesis",
+              "weakness",
+              "refuted",
+              "not-applicable"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "description": "The F-n, H-n, or W-n id for finding, hypothesis, and weakness."
+          },
+          "reason": {
+            "type": "string",
+            "description": "What the code does that settles the question."
+          }
+        },
+        "required": [
+          "lens",
+          "question",
+          "outcome",
+          "reason"
+        ]
+      }
+    }
+  },
+  "required": [
+    "features",
+    "cases"
   ]
 }
 ```

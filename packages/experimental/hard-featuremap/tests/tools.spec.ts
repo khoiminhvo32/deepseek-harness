@@ -32,6 +32,8 @@ const repo = join(root, 'target')
 await mkdir(repo)
 await writeFile(join(repo, 'ajax.php'), ['<?php', 'function wp_ajax_save() {', '  check_ajax_referer("save");', '  save_post();', '}', 'function wp_ajax_trash() {', '  current_user_can("delete_posts");', '  update_post_meta(1, "trashed", 1);', '  $fn = "log_" . "change"; $fn(); // log_change()', '}', ''].join('\n'))
 const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', env: GIT_ENV })
+await writeFile(join(repo, 'guard.php'), ['<?php', 'function ensure_admin() {', '  if (!is_super_admin()) { wp_die("forbidden", 403); }', '  return true;', '}', ''].join('\n'))
+await writeFile(join(repo, 'router.php'), ['<?php', 'switch ($_GET["a"]) {', '  case "trash": wp_ajax_trash(); break;', '}', ''].join('\n'))
 git('init', '--quiet')
 git('add', '-A')
 git('-c', 'user.name=hard-test', '-c', 'user.email=hard@test', 'commit', '--quiet', '-m', 'seed')
@@ -45,7 +47,9 @@ const method = (id: string, line: number) => ({ k: 'method', id, name: id, file:
 const call = (caller: string, name: string, line: number, args: unknown[] = []) => ({ k: 'call', caller, name, target: name, resolved: [name], file: 'ajax.php', line, dispatch: 'static', args })
 await writeFile(factsPath, [
   { k: 'header', format: 3 },
-  { k: 'file', path: 'ajax.php' },
+  { k: 'file', path: 'ajax.php' }, { k: 'file', path: 'guard.php' }, { k: 'file', path: 'router.php' },
+  { ...method('ensure_admin', 2), file: 'guard.php' },
+  { ...call('ensure_admin', 'wp_die', 3, [{ lit: '"forbidden"' }, { lit: '403' }]), file: 'guard.php', resolved: [] },
   method('wp_ajax_save', 2), method('wp_ajax_trash', 6), method('check_ajax_referer', 20), method('current_user_can', 30),
   method('save_post', 40), method('update_post_meta', 50), method('log_change', 60),
   { ...method('ghost', 0), line: null, end: null }, { ...method('open_end', 1), end: null },
@@ -223,7 +227,7 @@ describe('hard_record_feature', () => {
     const refused = errorText(await run(ctx, agent, 'hard_record_feature', { ...SAVE, symbols: SAVE.symbols.slice(0, 2) }))
     expect(refused).toContain('hard_record_feature refused — 2 required symbols are neither members nor excluded: save_post (near); update_post_meta (mutation)')
     expect(ctx.hardLedger.features(agent)).toEqual([])
-    expect(json(await run(ctx, agent, 'hard_record_feature', SAVE))).toEqual({ feature: { id: 'FE-1' }, check: { reach: 4, required: 4 }, unmappedEntryPoints: 1 })
+    expect(json(await run(ctx, agent, 'hard_record_feature', SAVE))).toEqual({ feature: { id: 'FE-1' }, check: { reach: 4, required: 4 }, unmappedEntryPoints: 1, pairs: [] })
     expect(ctx.hardLedger.features(agent)[0]).toMatchObject({ id: 'FE-1', entryPoints: ['ajax:save'], check: { commit: COMMIT, reach: 4, required: 4 } })
     expect(json(await run(ctx, agent, 'hard_query_map', { view: 'entry-points', unmapped_only: true }))).toMatchObject({ total: 1, items: [{ key: 'ajax:trash' }] })
     const revised = { ...SAVE, feature_id: ' FE-1 ', summary: 'Revised.', symbols: SAVE.symbols.filter(member => member.symbol !== 'save_post'), excluded: [{ symbol: 'save_post', reason: 'other-feature', note: 'shared' }, { symbol: 'log_change', reason: 'unreachable' }] }
@@ -269,7 +273,7 @@ describe('hard_query_map view features', () => {
       links: [{ from: 'FE-1', to: 'FE-2', kind: 'shares-state', note: 'postmeta' }],
       total: 2,
       offset: 0,
-      items: [{ id: 'FE-1', name: 'Save a post', summary: SAVE.summary, entryPoints: ['ajax:save'], members: 4, excluded: 0, states: SAVE.states }],
+      items: [{ id: 'FE-1', name: 'Save a post', summary: SAVE.summary, entryPoints: ['ajax:save'], members: 4, excluded: 0, states: SAVE.states, reviewed: false }],
     })
   })
 })
@@ -363,5 +367,97 @@ describe('panel routes', () => {
     expect([...web.routes.keys()]).toEqual([FEATURE_GRAPH_PATH, SYMBOL_DETAIL_PATH])
     await ctx.fiber.dispose()
     expect(web.routes.size).toBe(0)
+  })
+})
+
+describe('abuse tools', () => {
+  const TRASH = {
+    name: 'Trash a post',
+    summary: 'An editor trashes a post over admin-ajax.',
+    entry_points: ['ajax:trash'],
+    symbols: [{ symbol: 'wp_ajax_trash', role: 'entry' }, { symbol: 'current_user_can', role: 'guard' }, { symbol: 'update_post_meta', role: 'mutation' }],
+    states: [{ kind: 'meta', key: 'postmeta', access: 'write' }],
+  }
+
+  it('pairs entry points that write the same state behind different guard categories and links their features', async () => {
+    const { ctx, agent } = await harness()
+    expect(json(await run(ctx, agent, 'hard_record_feature', SAVE))).toMatchObject({ pairs: [] })
+    expect(json(await run(ctx, agent, 'hard_record_feature', TRASH))).toMatchObject({ pairs: ['P-1', 'P-2'] })
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'pairs' }))).toEqual({
+      total: 2,
+      offset: 0,
+      items: [
+        { id: 'P-1', category: 'authorization', states: ['update_post_meta', 'meta:postmeta'], weaker: { entry: 'ajax:save', feature: 'FE-1' }, stronger: { entry: 'ajax:trash', feature: 'FE-2' }, missing: ['current_user_can'], resolved: null },
+        { id: 'P-2', category: 'csrf', states: ['update_post_meta', 'meta:postmeta'], weaker: { entry: 'ajax:trash', feature: 'FE-2' }, stronger: { entry: 'ajax:save', feature: 'FE-1' }, missing: ['check_ajax_referer'], resolved: null },
+      ],
+    })
+    expect(ctx.hardLedger.featureLinks(agent)).toEqual([expect.objectContaining({ from: 'FE-1', to: 'FE-2', kind: 'shares-state', source: 'harness' })])
+    // Revising a feature derives nothing new: the pairs and the link are recorded once.
+    expect(json(await run(ctx, agent, 'hard_record_feature', { ...TRASH, feature_id: 'FE-2' }))).toMatchObject({ pairs: [] })
+    expect(ctx.hardLedger.featureLinks(agent)).toHaveLength(1)
+  })
+
+  it('closes a pair with a finding, a hypothesis, or a covering line the harness reads', async () => {
+    const { ctx, agent } = await harness()
+    json(await run(ctx, agent, 'hard_record_feature', SAVE))
+    json(await run(ctx, agent, 'hard_record_feature', TRASH))
+    expect(errorText(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-2', outcome: 'safe', reason: 'r' }))).toContain('safe needs the file and line')
+    expect(errorText(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-2', outcome: 'safe', file: 'ajax.php', line: 4, reason: 'r' }))).toContain('ajax.php:4 names no known guard and shows no denial')
+    expect(errorText(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-2', outcome: 'safe', file: 'ajax.php', line: 99, reason: 'r' }))).toContain('ajax.php:99 does not exist at the pinned commit')
+    expect(json(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-2 ', outcome: 'safe', file: 'ajax.php', line: 3, reason: 'the nonce covers both' }))).toEqual({ resolved: { id: 'P-2', outcome: 'safe' }, unresolved: 1 })
+    expect(json(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-1', outcome: 'safe', file: 'guard.php', line: 3, reason: 'denies' }))).toMatchObject({ unresolved: 0 })
+    expect(errorText(await run(ctx, agent, 'hard_resolve_pair', { pair_id: 'P-1', outcome: 'finding', ref: 'F-9', reason: 'r' }))).toContain('outcome finding needs the id of a recorded finding; got F-9')
+    expect(errorText(await run(ctx, undefined, 'hard_resolve_pair', { pair_id: 'P-1', outcome: 'safe', reason: 'r' }))).toContain('hard_resolve_pair requires a live agent')
+  })
+
+  it('declares a project guard only with a denying line inside it, then counts it as a guard', async () => {
+    const { ctx, agent } = await harness()
+    const guard = { symbol: 'ensure_admin', category: 'authorization', file: 'guard.php', line: 3, note: 'super admins only' }
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, symbol: 'nope' }))).toContain('nope is not in the feature map')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, line: 9 }))).toContain('guard.php:9 is not inside ensure_admin (guard.php:2)')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, line: 1 }))).toContain('guard.php:1 is not inside ensure_admin')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, file: 'ajax.php' }))).toContain('ajax.php:3 is not inside ensure_admin')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, line: 4 }))).toContain('guard.php:4 shows no denial')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, symbol: 'ghost', file: 'ajax.php', line: 1 }))).toContain('ajax.php:1 shows no denial')
+    expect(errorText(await run(ctx, agent, 'hard_declare_guard', { ...guard, symbol: 'open_end', file: 'ajax.php', line: 1 }))).toContain('ajax.php:1 shows no denial')
+    const candidates = json(await run(ctx, agent, 'hard_query_map', { view: 'guards' }))
+    expect(candidates).toEqual({
+      known: ['check_ajax_referer', 'current_user_can'],
+      declared: [],
+      candidates: { total: 1, offset: 0, items: [{ symbol: 'ensure_admin', file: 'guard.php', line: 2, reasons: ['name', 'denies'] }] },
+    })
+    expect(json(await run(ctx, agent, 'hard_declare_guard', guard))).toEqual({ declared: { symbol: 'ensure_admin', category: 'authorization' }, pairs: [] })
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'guards' }))).toEqual({
+      known: ['check_ajax_referer', 'current_user_can', 'ensure_admin'],
+      declared: [{ symbol: 'ensure_admin', category: 'authorization' }],
+      candidates: { total: 0, offset: 0, items: [] },
+    })
+    expect(ctx.hardFeatureMap.policyOf(agent).guards.has('ensure_admin')).toBe(true)
+  })
+
+  it('declares an entry point from a hand-written router so features can cover it', async () => {
+    const { ctx, agent } = await harness()
+    const entry = { name: 'trash', handler: 'wp_ajax_trash', auth: 'authenticated', file: 'router.php', line: 3 }
+    expect(errorText(await run(ctx, agent, 'hard_declare_entry_point', { ...entry, handler: 'nope' }))).toContain('nope is not in the feature map')
+    expect(errorText(await run(ctx, agent, 'hard_declare_entry_point', { ...entry, line: 2 }))).toContain('router.php:2 does not name wp_ajax_trash')
+    expect(json(await run(ctx, agent, 'hard_declare_entry_point', entry))).toEqual({ declared: { key: 'custom:trash', handler: 'wp_ajax_trash' } })
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'entry-points', kind: 'custom' }))).toMatchObject({ total: 1, items: [{ key: 'custom:trash', handler: 'wp_ajax_trash', auth: 'authenticated', mapped: false }] })
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'required', entry_points: ['custom:trash'] }))).toMatchObject({ handlers: ['wp_ajax_trash'] })
+    json(await run(ctx, agent, 'hard_record_feature', { ...TRASH, entry_points: ['ajax:trash', 'custom:trash'] }))
+    expect(ctx.hardLedger.unmappedEntryPoints(agent)).toEqual(['ajax:save'])
+  })
+
+  it('records abuse reviews of one feature and of linked features together', async () => {
+    const { ctx, agent } = await harness()
+    json(await run(ctx, agent, 'hard_record_feature', SAVE))
+    const lenses = ['skip-step', 'wrong-actor', 'wrong-object', 'sequence', 'race-replay', 'input', 'shared-state', 'limits']
+    const cases = lenses.map(lens => ({ lens, question: `what if ${lens}?`, outcome: 'refuted', reason: 'checked' }))
+    expect(errorText(await run(ctx, agent, 'hard_review_feature', { features: ['FE-1'], cases: cases.slice(2) }))).toContain('missing: skip-step, wrong-actor')
+    expect(json(await run(ctx, agent, 'hard_review_feature', { features: [' FE-1'], cases: [...cases, { ...cases[0], outcome: 'refuted', ref: ' x ' }] }))).toEqual({ reviewed: ['FE-1'], cases: 9 })
+    expect(json(await run(ctx, agent, 'hard_query_map', { view: 'features' }))).toMatchObject({ items: [{ id: 'FE-1', reviewed: true }] })
+    expect(ctx.tools.get('hard_review_feature')?.presentCall?.({ features: ['FE-1', 'FE-2'], cases: [] })).toEqual({ card: 'generic', title: 'Abuse review: FE-1 + FE-2', kind: 'other', rawInput: '0 questions' })
+    expect(ctx.tools.get('hard_resolve_pair')?.presentCall?.({ pair_id: 'P-1', outcome: 'safe', reason: 'r' })).toEqual({ card: 'generic', title: 'Guard pair P-1: safe', kind: 'other', rawInput: 'r' })
+    expect(ctx.tools.get('hard_declare_guard')?.presentCall?.({ symbol: 'g', category: 'csrf', file: 'a', line: 1, note: 'n' })).toEqual({ card: 'generic', title: 'Guard: g', kind: 'other', rawInput: 'csrf a:1' })
+    expect(ctx.tools.get('hard_declare_entry_point')?.presentCall?.({ name: 'n', handler: 'h', auth: 'public', file: 'a', line: 1 })).toEqual({ card: 'generic', title: 'Entry point: custom:n', kind: 'other', rawInput: 'a:1' })
   })
 })

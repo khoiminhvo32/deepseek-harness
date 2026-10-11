@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-11-hard-feature-abuse.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-11-hard-feature-abuse.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-11-hard-feature-abuse:
+  en: 2da0c43977294e79
+  zh: d9542f50be5b0b03
+/2026-10-11-hard-feature-abuse/summary:
+  en: 20a34317f8103d3d
+  zh: b369ab772cf69e19
+/2026-10-11-hard-feature-abuse/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-11-hard-feature-abuse/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-11-hard-feature-abuse/compatibility:
+  en: 52ae7f7130dc9375
+  zh: be6ca4b97050ef21
+/2026-10-11-hard-feature-abuse/verification:
+  en: c65789a3ad9ffe1c
+  zh: 560cf7a6a72324d7
+/2026-10-11-hard-feature-abuse/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

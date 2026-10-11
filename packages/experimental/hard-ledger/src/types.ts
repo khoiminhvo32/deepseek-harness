@@ -218,6 +218,103 @@ export interface HardFeatureLinkData {
   readonly to: HardFeatureId
   readonly kind: HardFeatureLinkKind
   readonly note: string
+  /** Who recorded the relation: the model through its tool, or the harness from a guard pair; absent means the model. */
+  readonly source?: 'model' | 'harness'
+}
+
+/** An opaque `P-n` guard pair id. */
+export type HardFeaturePairId = Branded<'HardFeaturePairId'>
+
+/** The kind of check a guard performs: request forgery, who the caller is, or what the caller may do. */
+export type HardGuardCategory = 'csrf' | 'authentication' | 'authorization'
+
+/**
+ * Two entry points that reach the same state write where the weaker one
+ * lacks every guard of one category that the stronger one, and most other
+ * writers of that state, carry. The harness derives it from the feature map
+ * and the recorded features; it is a candidate, not a verdict.
+ */
+export interface HardFeaturePairData {
+  readonly id: HardFeaturePairId
+  readonly category: HardGuardCategory
+  /** The state writes both entry points reach. */
+  readonly states: readonly string[]
+  readonly weaker: { readonly entry: string; readonly feature: HardFeatureId }
+  readonly stronger: { readonly entry: string; readonly feature: HardFeatureId }
+  /** The stronger entry point's guards of that category. */
+  readonly missing: readonly string[]
+}
+
+/**
+ * How the model closed one guard pair: a finding or hypothesis that proves or
+ * tests the weaker path, or `safe` with the line of the check that covers it,
+ * which the harness read at the pinned commit.
+ */
+export interface HardFeaturePairResolvedData {
+  readonly id: HardFeaturePairId
+  readonly outcome: 'finding' | 'hypothesis' | 'safe'
+  /** The `F-n` or `H-n` id for `finding` and `hypothesis`. */
+  readonly ref?: string
+  /** The covering check for `safe`. */
+  readonly cite?: { readonly file: string; readonly line: number }
+  readonly reason: string
+}
+
+/**
+ * The angles of an abuse review: skip a step of the intended flow, act as a
+ * different actor, act on someone else's object, reorder steps, replay or
+ * race, send unexpected input, reach the same state through another feature,
+ * and exceed a quantity or limit.
+ */
+export type HardAbuseLens = 'skip-step' | 'wrong-actor' | 'wrong-object' | 'sequence' | 'race-replay' | 'input' | 'shared-state' | 'limits'
+
+/** Where one abuse question led. */
+export type HardAbuseOutcome = 'finding' | 'hypothesis' | 'weakness' | 'refuted' | 'not-applicable'
+
+/**
+ * The model's abuse review of recorded features. A review of one feature
+ * asks at least one "what if" question per lens; a review of two or more
+ * features asks how using them together breaks what each guarantees alone.
+ * Each question records where it led: a finding, hypothesis, or weakness id
+ * (a weakness becomes chain material), a refutation, or why it does not
+ * apply. Recording the same feature set again revises the review.
+ */
+export interface HardFeatureReviewData {
+  /** One feature, or the features used together, sorted. */
+  readonly features: readonly HardFeatureId[]
+  readonly cases: readonly {
+    readonly lens: HardAbuseLens
+    readonly question: string
+    readonly outcome: HardAbuseOutcome
+    /** The `F-n`, `H-n`, or `W-n` id for `finding`, `hypothesis`, and `weakness`. */
+    readonly ref?: string
+    readonly reason: string
+  }[]
+}
+
+/**
+ * A guard of the target the model declared, with the line where it denies:
+ * a framework-neutral way to teach the harness project-specific access
+ * checks. The harness read the line at the pinned commit before the record
+ * was appended.
+ */
+export interface HardGuardDeclaredData {
+  readonly symbol: string
+  readonly category: HardGuardCategory
+  readonly cite: { readonly file: string; readonly line: number }
+  readonly note: string
+}
+
+/**
+ * An entry point of the target the model declared because no framework
+ * profile finds it, such as a hand-written router: its `custom:` key, its
+ * handler, and the dispatch line the harness read at the pinned commit.
+ */
+export interface HardEntryDeclaredData {
+  readonly key: string
+  readonly handler: string
+  readonly auth: 'public' | 'authenticated' | 'unknown'
+  readonly cite: { readonly file: string; readonly line: number }
 }
 
 /**
@@ -517,8 +614,26 @@ export interface HardLedgerClientView {
       readonly states: readonly { readonly kind: string; readonly key: string; readonly access: 'read' | 'write' }[]
       readonly reach: number
       readonly required: number
+      /** Whether the feature has an abuse review. */
+      readonly reviewed: boolean
     }[]
-    readonly links: readonly { readonly from: string; readonly to: string; readonly kind: HardFeatureLinkKind; readonly note: string }[]
+    readonly links: readonly {
+      readonly from: string
+      readonly to: string
+      readonly kind: HardFeatureLinkKind
+      readonly note: string
+      readonly source: 'model' | 'harness'
+    }[]
+    /** Guard pairs in derivation order, with how each was closed. */
+    readonly pairs: readonly {
+      readonly id: string
+      readonly category: HardGuardCategory
+      readonly weaker: { readonly entry: string; readonly feature: string }
+      readonly stronger: { readonly entry: string; readonly feature: string }
+      readonly missing: readonly string[]
+      readonly states: readonly string[]
+      readonly outcome: 'finding' | 'hypothesis' | 'safe' | null
+    }[]
   }
 }
 

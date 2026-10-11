@@ -11792,11 +11792,11 @@
       }
     },
     {
-      "key": "event:hard/feature/linked",
+      "key": "event:hard/entry/declared",
       "kind": "event",
-      "event": "hard/feature/linked",
+      "event": "hard/entry/declared",
       "surface": false,
-      "digest": "cd4908c1207d6767117f4e09395408db86f453a0cbc398f9ee0593191f876c7a",
+      "digest": "54f36275b85fb962e4fa165351038a0507f65691484172f206150c35bb30d6f8",
       "schema": {
         "root": 0,
         "nodes": [
@@ -11810,22 +11810,143 @@
               },
               {
                 "name": "ignorable",
-                "type": 8,
+                "type": 9,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 9,
+                "type": 8,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 9,
+                "type": 8,
                 "optional": false
               },
               {
                 "name": "type",
                 "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "auth",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cite",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "handler",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authenticated"
+          },
+          {
+            "kind": "literal",
+            "value": "public"
+          },
+          {
+            "kind": "literal",
+            "value": "unknown"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/entry/declared"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/linked",
+      "kind": "event",
+      "event": "hard/feature/linked",
+      "surface": false,
+      "digest": "eacde8a049a74e19c6a7f9dfe7189ef2caf5b549b34dd9d18a8dbffda2ed27ed",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 11,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
                 "optional": false
               }
             ],
@@ -11848,6 +11969,11 @@
                 "name": "note",
                 "type": 2,
                 "optional": false
+              },
+              {
+                "name": "source",
+                "type": 8,
+                "optional": true
               },
               {
                 "name": "to",
@@ -11880,11 +12006,26 @@
           },
           {
             "kind": "literal",
-            "value": "gates"
+            "value": "shares-state"
           },
           {
             "kind": "literal",
-            "value": "shares-state"
+            "value": "gates"
+          },
+          {
+            "kind": "union",
+            "types": [
+              9,
+              10
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "harness"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
           },
           {
             "kind": "literal",
@@ -11897,6 +12038,267 @@
           {
             "kind": "literal",
             "value": "hard/feature/linked"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/pair",
+      "kind": "event",
+      "event": "hard/feature/pair",
+      "surface": false,
+      "digest": "d666933bbcf615e39a2f7358e416218cf954a44b0038c44217af990b85a8a243",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "missing",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "states",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "stronger",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "weaker",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authentication"
+          },
+          {
+            "kind": "literal",
+            "value": "authorization"
+          },
+          {
+            "kind": "literal",
+            "value": "csrf"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "entry",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "feature",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/pair"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/pair/resolved",
+      "kind": "event",
+      "event": "hard/feature/pair/resolved",
+      "surface": false,
+      "digest": "06b2ac1f171f7cabb3a29fa01df4f084bb1ee5039a8edc6d41dbe39b0a0086c6",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cite",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "ref",
+                "type": 3,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "finding"
+          },
+          {
+            "kind": "literal",
+            "value": "hypothesis"
+          },
+          {
+            "kind": "literal",
+            "value": "safe"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/pair/resolved"
           }
         ]
       }
@@ -12157,6 +12559,195 @@
           {
             "kind": "literal",
             "value": "hard/feature/recorded"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/feature/reviewed",
+      "kind": "event",
+      "event": "hard/feature/reviewed",
+      "surface": false,
+      "digest": "a4cfcf2c6c262dfcae4a01df5a5c4f6194c97931b6592cfbb8536e8a07b7d9d2",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 21,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cases",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "lens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "outcome",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "question",
+                "type": 19,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 19,
+                "optional": false
+              },
+              {
+                "name": "ref",
+                "type": 19,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "input"
+          },
+          {
+            "kind": "literal",
+            "value": "limits"
+          },
+          {
+            "kind": "literal",
+            "value": "race-replay"
+          },
+          {
+            "kind": "literal",
+            "value": "sequence"
+          },
+          {
+            "kind": "literal",
+            "value": "shared-state"
+          },
+          {
+            "kind": "literal",
+            "value": "skip-step"
+          },
+          {
+            "kind": "literal",
+            "value": "wrong-actor"
+          },
+          {
+            "kind": "literal",
+            "value": "wrong-object"
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16,
+              17,
+              18
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "hypothesis"
+          },
+          {
+            "kind": "literal",
+            "value": "finding"
+          },
+          {
+            "kind": "literal",
+            "value": "not-applicable"
+          },
+          {
+            "kind": "literal",
+            "value": "refuted"
+          },
+          {
+            "kind": "literal",
+            "value": "weakness"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 19
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "hard/feature/reviewed"
           }
         ]
       }
@@ -13044,6 +13635,127 @@
           {
             "kind": "literal",
             "value": "hard/gate/decision"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:hard/guard/declared",
+      "kind": "event",
+      "event": "hard/guard/declared",
+      "surface": false,
+      "digest": "ea5fa056b01f9c556e5580555456691d47cbd59cd06c3f884823f39f6db3cc30",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "category",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "cite",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "note",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "symbol",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "authentication"
+          },
+          {
+            "kind": "literal",
+            "value": "authorization"
+          },
+          {
+            "kind": "literal",
+            "value": "csrf"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "file",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "line",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "hard/guard/declared"
           }
         ]
       }
@@ -27089,6 +27801,11 @@
       ]
     },
     {
+      "digest": "018d5abfdbe707119517350ec78d2703b72ab04da294162c3b22d28e3c948de9",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "01a9d33aab4a3d0c41b3d8be2eea3428447c888a48e8c7368b4cfaa59b33e5c5",
       "names": [],
       "sources": []
@@ -27128,6 +27845,11 @@
       "sources": []
     },
     {
+      "digest": "0508943b55d92caab6481407d00c453300c967089380af5afe2c4c103f2a809f",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "05a2796621b1ee6c03ef7abe560b25116bb4da4d592312117242a78415a32b04",
       "names": [],
       "sources": []
@@ -27149,6 +27871,11 @@
       "sources": [
         "packages/core/session/src/types.ts:32"
       ]
+    },
+    {
+      "digest": "06b2ac1f171f7cabb3a29fa01df4f084bb1ee5039a8edc6d41dbe39b0a0086c6",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "07e1a58c58b593f507b8e7f25723bb0aa42baae6e00f5ecfddf28cb1e64d3235",
@@ -27233,6 +27960,11 @@
       "sources": []
     },
     {
+      "digest": "0b2b082d7baecf099bf071819b77d93757920e33dd3800a948f1b3ace45048a8",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "0b6d718c693fdf7f06dcccb0bcbbabe78cc63514eafc62d6b2a3899735279d6f",
       "names": [
         "packages/goal/goal/src/types.ts#GoalRef"
@@ -27281,6 +28013,11 @@
     },
     {
       "digest": "0e10d7c096b47e61defe372a5fc8bd37d835199410eac44367f95c45082498bd",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "0e741a7e7ac358e81d9159b1837fc1a5ae6b5e7405d10ca816aa88584cfd63ee",
       "names": [],
       "sources": []
     },
@@ -27362,6 +28099,11 @@
     },
     {
       "digest": "113b41f09d2824570abc5ffc66837c8fbacf5d1b7431d6eba477511d43e61bda",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "115b7c7cc627e392dc5a7a203d60d5cdd72595a89f81fdf7ced36a07c8e02b99",
       "names": [],
       "sources": []
     },
@@ -27589,6 +28331,11 @@
       "sources": []
     },
     {
+      "digest": "1bd4c07f409c87b00fd5c8c105c36ea3a8c7b9f5e4a61e35252f3d1c124d6708",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "1c2686c0682e7bc51d61117b2652bd4a80707e331aa276d6ef915ae32534a330",
       "names": [],
       "sources": []
@@ -27673,11 +28420,16 @@
       "digest": "1e5545d0505fb302ed9babf0f278726c57150b8f3fc8b78ffe00a9d753af5dd8",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:337"
+        "packages/experimental/hard-ledger/src/types.ts:434"
       ]
     },
     {
       "digest": "1e709346005826eb81809eeb76a3f713cf13ad6c5cec75146d07020ab9adc938",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "1e83e946e1c3808f56274ddafdf5f60f53f376929c11de48c33ca4918276c6fd",
       "names": [],
       "sources": []
     },
@@ -27807,6 +28559,11 @@
     },
     {
       "digest": "254dce209e735f9cb6f6b7aec0354712b1611759ec02af4d35a96f2081e666f6",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "2558079bfb21cc53cecf651c9c96b10c7d725690fa6dd32bc15b7d7331783e99",
       "names": [],
       "sources": []
     },
@@ -28094,11 +28851,16 @@
       "digest": "34c723adfa64c8c0d087a0fbdfdcb135cabe327576e21b854aa0abb90b6fcfdf",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:350"
+        "packages/experimental/hard-ledger/src/types.ts:447"
       ]
     },
     {
       "digest": "34d1ab5c5df378186d6054b1a1beea9a41e41965d6f336f0bc0025c441a82e66",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "34f9e0c990ab51a7f82198e63170dd4ab6647f045bd77120a2489c67b0d573eb",
       "names": [],
       "sources": []
     },
@@ -28111,6 +28873,15 @@
       "digest": "35e76e915ed0d9acee5ba14eeb353d392b10622bd6071fd49aa1045d033935f7",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "360202cd8eeb2fb596a77d9d5c0c7c91dc807358beebfa34be7df023af1c110a",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureReviewData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:282"
+      ]
     },
     {
       "digest": "36d6a9a871d949ea4f3edd919d81d66aa69218bebef38899d2a1282c39420a1f",
@@ -28146,6 +28917,11 @@
     },
     {
       "digest": "383cf73ae4748e5beb281ae74857ba1ffb92ae01075b9fbf51af78b666007a8f",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "385e32b97955ec4a72941d1dd06a6838b1a8b5fe1f548f94dd209c9e051ae342",
       "names": [],
       "sources": []
     },
@@ -28321,6 +29097,11 @@
     },
     {
       "digest": "4208123b50df5006b181481ab45fcf1cde807b88d3fd4d340090bc2e202fac41",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "423530c0362cc3cd33c387db8f6087ea1d52becc65b6fea2ed1246915e2dfadf",
       "names": [],
       "sources": []
     },
@@ -28524,7 +29305,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardSweepSummaryData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:306"
+        "packages/experimental/hard-ledger/src/types.ts:403"
       ]
     },
     {
@@ -28550,6 +29331,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamMessageId",
         "packages/experimental/agent-team/src/types.ts#TeamTaskId",
         "packages/experimental/hard-ledger/src/types.ts#HardFeatureId",
+        "packages/experimental/hard-ledger/src/types.ts#HardFeaturePairId",
         "packages/experimental/hard-ledger/src/types.ts#HardFindingId",
         "packages/experimental/hard-ledger/src/types.ts#HardFlawId",
         "packages/experimental/hard-ledger/src/types.ts#HardHypothesisId",
@@ -28582,6 +29364,7 @@
         "packages/experimental/hard-ledger/src/types.ts:15",
         "packages/experimental/hard-ledger/src/types.ts:18",
         "packages/experimental/hard-ledger/src/types.ts:21",
+        "packages/experimental/hard-ledger/src/types.ts:226",
         "packages/feedback/message-feedback/src/types.ts:14",
         "packages/goal/goal/src/types.ts:17",
         "packages/interaction/commands/src/brand.ts:31",
@@ -28686,6 +29469,11 @@
       "sources": []
     },
     {
+      "digest": "523f771f9fb6dcfb4f80d0dfcd4a41350f19dc8be050753ea4fee4293db68ff6",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "525254db03b1d1e6b74cf55aced52817568331ac1f96c0818728910b6692e336",
       "names": [],
       "sources": []
@@ -28729,7 +29517,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocSections"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:275"
+        "packages/experimental/hard-ledger/src/types.ts:372"
       ]
     },
     {
@@ -28749,6 +29537,11 @@
     },
     {
       "digest": "5474d299af5ab983cba2887fb64892438cb689ed05a9a5d1307b6597ee330966",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "54f36275b85fb962e4fa165351038a0507f65691484172f206150c35bb30d6f8",
       "names": [],
       "sources": []
     },
@@ -28836,6 +29629,11 @@
       "sources": []
     },
     {
+      "digest": "59a839f47275e3ddd29ca7093ceb38dd48c587b30f8a309d47d2a6f7200b8cb9",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "5a358384df162f107a1136d8598fc454d2d8a9ae032f871582512da47c9abdd2",
       "names": [],
       "sources": []
@@ -28854,6 +29652,13 @@
       "digest": "5b232a9b9bfcc0fc6794dab7865bcf203a65785c5de5aa647a51228bff628413",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "5b360bae9e362b03ffa41fd2dc90becfc893d7889b47bc7eeb40a01e7ad1eeb7",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:285"
+      ]
     },
     {
       "digest": "5b6fb1f226ff56402db08a6aae82af76100b14056271875f69ec526a1ae05d51",
@@ -28935,6 +29740,11 @@
     },
     {
       "digest": "5f26a6c20b37632f8f57729d171c671def4683d994ac6257a8dffcd855101627",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "5f34fc2646e88019068d8cd6df2cb595bdaa395ce25eb55cac666a9b2de510b9",
       "names": [],
       "sources": []
     },
@@ -29105,6 +29915,15 @@
       ]
     },
     {
+      "digest": "6b3a3aa32ba8c18b67a6137e2dc23b024c03a0e38366366d4b049e2376c8dc7a",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeaturePairResolvedData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:253"
+      ]
+    },
+    {
       "digest": "6b4169b5598d91c5395e36904bf2c73c80c95e2dba9dc33ff5c14a4d72ad0bfb",
       "names": [],
       "sources": []
@@ -29220,7 +30039,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardCoverageCellData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:250"
+        "packages/experimental/hard-ledger/src/types.ts:347"
       ]
     },
     {
@@ -29258,7 +30077,7 @@
       "digest": "71dd87f6cbd59c243864fb06617fe73a121e5f16b27c4ea56d838589389b8c4a",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:271"
+        "packages/experimental/hard-ledger/src/types.ts:368"
       ]
     },
     {
@@ -29365,7 +30184,7 @@
       "digest": "7a560ce8ed648b2fe639a2e5251607d88fce025f31061021635888fd05f362a4",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:272"
+        "packages/experimental/hard-ledger/src/types.ts:369"
       ]
     },
     {
@@ -29390,6 +30209,11 @@
     },
     {
       "digest": "7c380833d2f12d51aac1ee504b3b32c8246ccd7820d5630523fb7dae10fbe7be",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "7c40ecf197d517b5944125e28fa8b626a8c5e387da39ab006148006c451bd08c",
       "names": [],
       "sources": []
     },
@@ -29443,6 +30267,15 @@
       "digest": "7df62978a2b7de8540e714152297743e0a622209a46a5ac9513fc0fad73ca23b",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "7e16b1197b9147e2864e5499237da4c3c08573f7d9af2eccb2c27cde70ceed23",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardEntryDeclaredData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:313"
+      ]
     },
     {
       "digest": "7eaef7a763ba5b949b8464bc8add8980a3a5ab566014b69787aeba71e5dfe07b",
@@ -29501,7 +30334,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlawData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:231"
+        "packages/experimental/hard-ledger/src/types.ts:328"
       ]
     },
     {
@@ -29639,7 +30472,7 @@
       "digest": "84e3f3ee50f8de271682ee6fb6ddc0f487245919dbba6645d90587714e3dc557",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:401"
+        "packages/experimental/hard-ledger/src/types.ts:498"
       ]
     },
     {
@@ -29732,6 +30565,15 @@
       ]
     },
     {
+      "digest": "890a14bd95ec3c1715d2d3230297b1a5dfee91e2327fe92e986f42c8cde712be",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:259",
+        "packages/experimental/hard-ledger/src/types.ts:304",
+        "packages/experimental/hard-ledger/src/types.ts:317"
+      ]
+    },
+    {
       "digest": "8a046b52331959aa3394680d6acbe09b8a5447c6b61375f263445bfcef19b7f1",
       "names": [],
       "sources": []
@@ -29751,6 +30593,15 @@
       "names": [],
       "sources": [
         "packages/interaction/permission-presets/src/index.ts:59"
+      ]
+    },
+    {
+      "digest": "8aa0d4823edfc464e413e3918b2ecd89ba3bf1b0f6c34fa8b0799e2de7d5f7d6",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeaturePairData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:237"
       ]
     },
     {
@@ -29918,7 +30769,7 @@
       "digest": "96341ae7b87eb740d7a1c86fe4dbbd40e031cf755296c2b3e078bb3778fa62a1",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:356"
+        "packages/experimental/hard-ledger/src/types.ts:453"
       ]
     },
     {
@@ -29963,6 +30814,11 @@
       "sources": []
     },
     {
+      "digest": "99486fc87b57092f77c30c87437c329db008cd54ee1b102ea3a46732e8a40582",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "998f22585a5d73ec005365e203f07fc3b3a029e82323fdda3fd7f13b0a9639d0",
       "names": [],
       "sources": []
@@ -29983,7 +30839,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMatrixExclusions"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:375"
+        "packages/experimental/hard-ledger/src/types.ts:472"
       ]
     },
     {
@@ -30034,6 +30890,15 @@
       "digest": "9b4fd974c124c83743efe030ba4e1250e087505f3f74588716a521fb8d453267",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "9b8d7a5ce7afa73cb2b5631ba45888bd1f45ff12d0be043fbed08077593451cd",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardGuardDeclaredData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:301"
+      ]
     },
     {
       "digest": "9ba55f70acec6906e0422c6fba4ac3304042c40b05369b081070f301bcaa8a1e",
@@ -30170,6 +31035,11 @@
       "sources": []
     },
     {
+      "digest": "a18ad55d13f8e0998d2d69c00eea2774e0122ba76e07a6c08c79f8b8400b95dd",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a2066bd52f61218ba15b758def2641cc6a8bd3d4a594a488ee4c65be356d7e39",
       "names": [],
       "sources": []
@@ -30223,6 +31093,11 @@
       "sources": []
     },
     {
+      "digest": "a4cfcf2c6c262dfcae4a01df5a5c4f6194c97931b6592cfbb8536e8a07b7d9d2",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a6070ac85f65889290ca90622dd0f508b6621a74e9b5319ff07ef86442b002d0",
       "names": [],
       "sources": []
@@ -30235,6 +31110,11 @@
       "sources": [
         "packages/experimental/hard-audit/src/domain.ts:71"
       ]
+    },
+    {
+      "digest": "a6384259ba2f6c5060d2f75e2870c281295a97fc395a9ea88f440601dd500d3e",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "a6567ccb2e530606b775371eb4fa31468d72084339968e8b0440a516a23b39dc",
@@ -30288,6 +31168,11 @@
       "sources": [
         "packages/interaction/commands/src/types.ts:105"
       ]
+    },
+    {
+      "digest": "a8928a55a4ac9f2ebfa3b37dc9b2c05b39c344388057488853c5783bec904c50",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "a8a2b9011fc067862df7ce40748868467e5778283d7ac193c13f77684a914c57",
@@ -30394,7 +31279,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardMissionArmedData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:410"
+        "packages/experimental/hard-ledger/src/types.ts:507"
       ]
     },
     {
@@ -30472,6 +31357,11 @@
       ]
     },
     {
+      "digest": "aedb657840c36d84ea7ed5a7ab5bfd137d4a2227fdc8a99cdb17672571f0d6db",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "af0750d32d97d47b12b7361a587db41894b17e04c9a805fe212f0114aa2248c7",
       "names": [],
       "sources": []
@@ -30490,6 +31380,15 @@
       "digest": "b0127044ab31a702bddfd785d345f5abd7a70876746e895ce443afa3e60ddf2d",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "b0556deb09964a7f0640cf07c8dd1cdc0f1674fe629dcddca012d1b6bdfc2bd8",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardAbuseLens"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:269"
+      ]
     },
     {
       "digest": "b062078e899958f99ae464514578b8c093924dfe34bd9a835932b420ff2150b1",
@@ -30566,6 +31465,14 @@
       "sources": []
     },
     {
+      "digest": "b3f5d2ee4233bf39ad22404f5146fe2eed22d8144ecc98c666726d7c98542032",
+      "names": [],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:242",
+        "packages/experimental/hard-ledger/src/types.ts:243"
+      ]
+    },
+    {
       "digest": "b4ec0af39fd52ed971990e42f04e5be3204882e555c409eb330f8238eec21569",
       "names": [],
       "sources": []
@@ -30601,6 +31508,11 @@
     },
     {
       "digest": "b57ae1b37e52bee0a21cbdace168dc6a15582bcda8c306dad962c5dcc8a8e28b",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "b58588396a7ba96286e657fa59679e19a999c29d6b9d08c367fffe11dc8b2bc1",
       "names": [],
       "sources": []
     },
@@ -30686,6 +31598,15 @@
       "sources": []
     },
     {
+      "digest": "b93e26fb71a237a72285d86e6a313a7a3e55dcc2e7225dd36f0ec455375fda41",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardFeatureLinkData"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:216"
+      ]
+    },
+    {
       "digest": "b96d60645e45c6a8c7a7e420b45fe21a033825ff921f1d44e5b7ef01800ea56c",
       "names": [],
       "sources": []
@@ -30762,13 +31683,9 @@
       "sources": []
     },
     {
-      "digest": "be1c4cc34ffa5c0b38370d0af9efddb3ee92a8e8bfe320e516b489c6ba071a5a",
-      "names": [
-        "packages/experimental/hard-ledger/src/types.ts#HardFeatureLinkData"
-      ],
-      "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:216"
-      ]
+      "digest": "bd845519560bd5cbd9e30d74214713da792b9ac9cd446c495a7b22ec36a18f0e",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "bf16d2e98a7f13894ded2cffe5ce857bf473954a0e3c0ed9bc7739e2e1c7b78a",
@@ -30893,7 +31810,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardFlowDocData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:291"
+        "packages/experimental/hard-ledger/src/types.ts:388"
       ]
     },
     {
@@ -30958,11 +31875,6 @@
     },
     {
       "digest": "cd186c309e2bef305705e1d324139240f5e681f4f6a957d6a25b0225f65560df",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "cd4908c1207d6767117f4e09395408db86f453a0cbc398f9ee0593191f876c7a",
       "names": [],
       "sources": []
     },
@@ -31050,6 +31962,15 @@
       "sources": []
     },
     {
+      "digest": "d1650de9c0ad7dd439d88bf646ecb1588ebfbcc1171403831616e5a57714524e",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardAbuseOutcome"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:272"
+      ]
+    },
+    {
       "digest": "d28765f87d6b6ab408e0b2f3e7e297791b004b806d8e302c49903ebae815feb2",
       "names": [],
       "sources": []
@@ -31070,7 +31991,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardTargetSnapshot"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:391"
+        "packages/experimental/hard-ledger/src/types.ts:488"
       ]
     },
     {
@@ -31092,6 +32013,11 @@
     },
     {
       "digest": "d63b8b8ffad9c02fd80c43a17df4f240c1fe8118ecca9de34f9d5871838ab5b9",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "d666933bbcf615e39a2f7358e416218cf954a44b0038c44217af990b85a8a243",
       "names": [],
       "sources": []
     },
@@ -31136,6 +32062,11 @@
     },
     {
       "digest": "db06ef35b27a38425046b2228fa6bce9582abe140d781d363137eb2f4d233a1c",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "db67f8cff514ff6bca932852c4c048643f074bb916c2c4dad91b2b492f54e859",
       "names": [],
       "sources": []
     },
@@ -31245,12 +32176,22 @@
       "sources": []
     },
     {
+      "digest": "e04d313520073bbcb33115172461a24b7185c30cf6d38649730f24c3560b801a",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "e0a787e6ec76c7c94fecbc501b489164ab0293db05bc947914077ad01e674f05",
       "names": [],
       "sources": []
     },
     {
       "digest": "e0a9270a4c677f2f6678b2e5393ac061da56497f45d42cf026b7ae3f6afa2b69",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e1970960d646f6784f36cedd0e538ddfd69493b4004dfaef3b2258b31d50a0be",
       "names": [],
       "sources": []
     },
@@ -31445,11 +32386,21 @@
       ]
     },
     {
+      "digest": "ea5fa056b01f9c556e5580555456691d47cbd59cd06c3f884823f39f6db3cc30",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "eaa71be0fbf0f702df8ea6c11d0aa2f9782263d45a10d0fb14eda662f4bfe04c",
       "names": [],
       "sources": [
         "packages/core/session/src/types.ts:196"
       ]
+    },
+    {
+      "digest": "eacde8a049a74e19c6a7f9dfe7189ef2caf5b549b34dd9d18a8dbffda2ed27ed",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "ebb768d85ec87fb68e42fc14fd7d8535b5ac11791b14d04c6770180f0a719bf8",
@@ -31465,7 +32416,7 @@
       "digest": "ec578de600f5120d345f2b0475aaf4826e9119728460dcd56b6cd3ac5e0c2593",
       "names": [],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:340"
+        "packages/experimental/hard-ledger/src/types.ts:437"
       ]
     },
     {
@@ -31518,6 +32469,15 @@
       "sources": []
     },
     {
+      "digest": "ef5581d97c90c40a6f2c1015f1a2f7822a93e48798e8a32227796e28436e03a4",
+      "names": [
+        "packages/experimental/hard-ledger/src/types.ts#HardGuardCategory"
+      ],
+      "sources": [
+        "packages/experimental/hard-ledger/src/types.ts:229"
+      ]
+    },
+    {
       "digest": "ef9e06e2b7c45cc87ff02598392814e2bdf8b4ff2fbb961c61cd5ea43a1a42d5",
       "names": [
         "packages/experimental/hard-rounds/src/domain.ts#HardStepCapReachedData"
@@ -31555,7 +32515,7 @@
         "packages/experimental/hard-ledger/src/types.ts#HardGateDecisionData"
       ],
       "sources": [
-        "packages/experimental/hard-ledger/src/types.ts:332"
+        "packages/experimental/hard-ledger/src/types.ts:429"
       ]
     },
     {
@@ -31638,6 +32598,11 @@
     },
     {
       "digest": "f4a66f654996c093aae700ea4c434ff2ee3569fea9c0e5813ccf6afdccabd163",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "f4b8f70b4908aa82176551d630e071a8abd305a56c40f96ab9e8d6440c6ad65b",
       "names": [],
       "sources": []
     },

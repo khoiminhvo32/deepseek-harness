@@ -23,8 +23,8 @@ const CALLS: Record<string, string[]> = {
 }
 const FILES: Record<string, string> = { orphan_caller: 'caller.php' }
 const ENTRIES: Record<string, HardEntryPoint> = {
-  'ajax:save': { kind: 'ajax', key: 'save', handler: 'save_handler', file: 'a.php', line: 1, auth: 'authenticated', guards: [] },
-  'ajax:broken': { kind: 'ajax', key: 'broken', handler: null, file: 'a.php', line: 2, auth: 'authenticated', guards: [] },
+  'ajax:save': { kind: 'ajax', key: 'save', handler: 'save_handler', file: 'a.php', line: 1, auth: 'authenticated', guards: [], checks: [] },
+  'ajax:broken': { kind: 'ajax', key: 'broken', handler: null, file: 'a.php', line: 2, auth: 'authenticated', guards: [], checks: [] },
 }
 
 const graph: HardFeatureGraph = {

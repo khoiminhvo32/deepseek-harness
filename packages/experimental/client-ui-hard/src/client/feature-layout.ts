@@ -26,6 +26,8 @@ export interface LayoutNode {
   readonly mapped?: boolean
   /** For the unmapped node: how many entry points no feature covers. */
   readonly count?: number
+  /** For a feature node: whether the feature has an abuse review. */
+  readonly reviewed?: boolean
   readonly x: number
   readonly y: number
 }
@@ -35,7 +37,7 @@ export interface LayoutEdge {
   readonly id: string
   readonly from: string
   readonly to: string
-  readonly kind: 'member' | 'link' | HardEdgeSource
+  readonly kind: 'member' | 'link' | 'harness-link' | HardEdgeSource
   readonly label?: string
 }
 
@@ -85,7 +87,7 @@ function clusterLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: Layou
     const x = (index % CLUSTER_COLUMNS) * CLUSTER_X
     const y = Math.floor(index / CLUSTER_COLUMNS) * CLUSTER_Y
     const featureNode = overviewId('feature', feature.id)
-    nodes.push({ id: featureNode, kind: 'feature', label: `${feature.id} ${feature.name}`, detail: feature.summary, x, y })
+    nodes.push({ id: featureNode, kind: 'feature', label: `${feature.id} ${feature.name}`, detail: feature.summary, reviewed: feature.reviewed, x, y })
     feature.entryPoints.slice(0, CLUSTER_ENTRIES).forEach((key, row) => {
       const id = overviewId('entry', `${feature.id}:${key}`)
       nodes.push({ id, kind: 'entry', label: key, detail: handler.get(key) ?? '', mapped: true, x: x + 24, y: y + ROW + row * ENTRY_ROW })
@@ -99,7 +101,10 @@ function clusterLayout(map: FeatureMapView): { nodes: LayoutNode[]; edges: Layou
   const unmapped = map.entryPoints.filter(entry => !entry.mapped).length
   if (unmapped > 0) nodes.push({ id: UNMAPPED_NODE, kind: 'unmapped', label: '', detail: '', count: unmapped, x: CLUSTER_COLUMNS * CLUSTER_X + 40, y: 0 })
   for (const [index, link] of map.links.entries()) {
-    edges.push({ id: `link:${index}`, from: overviewId('feature', link.from), to: overviewId('feature', link.to), kind: 'link', label: link.kind })
+    edges.push({
+      id: `link:${index}`, from: overviewId('feature', link.from), to: overviewId('feature', link.to),
+      kind: link.source === 'harness' ? 'harness-link' : 'link', label: link.kind,
+    })
   }
   return { nodes, edges }
 }

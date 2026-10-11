@@ -13,6 +13,11 @@ import type {
   HardFeatureData,
   HardFeatureLinkData,
   HardFeatureMapIndexedData,
+  HardFeaturePairData,
+  HardFeaturePairResolvedData,
+  HardFeatureReviewData,
+  HardEntryDeclaredData,
+  HardGuardDeclaredData,
   HardFlawData,
   HardFlowDocData,
   HardGateDecisionData,
@@ -56,6 +61,16 @@ declare module '@deepseek-ai/dsh-session/types' {
     'hard/feature/recorded': HardFeatureData
     /** One relation between two recorded features. */
     'hard/feature/linked': HardFeatureLinkData
+    /** One guard pair the harness derived from the feature map; it stays open until resolved. */
+    'hard/feature/pair': HardFeaturePairData
+    /** How the model closed one guard pair. */
+    'hard/feature/pair/resolved': HardFeaturePairResolvedData
+    /** The model's abuse review of one feature or of features used together; the ledger folds the latest per feature set. */
+    'hard/feature/reviewed': HardFeatureReviewData
+    /** A project-specific guard the model declared with the line where it denies. */
+    'hard/guard/declared': HardGuardDeclaredData
+    /** An entry point the model declared with its dispatch line; it joins the indexed ones. */
+    'hard/entry/declared': HardEntryDeclaredData
     /**
      * One flow document recorded for a module, with every citation already
      * resolved against the pinned commit; the ledger folds it as the durable

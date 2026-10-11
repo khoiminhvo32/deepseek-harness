@@ -27,7 +27,9 @@ import {
   unchainedMaterialFromState,
   uncoveredCellsFromState,
   chainMaterialFromState,
+  DEFAULT_ABUSE_GATE,
   DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
+  HARD_ABUSE_LENSES,
   unmappedEntryPointsFromState,
 } from './aggregate.ts'
 import { classScope } from './scope.ts'
@@ -52,6 +54,12 @@ import type {
   HardFeatureId,
   HardFeatureLinkData,
   HardFeatureMapIndexedData,
+  HardFeaturePairData,
+  HardFeaturePairId,
+  HardFeaturePairResolvedData,
+  HardFeatureReviewData,
+  HardEntryDeclaredData,
+  HardGuardDeclaredData,
   HardFlawData,
   HardFlawId,
   HardFlowDocData,
@@ -85,7 +93,16 @@ export type {
   HardFeatureLinkData,
   HardFeatureLinkKind,
   HardFeatureMapIndexedData,
+  HardFeaturePairData,
+  HardFeaturePairId,
+  HardFeaturePairResolvedData,
+  HardFeatureReviewData,
   HardFeatureRole,
+  HardAbuseLens,
+  HardAbuseOutcome,
+  HardEntryDeclaredData,
+  HardGuardCategory,
+  HardGuardDeclaredData,
   HardFlawData,
   HardFlawId,
   HardFlowDocData,
@@ -118,8 +135,15 @@ export {
   unchainedMaterialFromState,
   uncoveredCellsFromState,
   unmappedEntryPointsFromState,
+  indexedEntryPointsFromState,
 } from './aggregate.ts'
-export { DEFAULT_EMPTY_SWEEPS_TO_FINISH, DEFAULT_MIN_ENTRY_MAPPED_PERCENT, DEFAULT_SCREEN_SPOT_CHECK_PERCENT } from './aggregate.ts'
+export {
+  DEFAULT_ABUSE_GATE,
+  DEFAULT_EMPTY_SWEEPS_TO_FINISH,
+  DEFAULT_MIN_ENTRY_MAPPED_PERCENT,
+  DEFAULT_SCREEN_SPOT_CHECK_PERCENT,
+  HARD_ABUSE_LENSES,
+} from './aggregate.ts'
 export type {
   CompletionAssessment,
   CoverageBySource,
@@ -163,6 +187,11 @@ export interface Config {
    * condition. Without an indexed feature map there is nothing to cover.
    */
   minEntryMappedPercent?: number
+  /**
+   * Whether unresolved guard pairs, features without an abuse review, and
+   * linked features without a combined review hold the completion gate.
+   */
+  abuseGate?: boolean
 }
 
 /** Schemastery config for the ledger service. */
@@ -170,6 +199,7 @@ export const Config: z<Config> = z.object({
   screenSpotCheckPercent: z.number().step(1).min(0).max(100).default(DEFAULT_SCREEN_SPOT_CHECK_PERCENT),
   emptySweepsToFinish: z.number().step(1).min(0).max(16).default(DEFAULT_EMPTY_SWEEPS_TO_FINISH),
   minEntryMappedPercent: z.number().step(1).min(0).max(100).default(DEFAULT_MIN_ENTRY_MAPPED_PERCENT),
+  abuseGate: z.boolean().default(DEFAULT_ABUSE_GATE),
 })
 
 /** Fully materialized ledger settings. */
@@ -177,6 +207,7 @@ interface ResolvedConfig {
   readonly screenSpotCheckPercent: number
   readonly emptySweepsToFinish: number
   readonly minEntryMappedPercent: number
+  readonly abuseGate: boolean
 }
 
 /** Validate config even when apply is called directly outside Loader normalization. */
@@ -193,7 +224,13 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isSafeInteger(minEntryMappedPercent) || minEntryMappedPercent < 0 || minEntryMappedPercent > 100) {
     throw new TypeError('minEntryMappedPercent must be a safe integer from 0 through 100')
   }
-  return { screenSpotCheckPercent, emptySweepsToFinish, minEntryMappedPercent }
+  return { screenSpotCheckPercent, emptySweepsToFinish, minEntryMappedPercent, abuseGate: config.abuseGate ?? DEFAULT_ABUSE_GATE }
+}
+
+/** Re-shape one folded resolution so its optional fields drop their `| undefined`. */
+function optionalResolution(resolution: NonNullable<NonNullable<HardLedgerProjectionState['featurePairs']>[number]['resolution']>): Omit<HardFeaturePairResolvedData, 'id'> {
+  const { ref, cite, ...rest } = resolution
+  return { ...rest, ...ref === undefined ? {} : { ref }, ...cite === undefined ? {} : { cite } }
 }
 
 /** Maximum characters retained for bounded reason and statement text. */
@@ -595,7 +632,7 @@ export class HardLedger extends Service {
    * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link,
    *   or a text error for a blank note.
    */
-  linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string }): void {
+  linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string; source?: 'model' | 'harness' }): void {
     this.assertText('note', request.note)
     const known = new Set((this.state(agent.session).features ?? []).map(feature => feature.id))
     const unknown = [request.from, request.to].filter(id => !known.has(id))
@@ -606,7 +643,174 @@ export class HardLedger extends Service {
       to: brandString<HardFeatureId>(request.to),
       kind: request.kind,
       note: request.note,
+      ...request.source === undefined ? {} : { source: request.source },
     })
+  }
+
+  /**
+   * Append one guard pair the feature map derived, unless the session already
+   * holds a pair for the same weaker entry point and guard category.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the pair without its id.
+   * @returns the new `P-n` id, or undefined when the pair is already recorded.
+   */
+  recordFeaturePair(agent: Agent, request: Omit<HardFeaturePairData, 'id'>): HardFeaturePairId | undefined {
+    const pairs = this.state(agent.session).featurePairs ?? []
+    if (pairs.some(pair => pair.weaker.entry === request.weaker.entry && pair.category === request.category)) return undefined
+    const id = brandString<HardFeaturePairId>(`P-${pairs.length + 1}`)
+    agent.session.append('hard/feature/pair', {
+      id,
+      category: request.category,
+      states: [...request.states],
+      weaker: { ...request.weaker },
+      stronger: { ...request.stronger },
+      missing: [...request.missing],
+    })
+    return id
+  }
+
+  /**
+   * Append how the model closed one guard pair; a later resolution replaces an earlier one.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the pair id, the outcome, its reference or citation, and the reason.
+   * @throws `HARD_LEDGER_UNKNOWN_PAIR` for an id never recorded, `HARD_LEDGER_INVALID_RESOLUTION` for a
+   *   missing or unknown reference or a `safe` outcome without a citation, or a text error for a blank reason.
+   */
+  resolveFeaturePair(agent: Agent, request: { id: string; outcome: HardFeaturePairResolvedData['outcome']; ref?: string; cite?: { file: string; line: number }; reason: string }): void {
+    this.assertText('reason', request.reason)
+    if (!(this.state(agent.session).featurePairs ?? []).some(pair => pair.id === request.id)) {
+      throw new HarnessError(`unknown guard pair id ${request.id}`, 'HARD_LEDGER_UNKNOWN_PAIR')
+    }
+    if (request.outcome === 'safe') {
+      if (request.cite === undefined) throw new HarnessError('a safe resolution cites the check that covers the weaker path', 'HARD_LEDGER_INVALID_RESOLUTION')
+    } else {
+      this.assertReference(agent, request.outcome, request.ref, 'HARD_LEDGER_INVALID_RESOLUTION')
+    }
+    agent.session.append('hard/feature/pair/resolved', {
+      id: brandString<HardFeaturePairId>(request.id),
+      outcome: request.outcome,
+      ...request.outcome === 'safe' ? {} : { ref: request.ref },
+      ...request.outcome === 'safe' && request.cite !== undefined ? { cite: { ...request.cite } } : {},
+      reason: request.reason,
+    })
+  }
+
+  /**
+   * Append the model's abuse review of one feature, or of features used together.
+   * @param agent - the live agent whose session receives the record.
+   * @param request - the reviewed feature ids and the questions with where each led.
+   * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_REVIEW` for a repeated
+   *   feature, a single-feature review that skips a lens, an empty review, or a missing or unknown reference,
+   *   or a text error for a blank question or reason.
+   */
+  reviewFeatures(agent: Agent, request: { features: readonly string[]; cases: HardFeatureReviewData['cases'] }): void {
+    const known = new Set((this.state(agent.session).features ?? []).map(feature => feature.id))
+    const unknown = request.features.filter(id => !known.has(id))
+    if (unknown.length > 0) throw new HarnessError(`unknown feature id ${unknown.join(', ')}`, 'HARD_LEDGER_UNKNOWN_FEATURE')
+    const features = [...new Set(request.features)].sort()
+    if (features.length !== request.features.length || features.length === 0) {
+      throw new HarnessError('a review names one feature or several distinct features', 'HARD_LEDGER_INVALID_REVIEW')
+    }
+    if (request.cases.length === 0) throw new HarnessError('a review asks at least one question', 'HARD_LEDGER_INVALID_REVIEW')
+    if (features.length === 1) {
+      const missing = HARD_ABUSE_LENSES.filter(lens => !request.cases.some(entry => entry.lens === lens))
+      if (missing.length > 0) {
+        throw new HarnessError(`a single-feature review asks about every lens; missing: ${missing.join(', ')}`, 'HARD_LEDGER_INVALID_REVIEW')
+      }
+    }
+    for (const entry of request.cases) {
+      this.assertText('question', entry.question)
+      this.assertText('reason', entry.reason)
+      if (entry.outcome !== 'refuted' && entry.outcome !== 'not-applicable') this.assertReference(agent, entry.outcome, entry.ref, 'HARD_LEDGER_INVALID_REVIEW')
+    }
+    agent.session.append('hard/feature/reviewed', {
+      features: features.map(id => brandString<HardFeatureId>(id)),
+      cases: request.cases.map(entry => ({
+        lens: entry.lens,
+        question: entry.question,
+        outcome: entry.outcome,
+        ...entry.ref === undefined || entry.outcome === 'refuted' || entry.outcome === 'not-applicable' ? {} : { ref: entry.ref },
+        reason: entry.reason,
+      })),
+    })
+  }
+
+  /**
+   * Append a project-specific guard the caller read at the pinned commit; declaring the same symbol again replaces it.
+   * @param agent - the live agent whose session receives the record.
+   * @param data - the guard symbol, its category, the line where it denies, and a note.
+   */
+  declareGuard(agent: Agent, data: HardGuardDeclaredData): void {
+    this.assertText('symbol', data.symbol)
+    this.assertText('note', data.note)
+    agent.session.append('hard/guard/declared', { symbol: data.symbol, category: data.category, cite: { ...data.cite }, note: data.note })
+  }
+
+  /**
+   * Append an entry point the caller read at the pinned commit; declaring the same key again replaces it.
+   * @param agent - the live agent whose session receives the record.
+   * @param data - the `custom:` key, the handler, who may call it, and the dispatch line.
+   */
+  declareEntryPoint(agent: Agent, data: HardEntryDeclaredData): void {
+    this.assertText('key', data.key)
+    this.assertText('handler', data.handler)
+    agent.session.append('hard/entry/declared', { key: data.key, handler: data.handler, auth: data.auth, cite: { ...data.cite } })
+  }
+
+  /**
+   * Guard pairs in record order, each with its latest resolution.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per pair.
+   */
+  featurePairs(agent: Agent): readonly (HardFeaturePairData & { readonly resolution?: Omit<HardFeaturePairResolvedData, 'id'> })[] {
+    return (this.state(agent.session).featurePairs ?? []).map(({ id, weaker, stronger, resolution, ...rest }) => ({
+      ...rest,
+      id: brandString<HardFeaturePairId>(id),
+      weaker: { entry: weaker.entry, feature: brandString<HardFeatureId>(weaker.feature) },
+      stronger: { entry: stronger.entry, feature: brandString<HardFeatureId>(stronger.feature) },
+      ...resolution === undefined ? {} : { resolution: optionalResolution(resolution) },
+    }))
+  }
+
+  /**
+   * The latest abuse review of every reviewed feature set, in record order.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per feature set.
+   */
+  featureReviews(agent: Agent): readonly HardFeatureReviewData[] {
+    return (this.state(agent.session).featureReviews ?? []).map(review => ({
+      features: review.features.map(id => brandString<HardFeatureId>(id)),
+      cases: review.cases.map(({ ref, ...entry }) => ({ ...entry, ...ref === undefined ? {} : { ref } })),
+    }))
+  }
+
+  /**
+   * The guards the model declared, the latest per symbol.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per declared guard.
+   */
+  declaredGuards(agent: Agent): readonly HardGuardDeclaredData[] {
+    return this.state(agent.session).declaredGuards ?? []
+  }
+
+  /**
+   * The entry points the model declared, the latest per key.
+   * @param agent - the live agent whose ledger state is read.
+   * @returns one record per declared entry point.
+   */
+  declaredEntryPoints(agent: Agent): readonly HardEntryDeclaredData[] {
+    return this.state(agent.session).declaredEntries ?? []
+  }
+
+  /** Require a finding, hypothesis, or weakness id the session holds for the outcome that names it. */
+  private assertReference(agent: Agent, outcome: 'finding' | 'hypothesis' | 'weakness', ref: string | undefined, code: string): void {
+    const state = this.state(agent.session)
+    const known = outcome === 'finding'
+      ? state.findings.some(entry => entry.proposed.id === ref)
+      : outcome === 'hypothesis'
+        ? state.hypotheses.some(hypothesis => hypothesis.id === ref)
+        : (state.flaws ?? []).some(flaw => flaw.id === ref)
+    if (!known) throw new HarnessError(`outcome ${outcome} needs the id of a recorded ${outcome}; got ${ref ?? 'none'}`, code)
   }
 
   /**
@@ -628,10 +832,11 @@ export class HardLedger extends Service {
    * @returns one record per relation.
    */
   featureLinks(agent: Agent): readonly HardFeatureLinkData[] {
-    return (this.state(agent.session).featureLinks ?? []).map(link => ({
+    return (this.state(agent.session).featureLinks ?? []).map(({ source, ...link }) => ({
       ...link,
       from: brandString<HardFeatureId>(link.from),
       to: brandString<HardFeatureId>(link.to),
+      ...source === undefined ? {} : { source },
     }))
   }
 

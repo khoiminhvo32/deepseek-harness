@@ -180,11 +180,11 @@ function typeAnnotationsOf(model: FactModel, method: MethodFact): readonly HardC
 }
 
 function route(verb: string, path: string, method: MethodFact, guards: string[], open: boolean): HardEntryPoint {
-  return { kind: 'http', key: `${verb} ${path}`, handler: method.id, file: method.file, line: method.line, auth: authOf(guards, open), guards }
+  return { kind: 'http', key: `${verb} ${path}`, handler: method.id, file: method.file, line: method.line, auth: authOf(guards, open), guards, checks: [] }
 }
 
 function routeAt(verb: string, path: string, handler: string | null, call: CallFact, guards: string[], open: boolean): HardEntryPoint {
-  return { kind: 'http', key: `${verb} ${path}`, handler, file: call.file, line: call.line, auth: authOf(guards, open), guards }
+  return { kind: 'http', key: `${verb} ${path}`, handler, file: call.file, line: call.line, auth: authOf(guards, open), guards, checks: [] }
 }
 
 function authOf(guards: readonly string[], open: boolean): HardEntryAuth {

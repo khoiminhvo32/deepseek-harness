@@ -66,7 +66,7 @@ export interface HardHook {
  * action, a WordPress REST controller handler, a shortcode, a directly
  * requested script's top-level code, or a framework HTTP route.
  */
-export type HardEntryKind = 'ajax' | 'admin-post' | 'rest' | 'shortcode' | 'script' | 'http'
+export type HardEntryKind = 'ajax' | 'admin-post' | 'rest' | 'shortcode' | 'script' | 'http' | 'custom'
 /** Who the routing itself admits; `unknown` leaves the decision to the handler. */
 export type HardEntryAuth = 'public' | 'authenticated' | 'unknown'
 
@@ -83,6 +83,8 @@ export interface HardEntryPoint {
   readonly line: number | null
   readonly auth: HardEntryAuth
   readonly guards: readonly string[]
+  /** Symbols the framework runs before the handler to admit the request, such as a REST permission callback. */
+  readonly checks: readonly string[]
 }
 
 /**
@@ -190,7 +192,9 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     const route = HOOK_ENTRY_PREFIXES.find(entry => name.startsWith(entry.prefix))
     if (route === undefined) continue
     const key = name.slice(route.prefix.length)
-    entries.push({ kind: route.kind, key, handler: hook.callback, file: hook.file, line: hook.line, auth: route.auth, guards: [] })
+    entries.push({
+      kind: route.kind, key, handler: hook.callback, file: hook.file, line: hook.line, auth: route.auth, guards: [], checks: [],
+    })
   }
   // Core registers most admin-ajax actions in a loop with a computed hook name
   // and the handler `wp_ajax_` plus the action, so a free function named by
@@ -201,7 +205,7 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     const route = HOOK_ENTRY_PREFIXES.find(entry => entry.kind === 'ajax' && method.id.startsWith(entry.prefix))
     if (route === undefined) continue
     const key = method.id.slice(route.prefix.length)
-    entries.push({ kind: 'ajax', key, handler: method.id, file: method.file, line: method.line, auth: route.auth, guards: [] })
+    entries.push({ kind: 'ajax', key, handler: method.id, file: method.file, line: method.line, auth: route.auth, guards: [], checks: [] })
   }
   model.calls.forEach((call) => {
     if (call.name !== 'add_shortcode') return
@@ -209,17 +213,22 @@ export function wordpressEntryPoints(model: FactModel, hooks: readonly HardHook[
     const tag = first !== undefined && 'lit' in first ? phpString(first.lit) : undefined
     if (tag === undefined) return
     const handler = resolveCallback(model, call.args[1], call.caller) ?? null
-    entries.push({ kind: 'shortcode', key: tag, handler, file: call.file, line: call.line, auth: 'public', guards: [] })
+    entries.push({ kind: 'shortcode', key: tag, handler, file: call.file, line: call.line, auth: 'public', guards: [], checks: [] })
   })
   for (const method of model.methods.values()) {
     if (method.owner === null || !REST_HANDLERS.has(method.name)) continue
     if (!lineage(model, method.owner).slice(1).includes(REST_CONTROLLER)) continue
-    entries.push({ kind: 'rest', key: method.id, handler: method.id, file: method.file, line: method.line, auth: 'unknown', guards: [] })
+    // The REST server runs `<handler>_permissions_check` before the handler; it may be inherited.
+    const check = findMethod(model, method.owner, `${method.name}_permissions_check`)
+    entries.push({
+      kind: 'rest', key: method.id, handler: method.id, file: method.file, line: method.line, auth: 'unknown', guards: [],
+      checks: check === undefined ? [] : [check],
+    })
   }
   const dirs = new Set(scriptDirs)
   for (const path of new Set(model.files)) {
     if (!path.endsWith('.php') || !dirs.has(dirname(path))) continue
-    entries.push({ kind: 'script', key: path, handler: model.fileLevel.get(path) ?? null, file: path, line: null, auth: 'unknown', guards: [] })
+    entries.push({ kind: 'script', key: path, handler: model.fileLevel.get(path) ?? null, file: path, line: null, auth: 'unknown', guards: [], checks: [] })
   }
   return entries
 }

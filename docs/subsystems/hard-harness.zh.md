@@ -91,6 +91,21 @@ async featureGraph(agent: Agent, featureId: string): Promise<HardFeatureGraphVie
 async symbolDetail(agent: Agent, symbol: string): Promise<HardSymbolDetail | undefined>
 
 /**
+ * The check policy of one session: the configured guards plus the guards the model declared.
+ * @param agent - an agent whose session armed a hard mission.
+ * @returns the policy.
+ */
+policyOf(agent: Agent): HardFeaturePolicy
+
+/**
+ * Derive the guard pairs among the entry points of recorded features, record the new ones, and link
+ * the two features of each new pair with a harness `shares-state` relation unless one already joins them.
+ * @param agent - an agent whose session recorded features.
+ * @returns the ids of the pairs this call recorded.
+ */
+async derivePairs(agent: Agent): Promise<string[]>
+
+/**
  * Every edge into a symbol of one snapshot.
  * @param snapshot - snapshot id from {@link index}.
  * @param symbol - callee symbol id.
@@ -201,7 +216,77 @@ recordFeature(agent: Agent, request: Omit<HardFeatureData, 'id'> & { id?: string
  * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_FEATURE_LINK` for a self link,
  *   or a text error for a blank note.
  */
-linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string }): void
+linkFeature(agent: Agent, request: { from: string; to: string; kind: HardFeatureLinkData['kind']; note: string; source?: 'model' | 'harness' }): void
+
+/**
+ * Append one guard pair the feature map derived, unless the session already
+ * holds a pair for the same weaker entry point and guard category.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the pair without its id.
+ * @returns the new `P-n` id, or undefined when the pair is already recorded.
+ */
+recordFeaturePair(agent: Agent, request: Omit<HardFeaturePairData, 'id'>): HardFeaturePairId | undefined
+
+/**
+ * Append how the model closed one guard pair; a later resolution replaces an earlier one.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the pair id, the outcome, its reference or citation, and the reason.
+ * @throws `HARD_LEDGER_UNKNOWN_PAIR` for an id never recorded, `HARD_LEDGER_INVALID_RESOLUTION` for a
+ *   missing or unknown reference or a `safe` outcome without a citation, or a text error for a blank reason.
+ */
+resolveFeaturePair(agent: Agent, request: { id: string; outcome: HardFeaturePairResolvedData['outcome']; ref?: string; cite?: { file: string; line: number }; reason: string }): void
+
+/**
+ * Append the model's abuse review of one feature, or of features used together.
+ * @param agent - the live agent whose session receives the record.
+ * @param request - the reviewed feature ids and the questions with where each led.
+ * @throws `HARD_LEDGER_UNKNOWN_FEATURE` for an id never recorded, `HARD_LEDGER_INVALID_REVIEW` for a repeated
+ *   feature, a single-feature review that skips a lens, an empty review, or a missing or unknown reference,
+ *   or a text error for a blank question or reason.
+ */
+reviewFeatures(agent: Agent, request: { features: readonly string[]; cases: HardFeatureReviewData['cases'] }): void
+
+/**
+ * Append a project-specific guard the caller read at the pinned commit; declaring the same symbol again replaces it.
+ * @param agent - the live agent whose session receives the record.
+ * @param data - the guard symbol, its category, the line where it denies, and a note.
+ */
+declareGuard(agent: Agent, data: HardGuardDeclaredData): void
+
+/**
+ * Append an entry point the caller read at the pinned commit; declaring the same key again replaces it.
+ * @param agent - the live agent whose session receives the record.
+ * @param data - the `custom:` key, the handler, who may call it, and the dispatch line.
+ */
+declareEntryPoint(agent: Agent, data: HardEntryDeclaredData): void
+
+/**
+ * Guard pairs in record order, each with its latest resolution.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per pair.
+ */
+featurePairs(agent: Agent): readonly (HardFeaturePairData & { readonly resolution?: Omit<HardFeaturePairResolvedData, 'id'> })[]
+
+/**
+ * The latest abuse review of every reviewed feature set, in record order.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per feature set.
+ */
+featureReviews(agent: Agent): readonly HardFeatureReviewData[]
+
+/**
+ * The guards the model declared, the latest per symbol.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per declared guard.
+ */
+declaredGuards(agent: Agent): readonly HardGuardDeclaredData[]
+
+/**
+ * The entry points the model declared, the latest per key.
+ * @param agent - the live agent whose ledger state is read.
+ * @returns one record per declared entry point.
+ */
+declaredEntryPoints(agent: Agent): readonly HardEntryDeclaredData[]
 
 /**
  * The latest record of every feature, in first-record order.

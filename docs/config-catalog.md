@@ -1126,7 +1126,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-featuremap`
 
 - `inject`: `agents` · `hardLedger` · `hardCpg` · `shell` · `tools` · `systemPrompt`
-- `source`: [`packages/experimental/hard-featuremap/src/index.ts:128`](../packages/experimental/hard-featuremap/src/index.ts)
+- `source`: [`packages/experimental/hard-featuremap/src/index.ts:141`](../packages/experimental/hard-featuremap/src/index.ts)
 
 ```ts config-catalog
 /** Feature map plugin config. */
@@ -1157,6 +1157,12 @@ export interface Config {
   guards?: string[]
   /** Names of state-writing symbols a feature must account for when reached; empty selects the WordPress list when its profile is on. */
   mutations?: string[]
+  /** Case-insensitive pattern of guard names that check request forgery. */
+  csrfGuardPattern?: string
+  /** Case-insensitive pattern of guard names that check who the caller is; other guards check what the caller may do. */
+  authenticationGuardPattern?: string
+  /** Case-insensitive pattern of symbol names hard_query_map suggests as guard candidates. */
+  guardCandidatePattern?: string
 }
 
 /** A framework profile that reads entry points: WordPress, or one of the HTTP route profiles. */
@@ -1190,7 +1196,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-hard-ledger`
 
 - `inject`: `sessionProjections`
-- `source`: [`packages/experimental/hard-ledger/src/index.ts:143`](../packages/experimental/hard-ledger/src/index.ts)
+- `source`: [`packages/experimental/hard-ledger/src/index.ts:167`](../packages/experimental/hard-ledger/src/index.ts)
 
 ```ts config-catalog
 /** Ledger service config. */
@@ -1217,6 +1223,11 @@ export interface Config {
    * condition. Without an indexed feature map there is nothing to cover.
    */
   minEntryMappedPercent?: number
+  /**
+   * Whether unresolved guard pairs, features without an abuse review, and
+   * linked features without a combined review hold the completion gate.
+   */
+  abuseGate?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hard-ledger -->

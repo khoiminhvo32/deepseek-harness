@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-为 Web 组合的 profile 开启 hard bundle：该组合包会在九个 hard 插件旁挂载本面板，且仅在那里挂载——headless 组合会禁用该行。Web Client 加载器挂载 `/client` 导出；根 Host 导出为惰性，本包没有用户配置字段。
+面板挂载期间，侧栏品牌显示 Meebard Harness，而不是本地构建的默认名称。为 Web 组合的 profile 开启 hard bundle：该组合包会在九个 hard 插件旁挂载本面板，且仅在那里挂载——headless 组合会禁用该行。Web Client 加载器挂载 `/client` 导出；根 Host 导出为惰性，本包没有用户配置字段。
 
 <a id="open-the-panel"></a>
 ### 打开面板

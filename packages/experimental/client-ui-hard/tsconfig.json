@@ -11,6 +11,7 @@
     { "path": "../../client/store" },
     { "path": "../../client/ui-primitives" },
     { "path": "../../client/ui-session" },
+    { "path": "../../client/ui-sidebar" },
     { "path": "../../client/ui-sidebar-right" },
     { "path": "../../client/ui-slots" },
     { "path": "../hard-featuremap" },

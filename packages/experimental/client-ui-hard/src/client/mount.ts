@@ -5,8 +5,10 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // ctx.slots lives on the renderer's Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import { MeebardBrandName } from './Brand.tsx'
 import { CoverageMatrix } from './CoverageMatrix.tsx'
 import { FeatureMap } from './FeatureMap.tsx'
 import { en, NS, zh, type HardKey } from './locales.ts'
@@ -66,8 +68,9 @@ export function featureMapDefinition(t: TranslateNS<typeof NS>): SidebarRightTab
 }
 
 /**
- * Register the hard-harness locale dictionaries, the coverage and feature map
- * tab types (each guide capsule is a doorway), and their keyed tab bodies. The bodies read the
+ * Register the hard-harness locale dictionaries, the Meebard Harness name in
+ * the sidebar brand slot, the coverage and feature map tab types (each guide
+ * capsule is a doorway), and their keyed tab bodies. The bodies read the
  * Session's `hardLedger` projection from the shared Session store; the
  * feature map body also fetches symbol graphs from the hard-featuremap Host
  * routes. This registration performs no ledger RPC.
@@ -82,6 +85,7 @@ export function registerHardUi(ctx: ClientContext): void {
     name: 'sidebar.right.pane.tab', key: id, locale: NS,
     inject: () => ({ hooks: {} }),
   }, CoverageMatrix))
+  ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: NS }, MeebardBrandName))
   ctx.effect(() => ctx.sidebarRightTabs.register(featureMapDefinition(t)), 'client-ui-hard: feature map tab')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: FEATURE_MAP_TAB, locale: NS,

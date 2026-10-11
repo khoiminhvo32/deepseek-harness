@@ -3,6 +3,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { apply } from '../src/client/index.ts'
 import { CoverageMatrix } from '../src/client/CoverageMatrix.tsx'
 import { FeatureMap } from '../src/client/FeatureMap.tsx'
+import { MeebardBrandName } from '../src/client/Brand.tsx'
 import { en, NS, zh } from '../src/client/locales.ts'
 
 describe('registerHardUi', () => {
@@ -10,7 +11,7 @@ describe('registerHardUi', () => {
     const effects: string[] = []
     type Tab = { kind: string; title: () => string; guide: { title: () => string; description: () => string }[] }
     const tabs: Tab[] = []
-    const bodies: { key: string; component: unknown; shares: object }[] = []
+    const bodies: { key?: string; name: string; component: unknown; shares?: object }[] = []
     const locale = { register: vi.fn(() => () => {}), bind: () => (key: string) => `t:${key}` }
     const ctx = {
       effect: (run: () => () => void, label: string) => {
@@ -28,8 +29,9 @@ describe('registerHardUi', () => {
         inject: (_name: string, run: () => void) => {
           run()
         },
-        register: (seat: { key: string; inject: () => object }, component: unknown) => {
-          bodies.push({ key: seat.key, component, shares: seat.inject() })
+        register: (seat: { key?: string; name: string; inject?: () => object }, component: unknown) => {
+          const shares = seat.inject === undefined ? {} : { shares: seat.inject() }
+          bodies.push({ ...seat.key === undefined ? {} : { key: seat.key }, name: seat.name, component, ...shares })
           return () => {}
         },
       },
@@ -42,8 +44,9 @@ describe('registerHardUi', () => {
       ['hard-feature-map', 't:map.tab.title', 't:map.guide.title', 't:map.guide.description'],
     ])
     expect(bodies).toEqual([
-      { key: '@deepseek-ai/dsh-experimental-client-ui-hard/coverage', component: CoverageMatrix, shares: { hooks: {} } },
-      { key: '@deepseek-ai/dsh-experimental-client-ui-hard/feature-map', component: FeatureMap, shares: { hooks: {} } },
+      { key: '@deepseek-ai/dsh-experimental-client-ui-hard/coverage', name: 'sidebar.right.pane.tab', component: CoverageMatrix, shares: { hooks: {} } },
+      { name: 'sidebar.brand.name', component: MeebardBrandName },
+      { key: '@deepseek-ai/dsh-experimental-client-ui-hard/feature-map', name: 'sidebar.right.pane.tab', component: FeatureMap, shares: { hooks: {} } },
     ])
   })
 })

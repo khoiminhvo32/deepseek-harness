@@ -25,7 +25,7 @@ This package adds two right-sidebar tabs to the Web client for hard-harness sess
 <a id="use-this-package"></a>
 ## Use this package
 
-Switch the hard bundle on for a Web-composition profile: the bundle mounts this panel beside the nine hard plugins, and only there — a headless composition disables the row. The Web Client loader mounts the `/client` export; the root Host export is inert, and the package has no user configuration fields.
+While the panel is mounted, the sidebar brand reads Meebard Harness instead of the local-build fallback. Switch the hard bundle on for a Web-composition profile: the bundle mounts this panel beside the nine hard plugins, and only there — a headless composition disables the row. The Web Client loader mounts the `/client` export; the root Host export is inert, and the package has no user configuration fields.
 
 ### Open the panel
 
